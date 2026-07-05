@@ -83,6 +83,11 @@ mastr gasverbrauch --sort "Bruttoleistung-desc" --page-size 10 --compact | jq '.
 
 ## Notes
 
+- **A wrong `--sort` field returns 0 results, not an error.** An unknown sort column
+  key makes the server answer with zero rows (`total: 0`), which reads like "no
+  matches". If a query returns 0 only after you add `--sort`, check the column key —
+  the CLI prints a note to stderr in this case. (Contrast `--filter`, where a wrong
+  field is silently *ignored* and you get the unfiltered set.)
 - **Dates** are Microsoft `/Date(ms)/` strings; `--iso-dates` converts them, or use the
   library's `parseMsDate()`.
 - **You cannot sum capacity server-side** — there is no aggregate endpoint. Use `--total`

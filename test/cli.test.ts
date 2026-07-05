@@ -69,6 +69,19 @@ test("a logical Errors envelope surfaces as an error (exit 1)", async () => {
   assert.match(cli.err.join("\n"), /Die Anfrage ist Null/);
 });
 
+test("0 results with --sort set prints a note about the likely bad sort field", async () => {
+  const cli = makeCli(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
+  const code = await run(["stromerzeugung", "--sort", "BogusField-desc", "--total"], cli.deps);
+  assert.equal(code, 0);
+  assert.match(cli.err.join("\n"), /0 results with --sort/);
+});
+
+test("0 results WITHOUT --sort prints no such note", async () => {
+  const cli = makeCli(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
+  await run(["stromerzeugung", "--total"], cli.deps);
+  assert.doesNotMatch(cli.err.join("\n"), /--sort/);
+});
+
 test("filters <category> hits GetFilterColumns and renders the columns", async () => {
   const cli = makeCli(() => jsonResponse(fx.filterColumns));
   const code = await run(["filters", "gaserzeugung"], cli.deps);

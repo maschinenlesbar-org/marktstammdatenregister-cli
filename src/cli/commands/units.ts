@@ -49,6 +49,14 @@ export function registerCommands(program: Command, deps: CliDeps): void {
       .action(
         action(deps, async ({ client, global, opts }) => {
           const page = await RUN[cat.name](client, buildQuery(opts));
+          // An unknown --sort field makes the server return 0 rows (not an error),
+          // which reads like "no matches". Nudge the user toward the likely cause.
+          if (page.total === 0 && typeof opts["sort"] === "string") {
+            deps.io.err(
+              "Note: 0 results with --sort set — an unknown sort field returns 0 rows; " +
+                "verify the sort column key (see `mastr filters`).",
+            );
+          }
           renderJson(deps, global, opts["total"] === true ? page.total : page);
         }),
       );
