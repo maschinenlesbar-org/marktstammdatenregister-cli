@@ -31,10 +31,12 @@ test("stromerzeugung renders { total, data } and hits the endpoint", async () =>
   assert.equal(parsed.data.length, 2);
 });
 
-test("--total prints only the count", async () => {
+test("--total prints only the count and fetches just 1 row (pageSize=1)", async () => {
   const cli = makeCli(() => jsonResponse(fx.unitPage));
-  await run(["stromerzeugung", "--total"], cli.deps);
+  await run(["stromerzeugung", "--total", "--page-size", "500"], cli.deps);
   assert.equal(JSON.parse(cli.out.join("\n")), 9063887);
+  // --total overrides page size to 1 so the count query never pulls a full page.
+  assert.equal(queryOf(cli.mt.last()).get("pageSize"), "1");
 });
 
 test("--page/--page-size/--sort/--filter are forwarded", async () => {

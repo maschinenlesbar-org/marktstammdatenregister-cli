@@ -29,6 +29,9 @@ function buildQuery(opts: Record<string, unknown>): UnitQuery {
   if (typeof opts["pageSize"] === "number") q.pageSize = opts["pageSize"];
   if (typeof opts["sort"] === "string") q.sort = opts["sort"];
   if (typeof opts["filter"] === "string") q.filter = opts["filter"];
+  // `--total` needs only the match count (returned regardless of page size), so
+  // request a single row instead of fetching and discarding a full page.
+  if (opts["total"] === true) q.pageSize = 1;
   return q;
 }
 
