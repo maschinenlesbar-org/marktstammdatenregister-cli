@@ -57,6 +57,9 @@ mastr stromerzeugung --filter "Energieträger~eq~'2495'~and~Betriebs-Status~eq~'
 ## Sorting
 
 `--sort "FieldKey-asc"` or `--sort "FieldKey-desc"`, e.g. `--sort "Bruttoleistung-desc"`.
+**A wrong sort key is worse than a wrong filter: it returns 0 rows** (not an error, not
+the unfiltered set), so a query that goes to `total: 0` right after you add `--sort`
+almost always has a bad sort key.
 
 ## Traps
 

@@ -62,5 +62,8 @@ mastr stromerzeugung --page 2 --page-size 100 --compact
 - **`--page-size` is capped at 5000.** For big pulls, page; don't crank it arbitrarily.
 - **Filtering needs the exact FilterName + code** — resolve them with **mastr-filters**;
   a wrong field name is ignored and you silently get the unfiltered total.
+- **A wrong `--sort` field returns 0 rows, not an error.** If a query drops to
+  `total: 0` only after you add `--sort`, the sort column key is probably wrong (the
+  CLI prints a stderr note) — verify it against `mastr filters`.
 - **Reading a record** (fields, dates, anonymisation) → the **mastr-unit** skill.
 - Cite the source: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0).
