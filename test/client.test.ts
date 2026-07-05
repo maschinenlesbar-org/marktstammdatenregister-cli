@@ -95,3 +95,10 @@ test("isoifyDates recursively rewrites /Date(ms)/ strings", () => {
     e: 5,
   });
 });
+
+test("isoifyDates leaves an out-of-range /Date(ms)/ as-is instead of throwing", () => {
+  // 1e20 ms is far outside the valid Date range -> Invalid Date; must not throw.
+  const bad = "/Date(99999999999999999999)/";
+  assert.doesNotThrow(() => isoifyDates({ x: bad }));
+  assert.deepEqual(isoifyDates({ x: bad }), { x: bad });
+});

@@ -48,7 +48,9 @@ export function parseMsDate(value: string): Date | null {
 export function isoifyDates<T>(value: T): T {
   if (typeof value === "string") {
     const d = parseMsDate(value);
-    return (d ? d.toISOString() : value) as unknown as T;
+    // An out-of-range milliseconds value yields an Invalid Date (a truthy object);
+    // guard against it so `.toISOString()` never throws — leave the string as-is.
+    return (d && !Number.isNaN(d.getTime()) ? d.toISOString() : value) as unknown as T;
   }
   if (Array.isArray(value)) {
     return value.map((v) => isoifyDates(v)) as unknown as T;
