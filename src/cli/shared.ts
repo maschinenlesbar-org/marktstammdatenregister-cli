@@ -33,6 +33,32 @@ export function parseNonEmpty(value: string): string {
   return value;
 }
 
+/**
+ * commander value-parser for `--base-url`: non-empty and http/https-only.
+ *
+ * The transport already rejects any non-http(s) scheme, so this is defence in
+ * depth — but doing the check at parse time turns a bad scheme (e.g. `file:` /
+ * `data:` / `ftp:`) into a friendly usage error (exit 2) with the value the user
+ * actually typed, rather than a network error (exit 6) echoing the fully built
+ * request URL. The transport check stays the enforcement point for library callers.
+ */
+export function parseBaseUrl(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    throw new InvalidArgumentError("Expected a non-empty value.");
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new InvalidArgumentError("Expected an absolute http(s) URL.");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new InvalidArgumentError("Only http and https URLs are supported.");
+  }
+  return value;
+}
+
 /** Build a commander value-parser for an integer constrained to [min, max]. */
 export function parseBoundedInt(min: number, max: number): (value: string) => number {
   return (value: string) => {

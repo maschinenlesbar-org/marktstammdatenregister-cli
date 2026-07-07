@@ -8,7 +8,7 @@ import { Command } from "commander";
 import type { CliDeps } from "./io.js";
 import { defaultIO } from "./io.js";
 import { MastrClient } from "../client/client.js";
-import { parseIntArg, parseBoundedInt, parseHeaderValue, parseNonEmpty } from "./shared.js";
+import { parseIntArg, parseBoundedInt, parseHeaderValue, parseBaseUrl } from "./shared.js";
 import { registerCommands } from "./commands/units.js";
 
 /**
@@ -50,8 +50,8 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     .version(VERSION)
     .option(
       "--base-url <url>",
-      "API base URL",
-      parseNonEmpty,
+      "API base URL (http/https only)",
+      parseBaseUrl,
       "https://www.marktstammdatenregister.de/MaStR",
     )
     .option("--timeout <ms>", "per-request timeout in ms (0 = no timeout)", parseIntArg)

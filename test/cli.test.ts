@@ -134,6 +134,15 @@ test("an empty --base-url is rejected (exit 2)", async () => {
   assert.equal(cli.mt.calls.length, 0);
 });
 
+test("a non-http(s) --base-url is rejected at parse time (exit 2, no request) (MASTR-03)", async () => {
+  for (const bad of ["file:///etc/passwd", "data:text/plain,x", "ftp://example.test"]) {
+    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    const code = await run(["--base-url", bad, "stromerzeugung"], cli.deps);
+    assert.equal(code, 2, `expected usage exit for ${bad}`);
+    assert.equal(cli.mt.calls.length, 0, `no request should be made for ${bad}`);
+  }
+});
+
 test("a control character in --user-agent is rejected (exit 2)", async () => {
   const cli = makeCli(() => jsonResponse(fx.unitPage));
   const code = await run(["stromerzeugung", "--user-agent", "bad\r\nX-Injected: 1"], cli.deps);
