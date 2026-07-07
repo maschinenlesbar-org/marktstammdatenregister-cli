@@ -42,6 +42,26 @@ export interface EngineOptions {
 
 const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
 
+/**
+ * Strip control characters (C0 except tab/newline, DEL, and C1) out of a string
+ * that originates in an attacker-controlled response — the error `detail` and the
+ * echoed Content-Type. `JSON.parse` decodes an escaped ESC in an error body into a
+ * real ESC byte, so without this a hostile/MITM'd endpoint could drive ANSI/OSC
+ * escape sequences into the user's terminal when the message is printed to stderr.
+ * The success path is already safe (`JSON.stringify` escapes these), so this only
+ * needs to cover text that flows into an error message. Implemented as a code-point
+ * filter so no raw control byte ever appears in this source file.
+ */
+export function sanitizeServerText(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const n = ch.codePointAt(0) ?? 0;
+    if (n <= 8 || (n >= 0x0b && n <= 0x1f) || (n >= 0x7f && n <= 0x9f)) continue;
+    out += ch;
+  }
+  return out;
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -148,6 +168,10 @@ export class RequestEngine {
         detail = snippet.length > 200 ? `${snippet.slice(0, 200)}…` : snippet;
       }
     }
+    // `detail` came from the response body (JSON field or text snippet); the `\s+`
+    // collapse above does not remove ESC, so strip control characters before it can
+    // reach stderr and inject terminal escape sequences.
+    if (detail !== undefined) detail = sanitizeServerText(detail);
     return new MastrApiError({ status, url, method: "GET", body: text, detail });
   }
 }

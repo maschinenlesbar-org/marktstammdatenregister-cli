@@ -68,6 +68,21 @@ test("a logical Errors envelope throws MastrApiError", async () => {
   );
 });
 
+test("control characters in a 200 Errors envelope are stripped from the message (MASTR-02)", async () => {
+  // Built via char code so no raw control byte appears in this source file.
+  const ESC = String.fromCharCode(0x1b);
+  const { client } = clientFor({ Errors: `${ESC}]0;spoof${ESC}\\Die Anfrage ist Null.` });
+  await assert.rejects(
+    () => client.stromerzeugung(),
+    (err) => {
+      assert.ok(err instanceof MastrApiError);
+      assert.equal(err.message.includes(ESC), false, "ESC must not reach the message");
+      assert.match(err.message, /Die Anfrage ist Null/);
+      return true;
+    },
+  );
+});
+
 test("filterColumns() hits the GetFilterColumns endpoint and returns the array", async () => {
   const { client, mt } = clientFor(fx.filterColumns);
   const cols = await client.filterColumns("stromerzeugung");

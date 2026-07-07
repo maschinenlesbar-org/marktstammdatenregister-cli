@@ -5,6 +5,9 @@ import { MastrApiError, MastrParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
+// Built via char code so no raw control byte ever appears in this source file.
+const ESC = String.fromCharCode(0x1b);
+
 test("buildUrl appends the path and query string", () => {
   const e = new RequestEngine({ baseUrl: "https://example.test/MaStR/" });
   assert.equal(e.buildUrl("/x", { page: 1 }), "https://example.test/MaStR/x?page=1");
@@ -61,6 +64,29 @@ test("a non-JSON (plain-text) error body is surfaced as the detail", async () =>
   await assert.rejects(
     () => e.getJson("/x"),
     (err) => err instanceof MastrApiError && err.status === 500 && /Server overloaded/.test(err.message),
+  );
+});
+
+test("control characters in a JSON error detail are stripped before reaching the message (MASTR-02)", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ Errors: `${ESC}]0;pwned${ESC}evil` }, 400));
+  const e = new RequestEngine({ transport: mt.transport });
+  await assert.rejects(
+    () => e.getJson("/x"),
+    (err) => {
+      assert.ok(err instanceof MastrApiError);
+      assert.equal(err.message.includes(ESC), false, "ESC must not reach the message");
+      assert.match(err.message, /pwnedevil/);
+      return true;
+    },
+  );
+});
+
+test("control characters in a plain-text error snippet are stripped (MASTR-02)", async () => {
+  const mt = makeMockTransport(() => rawResponse(`boom${ESC}]0;x`, "text/plain", 500));
+  const e = new RequestEngine({ transport: mt.transport });
+  await assert.rejects(
+    () => e.getJson("/x"),
+    (err) => err instanceof MastrApiError && !err.message.includes(ESC) && /boom/.test(err.message),
   );
 });
 

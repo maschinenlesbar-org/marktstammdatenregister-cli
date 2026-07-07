@@ -10,7 +10,7 @@
 //   const page = await c.stromerzeugung({ pageSize: 10, filter: "Energieträger~eq~'2495'" });
 //   page.total; // total solar units
 
-import { RequestEngine, type EngineOptions } from "./engine.js";
+import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import { MastrApiError } from "./errors.js";
 import type { QueryParams } from "./query.js";
 import type { FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery, UnitResponse } from "./types.js";
@@ -95,7 +95,10 @@ export class MastrClient {
         url: this.engine.buildUrl(path, params),
         method: "GET",
         body: JSON.stringify(res),
-        detail: res.Errors,
+        // MaStR answers HTTP 200 with a logical error string; it is server-
+        // controlled and reaches stderr, so strip control characters to prevent
+        // terminal escape-sequence injection.
+        detail: sanitizeServerText(res.Errors),
       });
     }
     return { total: res?.Total ?? 0, data: (res?.Data ?? []) as MastrUnit[] };
