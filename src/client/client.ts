@@ -56,7 +56,12 @@ export function isoifyDates<T>(value: T): T {
     return value.map((v) => isoifyDates(v)) as unknown as T;
   }
   if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
+    // Build with a null prototype so an attacker-controlled response key literally
+    // named `__proto__` (or `constructor`/`prototype`) becomes an ordinary own
+    // property via assignment, instead of hitting the `Object.prototype.__proto__`
+    // setter and silently reparenting this object. JSON.stringify still renders a
+    // null-prototype object's own enumerable keys, so downstream output is unchanged.
+    const out: Record<string, unknown> = Object.create(null);
     for (const [k, v] of Object.entries(value)) out[k] = isoifyDates(v);
     return out as T;
   }
