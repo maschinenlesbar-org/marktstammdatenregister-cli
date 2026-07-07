@@ -6,6 +6,7 @@ import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "./io.js";
 import type { MastrClientOptions } from "../client/client.js";
 import { isoifyDates } from "../client/client.js";
+import { MastrParseError } from "../client/errors.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -111,8 +112,20 @@ export function toEngineOptions(global: GlobalOptions): MastrClientOptions {
  * With --iso-dates, every MaStR `"/Date(ms)/"` string is rewritten to ISO-8601 first.
  */
 export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown): void {
-  const shaped = global.isoDates ? isoifyDates(value) : value;
-  const text = global.compact ? JSON.stringify(shaped) : JSON.stringify(shaped, null, 2);
+  let text: string;
+  try {
+    const shaped = global.isoDates ? isoifyDates(value) : value;
+    text = global.compact ? JSON.stringify(shaped) : JSON.stringify(shaped, null, 2);
+  } catch (cause) {
+    // Pathologically deep JSON (within the size cap) can exhaust the call stack in
+    // the recursive isoifyDates transform or in JSON.stringify, throwing a
+    // RangeError. Map it to a typed parse error so it surfaces consistently with a
+    // JSON.parse depth failure, rather than as a generic "Unexpected error".
+    if (cause instanceof RangeError) {
+      throw new MastrParseError("Response is too deeply nested to render.", { cause });
+    }
+    throw cause;
+  }
   deps.io.out(text);
 }
 

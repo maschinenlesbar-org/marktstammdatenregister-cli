@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run } from "../src/cli/run.js";
 import { MastrClient } from "../src/client/client.js";
+import { renderJson } from "../src/cli/shared.js";
+import { MastrParseError } from "../src/client/errors.js";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
 import { makeMockTransport, jsonResponse, queryOf } from "./helpers.js";
@@ -166,4 +168,24 @@ test("--compact prints single-line JSON", async () => {
   const cli = makeCli(() => jsonResponse(fx.unitPage));
   await run(["stromerzeugung", "--compact"], cli.deps);
   assert.equal(cli.out.length, 1);
+});
+
+test("renderJson maps a deep-nesting RangeError to a typed MastrParseError (MASTR-04)", () => {
+  // Build a chain deep enough to overflow the call stack in JSON.stringify. This
+  // must surface as a typed parse error, not a generic "Unexpected error".
+  const deep: Record<string, unknown> = {};
+  let cur = deep;
+  for (let i = 0; i < 200_000; i++) {
+    const next: Record<string, unknown> = {};
+    cur["a"] = next;
+    cur = next;
+  }
+  const out: string[] = [];
+  const deps: CliDeps = {
+    io: { out: (s) => out.push(s), err: () => {} },
+    createClient: (opts) => new MastrClient(opts),
+  };
+  assert.throws(() => renderJson(deps, {}, deep), MastrParseError);
+  // Fail-secure: nothing partial was written to stdout.
+  assert.equal(out.length, 0);
 });
