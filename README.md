@@ -1,5 +1,7 @@
 # marktstammdatenregister-cli
 
+**Website:** [English](https://maschinenlesbar-org.github.io/marktstammdatenregister-cli/) · [Deutsch](https://maschinenlesbar-org.github.io/marktstammdatenregister-cli/de/) — command reference, guides and API docs
+
 A dependency-light **TypeScript client + CLI** for the **Marktstammdatenregister
 (MaStR)** — the Bundesnetzagentur's register of the German electricity & gas market:
 ~9 million generation and consumption units (solar, wind, storage, CHP, …). Wraps
