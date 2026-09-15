@@ -77,13 +77,35 @@ test("0 results with --sort set prints a note about the likely bad sort field", 
   const cli = makeCli(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
   const code = await run(["stromerzeugung", "--sort", "BogusField-desc", "--total"], cli.deps);
   assert.equal(code, 0);
-  assert.match(cli.err.join("\n"), /0 results with --sort/);
+  const err = cli.err.join("\n");
+  assert.match(err, /0 results with --sort/);
+  // `mastr filters` lists FilterNames, which are not sort keys (live: "Bruttoleistung der
+  // Einheit-desc" gives 0 rows, "Bruttoleistung-desc" works), so point at the record keys.
+  assert.match(err, /not the FilterNames from `mastr filters`/);
+  assert.match(err, /mastr stromerzeugung --page-size 1 --compact \| jq '\.data\[0\] \| keys'/);
+  assert.doesNotMatch(err, /--filter/);
 });
 
-test("0 results WITHOUT --sort prints no such note", async () => {
+test("0 results with --filter set prints a note listing the known operators", async () => {
+  const cli = makeCli(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
+  const code = await run(["stromerzeugung", "--filter", "Bruttoleistung der Einheit~gte~'5000'", "--total"], cli.deps);
+  assert.equal(code, 0);
+  const err = cli.err.join("\n");
+  assert.match(err, /0 results with --filter/);
+  assert.match(err, /eq, neq, sw, ct, nct, ew, null, nn, gt and lt/);
+  assert.doesNotMatch(err, /--sort/);
+});
+
+test("0 results WITHOUT --sort or --filter prints no such note", async () => {
   const cli = makeCli(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
   await run(["stromerzeugung", "--total"], cli.deps);
-  assert.doesNotMatch(cli.err.join("\n"), /--sort/);
+  assert.equal(cli.err.join("\n"), "");
+});
+
+test("matches with --sort and --filter set print no note", async () => {
+  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  await run(["stromerzeugung", "--sort", "Bruttoleistung-desc", "--filter", "X~gt~'1'", "--total"], cli.deps);
+  assert.equal(cli.err.join("\n"), "");
 });
 
 test("filters <category> hits GetFilterColumns and renders the columns", async () => {
