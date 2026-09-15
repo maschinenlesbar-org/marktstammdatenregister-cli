@@ -36,7 +36,8 @@ This skill drives the `mastr` command. **Before anything else, validate it is av
 | `InbetriebnahmeDatum` | commissioning date |
 | `EinheitRegistrierungsdatum` | date registered in MaStR |
 | `AnlagenbetreiberName` | operator (often anonymised) |
-| `NetzbetreiberNamen` | grid operator |
+| `NetzbetreiberNamen` | grid operator, with its number (`Stadtnetze Münster GmbH (SNB980883363112)`) |
+| `NetzbetreiberMaStRNummer` | grid operator's MaStR number, **wrapped in raw HTML** upstream (`<a href="/MaStR/Akteur/Marktakteur/Detail/1000601">SNB980883363112</a>`) — strip the tags before showing it |
 
 ## Fetch one unit by its number
 
@@ -44,7 +45,8 @@ There is no by-id endpoint; filter by `MaStRNummer`:
 
 ```bash
 mastr stromerzeugung --filter "MaStR-Nr. der Einheit~eq~'SEE984033548619'" --iso-dates --compact \
-  | jq '.data[0] | {MaStRNummer, EinheitName, EnergietraegerName, Bruttoleistung, BetriebsStatusName, Bundesland, Ort, InbetriebnahmeDatum}'
+  | jq '.data[0] | {MaStRNummer, EinheitName, EnergietraegerName, Bruttoleistung, BetriebsStatusName, Bundesland, Ort, InbetriebnahmeDatum,
+        NetzbetreiberMaStRNummer: (.NetzbetreiberMaStRNummer // "" | gsub("<[^>]*>"; ""))}'
 ```
 
 (Confirm the exact filter FilterName with the **mastr-filters** skill.)
@@ -59,6 +61,14 @@ mastr stromerzeugung --filter "MaStR-Nr. der Einheit~eq~'SEE984033548619'" --iso
   location data is withheld** for units < 30 kW — this is by law (natural-person /
   confidential data are not published), not a bug. Don't try to de-anonymise.
 - **Coordinates may be null** — handle before mapping.
+- **`NetzbetreiberMaStRNummer` is an HTML link**, not a bare number, on the rows seen
+  (solar, onshore and offshore wind alike). Strip the tags (`gsub("<[^>]*>"; "")`) or take
+  the number from the parentheses in `NetzbetreiberNamen`; never paste the raw HTML.
+- **Company names use a full-width ampersand `＆`** (U+FF06), e.g.
+  `EnBW He Dreiht GmbH ＆ Co. KG` in `AnlagenbetreiberName`. A `--filter` with a plain `&`
+  still matches these names (both gave 51 rows for that operator on 2026-09-15), but
+  `jq ==`/`grep` with a plain `&` does not; normalise `＆` to `&` before comparing or
+  showing names.
 - **Fields vary by category** — a gas consumer lacks the solar/wind columns; only read
   fields that are present.
 - Cite the source: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0).
