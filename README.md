@@ -1,5 +1,9 @@
 # marktstammdatenregister-cli
 
+[![CI](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/actions/workflows/ci.yml)
+[![Release](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/actions/workflows/release.yml/badge.svg)](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/actions/workflows/release.yml)
+[![npm](https://img.shields.io/npm/v/@maschinenlesbar.org/marktstammdatenregister-cli)](https://www.npmjs.com/package/@maschinenlesbar.org/marktstammdatenregister-cli)
+
 **Website:** [English](https://maschinenlesbar-org.github.io/marktstammdatenregister-cli/) · [Deutsch](https://maschinenlesbar-org.github.io/marktstammdatenregister-cli/de/) — command reference, guides and API docs
 
 A dependency-light **TypeScript client + CLI** for the **Marktstammdatenregister
