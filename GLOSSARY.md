@@ -14,7 +14,7 @@ keep them verbatim.
 | **Betriebs-Status** | `BetriebsStatusName` / filter | Operating status — `In Betrieb` (in operation), `In Planung`, `Endgültig stillgelegt`, … (filtered by code, e.g. `35` = In Betrieb). |
 | **Anlagenbetreiber / Netzbetreiber** | `AnlagenbetreiberName` / `NetzbetreiberNamen` | Plant operator / grid operator. Operator names are often **anonymised** (`natürliche Person (ABR…)`). |
 | **Total** | `total` | The full number of units matching the query, across all pages (respects the filter). Returned for free — use `--total`. |
-| **Filter / Sort** | `--filter` / `--sort` | Kendo-grid selection. Filter: `FilterName~op~'value'~[and|or]~…`; sort: `FieldKey-asc|desc`. See `mastr filters`. |
+| **Filter / Sort** | `--filter` / `--sort` | Kendo-grid selection. Filter: `FilterName~op~'value'~and~…` (or `~or~`); sort: `FieldKey-asc` or `FieldKey-desc`. See `mastr filters`. |
 | **`/Date(ms)/`** | `--iso-dates` / `parseMsDate` | A Microsoft-AJAX date (epoch-milliseconds, UTC). `--iso-dates` rewrites them to ISO-8601. |
 
 ## Reading a record
