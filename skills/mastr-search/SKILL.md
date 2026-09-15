@@ -64,6 +64,10 @@ mastr stromerzeugung --page 2 --page-size 100 --compact
   a wrong field name is ignored and you silently get the unfiltered total.
 - **A wrong `--sort` field returns 0 rows, not an error.** If a query drops to
   `total: 0` only after you add `--sort`, the sort column key is probably wrong (the
-  CLI prints a stderr note) — verify it against `mastr filters`.
+  CLI prints a stderr note). Sort keys are record field names (`Bruttoleistung`), not
+  the FilterNames from `mastr filters` (`Bruttoleistung der Einheit` gives 0 rows); list
+  them with `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`.
+- **A wrong filter operator also returns 0 rows.** Range filters use `gt`/`lt`
+  (strict; there is no `gte`/`lte`) — see **mastr-filters**.
 - **Reading a record** (fields, dates, anonymisation) → the **mastr-unit** skill.
 - Cite the source: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0).
