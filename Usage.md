@@ -35,7 +35,7 @@ mastr [global options] <command> [command options]
 |---|---|
 | `--page <n>` | 1-based page (default 1) |
 | `--page-size <n>` | rows per page (1..5000, default 25) |
-| `--sort <spec>` | `FieldKey-asc` or `FieldKey-desc`, e.g. `Bruttoleistung-desc` |
+| `--sort <spec>` | `FieldKey-asc` or `FieldKey-desc`, e.g. `Bruttoleistung-desc`. `FieldKey` is a record field name, not a `FilterName` |
 | `--filter <spec>` | filter expression (see below) |
 | `--total` | print only the total match count, not the rows |
 
@@ -49,13 +49,19 @@ FilterName~op~'value'~[and|or]~FilterName~op~'value'~…
 ```
 
 - **operators:** `eq` (=), `neq` (≠), `sw` (starts-with), `ct` (contains),
-  `nct` (not-contains), `ew` (ends-with), `null` (empty), `nn` (not empty)
-- **value:** single-quoted; for a dropdown use its **code** (`Value`), not its label
+  `nct` (not-contains), `ew` (ends-with), `null` (empty), `nn` (not empty), and for
+  `number`/`date` columns `gt` (>) and `lt` (<). `gt`/`lt` are strict; there is no
+  `gte`/`lte`, and an unknown operator returns 0 rows
+- **value:** single-quoted; for a dropdown use its **code** (`Value`), not its label;
+  decimals take a point (`'4999.999'`), dates work as `'2025-01-01'` or `'01.01.2025'`
 - discover the `FilterName`s and codes with `mastr filters <category>`
 
 ```bash
 # Solar (Energieträger 2495) units in operation (Betriebs-Status 35)
 mastr stromerzeugung --filter "Energieträger~eq~'2495'~and~Betriebs-Status~eq~'35'" --total
+
+# Wind (2497) units above 5,000 kW gross
+mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Bruttoleistung der Einheit~gt~'5000'" --total
 ```
 
 > **A wrong/misspelled FilterName is silently ignored** and you get the unfiltered
@@ -86,8 +92,12 @@ mastr gasverbrauch --sort "Bruttoleistung-desc" --page-size 10 --compact | jq '.
 - **A wrong `--sort` field returns 0 results, not an error.** An unknown sort column
   key makes the server answer with zero rows (`total: 0`), which reads like "no
   matches". If a query returns 0 only after you add `--sort`, check the column key —
-  the CLI prints a note to stderr in this case. (Contrast `--filter`, where a wrong
-  field is silently *ignored* and you get the unfiltered set.)
+  the CLI prints a note to stderr in this case. Sort keys are the record's field names
+  (`Bruttoleistung`, `InbetriebnahmeDatum`), not the FilterNames from `mastr filters`
+  (`Bruttoleistung der Einheit-desc` returns 0 rows); list them with
+  `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. (Contrast
+  `--filter`, where a wrong field is silently *ignored* and you get the unfiltered set,
+  but a wrong operator also returns 0 rows, with a stderr note naming the known ones.)
 - **Dates** are Microsoft `/Date(ms)/` strings; `--iso-dates` converts them, or use the
   library's `parseMsDate()`.
 - **You cannot sum capacity server-side** — there is no aggregate endpoint. Use `--total`

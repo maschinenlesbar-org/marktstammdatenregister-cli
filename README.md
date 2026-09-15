@@ -43,10 +43,13 @@ mastr filters stromerzeugung                        # the filterable columns + d
 Categories: `stromerzeugung`, `stromverbrauch`, `gaserzeugung`, `gasverbrauch`.
 
 **Filtering** uses the register's own syntax — `FilterName~op~'value'~[and|or]~…`
-(ops `eq|neq|sw|ct|nct|ew|null|nn`); discover the German field names and dropdown
-codes with `mastr filters <category>`. A **wrong `FilterName` is silently ignored**
-(you get the unfiltered set) and a **wrong `--sort` field returns 0 rows** — verify
-with `mastr filters` and sanity-check with `--total`. **Dates** come as Microsoft
+(ops `eq|neq|sw|ct|nct|ew|null|nn`, plus the strict `gt`/`lt` for numbers and dates);
+discover the German field names and dropdown codes with `mastr filters <category>`. A
+**wrong `FilterName` is silently ignored** (you get the unfiltered set), while a **wrong
+operator** (e.g. `gte`) or a **wrong `--sort` key returns 0 rows**. Verify filter names
+with `mastr filters` and sanity-check with `--total`; sort keys are record field names
+(`Bruttoleistung`), not FilterNames — list them with
+`mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. **Dates** come as Microsoft
 `/Date(ms)/` strings — add `--iso-dates` to convert them to ISO-8601.
 
 Global flags: `--base-url`, `--timeout`, `--user-agent`, `--max-retries`,
