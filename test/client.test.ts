@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient, parseMsDate, isoifyDates } from "../src/client/client.js";
-import { MastrApiError } from "../src/client/errors.js";
+import { MastrApiError, MastrNetworkError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -139,4 +139,15 @@ test("isoifyDates does not reparent or pollute on an attacker '__proto__' key", 
   // The rebuilt object still round-trips through JSON.stringify unchanged.
   const round = JSON.parse(JSON.stringify(out)) as Record<string, unknown>;
   assert.equal(round["ok"], "1970-01-01T00:00:00.000Z");
+});
+
+test("MastrClient rejects a non-http(s) base URL even with a custom transport", () => {
+  for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
+    const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
+    assert.throws(
+      () => new MastrClient({ baseUrl, transport: mt.transport }),
+      (err) => err instanceof MastrNetworkError && /Unsupported protocol/.test(err.message),
+    );
+    assert.equal(mt.calls.length, 0);
+  }
 });

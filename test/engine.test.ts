@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RequestEngine } from "../src/client/engine.js";
-import { MastrApiError, MastrParseError } from "../src/client/errors.js";
+import { MastrApiError, MastrNetworkError, MastrParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -110,4 +110,24 @@ test("a 503 is retried up to maxRetries then surfaces as a MastrApiError", async
   const e = new RequestEngine({ transport: mt.transport, maxRetries: 2, sleep: async () => {} });
   await assert.rejects(() => e.getJson("/x"), (err) => err instanceof MastrApiError && err.status === 503);
   assert.equal(calls, 3);
+});
+
+test("a non-http(s) base URL is rejected at construction, before any request", () => {
+  for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
+    const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
+    assert.throws(
+      () => new RequestEngine({ baseUrl, transport: mt.transport }),
+      (err) => err instanceof MastrNetworkError && /Unsupported protocol/.test(err.message),
+    );
+    assert.equal(mt.calls.length, 0);
+  }
+});
+
+test("an unparseable base URL is rejected at construction", () => {
+  const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
+  assert.throws(
+    () => new RequestEngine({ baseUrl: "not a url", transport: mt.transport }),
+    (err) => err instanceof MastrNetworkError && /Invalid base URL/.test(err.message),
+  );
+  assert.equal(mt.calls.length, 0);
 });
