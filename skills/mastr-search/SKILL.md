@@ -7,8 +7,11 @@ description: >
   battery storage units", "how much PV was registered in 2023?", "find gas
   generation units", or wants rows or totals from the register. Handles the four
   categories (electricity/gas × generation/consumption), paging, and match counts.
-version: 1.0.0
-userInvocable: true
+compatibility: >
+  Requires the `mastr` CLI (npm package
+  @maschinenlesbar.org/marktstammdatenregister-cli) on PATH, installed by the
+  user; the skill never installs it. Uses jq for JSON filtering. Network access
+  to www.marktstammdatenregister.de.
 ---
 
 # MaStR Search
@@ -19,6 +22,8 @@ German electricity & gas market (~9M). This skill searches and counts them.
 ## Tooling
 
 This skill drives the `mastr` command. **Before anything else, validate it is available** — run `command -v mastr` (or `mastr --version`). If it is not on your PATH, STOP and inform the user that the `mastr` CLI (`@maschinenlesbar.org/marktstammdatenregister-cli`) is not installed — installing it is their responsibility; never install it yourself, and do not fall back to `npx` or a local `node dist/...` build.
+
+This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
 **No API key is required.** Each command searches ONE category — `stromerzeugung` (electricity generation, ~9M units), `stromverbrauch`, `gaserzeugung`, `gasverbrauch` — paged with `--page`/`--page-size` (default 25, max 5000). `--total` returns just the match count. Narrow with `--filter` (see the **mastr-filters** skill for the arcane syntax). Timestamps arrive as `/Date(ms)/`; add `--iso-dates` for ISO-8601. `--compact` for `jq`. Data © Bundesnetzagentur – Marktstammdatenregister under DL-DE-BY-2.0 (attribution required) — see DATA_LICENSE.md.
 

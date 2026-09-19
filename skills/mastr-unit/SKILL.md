@@ -7,8 +7,11 @@ description: >
   is the capacity/commissioning date of this plant?", "why is the operator name
   hidden?", or needs help understanding a unit's fields, the /Date(ms)/ timestamps, or
   the withheld/anonymised data.
-version: 1.0.0
-userInvocable: true
+compatibility: >
+  Requires the `mastr` CLI (npm package
+  @maschinenlesbar.org/marktstammdatenregister-cli) on PATH, installed by the
+  user; the skill never installs it. Uses jq for JSON filtering. Network access
+  to www.marktstammdatenregister.de.
 ---
 
 # MaStR Unit Record
@@ -19,6 +22,8 @@ category. This skill reads the important fields and explains the quirks.
 ## Tooling
 
 This skill drives the `mastr` command. **Before anything else, validate it is available** — run `command -v mastr` (or `mastr --version`). If it is not on your PATH, STOP and inform the user that the `mastr` CLI (`@maschinenlesbar.org/marktstammdatenregister-cli`) is not installed — installing it is their responsibility; never install it yourself, and do not fall back to `npx` or a local `node dist/...` build.
+
+This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
 **No API key is required.** Records come from the four search commands (see **mastr-search**). Add `--iso-dates` to convert the `/Date(ms)/` timestamps to ISO-8601, and `--compact` to pipe to `jq`. Data © Bundesnetzagentur – Marktstammdatenregister under DL-DE-BY-2.0 (attribution required) — see DATA_LICENSE.md.
 
