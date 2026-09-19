@@ -1,6 +1,6 @@
 {
   "name": "mastr",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "German energy-market register skills powered by the marktstammdatenregister-cli (Marktstammdatenregister / MaStR API).",
   "author": {
     "name": "Sebastian Schürmann",
