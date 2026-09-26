@@ -82,7 +82,9 @@ page) surfaces as an error and maps to the usage exit code.
 
 - **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 20/22/24.
 - **Exit codes** (`run.ts`): help/version → 0; usage → 2; 404 → 4; network → 6; other → 1.
-- Retry transient `429`/`503` up to `maxRetries`; only `http:`/`https:` base URLs.
+- Retry transient `429`/`503` up to `maxRetries`, waiting the `Retry-After` (seconds or an
+  IMF-fixdate, `parseRetryAfter`; above `MAX_RETRY_AFTER_MS` = 30 s no retry, the error
+  surfaces at once), else `retryDelayMs * attempt`; only `http:`/`https:` base URLs.
 - **Scaffold origin:** scaffolded from `entgeltatlas-cli` (GET + query transport); the
   X-API-Key auth machinery was stripped because MaStR's public search needs no auth.
 

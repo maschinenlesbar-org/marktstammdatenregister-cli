@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RequestEngine } from "../src/client/engine.js";
+import { RequestEngine, parseRetryAfter } from "../src/client/engine.js";
 import { MastrApiError, MastrNetworkError, MastrParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -144,4 +144,60 @@ test("an unparseable base URL is rejected at construction", () => {
     (err) => err instanceof MastrNetworkError && /Invalid base URL/.test(err.message),
   );
   assert.equal(mt.calls.length, 0);
+});
+
+function retryRun(retryAfter: string | undefined) {
+  const delays: number[] = [];
+  let calls = 0;
+  const mt = makeMockTransport(() => {
+    calls += 1;
+    return {
+      status: 429,
+      headers: retryAfter === undefined ? {} : { "retry-after": retryAfter },
+      body: Buffer.from("{}"),
+    };
+  });
+  const e = new RequestEngine({
+    transport: mt.transport,
+    maxRetries: 2,
+    sleep: async (ms) => {
+      delays.push(ms);
+    },
+  });
+  return { e, delays, calls: () => calls };
+}
+
+test("Retry-After (seconds) is honoured on 429", async () => {
+  const r = retryRun("1");
+  await assert.rejects(() => r.e.getJson("/x"), (err) => err instanceof MastrApiError && err.status === 429);
+  assert.deepEqual(r.delays, [1000, 1000]);
+  assert.equal(r.calls(), 3);
+});
+
+test("a malformed Retry-After falls back to the linear backoff", async () => {
+  for (const bad of ["-1", "1.5", "+5", "1e3", "0x10", "soon", "2026-09-26T10:00:00Z", ""]) {
+    const r = retryRun(bad);
+    await assert.rejects(() => r.e.getJson("/x"));
+    assert.deepEqual(r.delays, [200, 400], bad);
+  }
+});
+
+test("a Retry-After above 30 s is not retried: the error surfaces at once", async () => {
+  for (const long of ["31", "99999999999", new Date(Date.now() + 3_600_000).toUTCString()]) {
+    const r = retryRun(long);
+    await assert.rejects(() => r.e.getJson("/x"), (err) => err instanceof MastrApiError && err.status === 429);
+    assert.deepEqual(r.delays, [], long);
+    assert.equal(r.calls(), 1, long);
+  }
+});
+
+test("parseRetryAfter reads seconds and IMF-fixdates only", () => {
+  const now = Date.parse("Sat, 26 Sep 2026 10:00:00 GMT");
+  assert.equal(parseRetryAfter("3", now), 3000);
+  assert.equal(parseRetryAfter(["2", "9"], now), 2000);
+  assert.equal(parseRetryAfter("Sat, 26 Sep 2026 10:00:05 GMT", now), 5000);
+  assert.equal(parseRetryAfter("Sat, 26 Sep 2026 09:00:00 GMT", now), 0);
+  assert.equal(parseRetryAfter("Saturday, 26-Sep-26 10:00:05 GMT", now), undefined);
+  assert.equal(parseRetryAfter("1.5", now), undefined);
+  assert.equal(parseRetryAfter(undefined, now), undefined);
 });
