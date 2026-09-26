@@ -272,3 +272,12 @@ test("the 0-results --sort note suggests a sort key that exists in that category
     if (category !== "stromerzeugung") assert.doesNotMatch(err, /e\.g\. Bruttoleistung/, category);
   }
 });
+
+test("an empty 200 body or a malformed envelope exits 1 with nothing on stdout", async () => {
+  for (const body of ["", "null", '{"Data":[{"a":1}]}', '{"Data":[],"Total":0,"Errors":{"":{"errors":["Invalid filter"]}}}']) {
+    const cli = makeCli(() => ({ status: 200, headers: { "content-type": "application/json" }, body: Buffer.from(body) }));
+    assert.equal(await run(["stromerzeugung", "--compact"], cli.deps), 1, body);
+    assert.deepEqual(cli.out, [], body);
+    assert.match(cli.err.join("\n"), /Empty response body|Unexpected response shape|Invalid filter/, body);
+  }
+});

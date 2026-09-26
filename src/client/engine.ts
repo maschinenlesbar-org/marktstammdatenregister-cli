@@ -67,6 +67,26 @@ export function sanitizeServerText(text: string): string {
 }
 
 /**
+ * Describe a Kendo `Errors` value for an error message: a string as is; otherwise
+ * (a ModelState object such as `{"": {"errors": ["Invalid filter"]}}`, or an array)
+ * every string found in it, sanitised, blanks and repeats dropped, joined "; ".
+ * Returns `undefined` when nothing readable is left.
+ */
+export function describeMastrErrors(errors: unknown): string | undefined {
+  const found: string[] = [];
+  const walk = (value: unknown, depth: number): void => {
+    if (typeof value === "string") {
+      const text = sanitizeServerText(value).replace(/\s+/g, " ").trim();
+      if (text !== "" && !found.includes(text)) found.push(text);
+    } else if (value !== null && typeof value === "object" && depth < 5) {
+      for (const v of Object.values(value)) walk(v, depth + 1);
+    }
+  };
+  walk(errors, 0);
+  return found.length > 0 ? found.join("; ") : undefined;
+}
+
+/**
  * Reject a base URL whose scheme is not http(s). The default transport already
  * gates this per hop, but the engine is exported as a library and may be handed a
  * custom transport that does no such check, so gate the configured base URL here
@@ -163,12 +183,16 @@ export class RequestEngine {
     }
   }
 
-  /** GET a path with query params and parse the JSON reply into `T`. */
+  /**
+   * GET a path with query params and parse the JSON reply into `T`. Every MaStR
+   * endpoint answers with a JSON document, so an empty body or a 204 is a
+   * `MastrParseError`, never a silent `null`.
+   */
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
     const res = await this.request(path, query);
     const text = res.data.toString("utf8");
     if (res.status === 204 || text.trim().length === 0) {
-      return null as T;
+      throw new MastrParseError(`Empty response body from ${path}`);
     }
     try {
       return JSON.parse(text) as T;
@@ -182,7 +206,7 @@ export class RequestEngine {
     let detail: string | undefined;
     try {
       const parsed = JSON.parse(text) as { Errors?: unknown; message?: unknown; detail?: unknown };
-      if (typeof parsed?.Errors === "string") detail = parsed.Errors;
+      if (parsed?.Errors !== undefined && parsed.Errors !== null) detail = describeMastrErrors(parsed.Errors);
       else if (typeof parsed?.message === "string") detail = parsed.message;
       else if (typeof parsed?.detail === "string") detail = parsed.detail;
     } catch {

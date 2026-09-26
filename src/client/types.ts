@@ -75,8 +75,11 @@ export interface UnitResponse {
   /** Total number of matching units (across all pages). */
   Total: number;
   AggregateResults?: unknown;
-  /** A logical error message (e.g. `"Die Anfrage ist Null."`); null on success. */
-  Errors?: string | null;
+  /**
+   * A logical error: a message (e.g. `"Die Anfrage ist Null."`) or a Kendo ModelState
+   * object; null on success. The client throws `MastrApiError` for any other value.
+   */
+  Errors?: string | Record<string, unknown> | null;
 }
 
 /** A page of units plus the total match count — what the client returns. */

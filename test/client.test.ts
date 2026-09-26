@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient, parseMsDate, isoifyDates } from "../src/client/client.js";
-import { MastrApiError, MastrNetworkError, MastrValidationError } from "../src/client/errors.js";
+import { MastrApiError, MastrNetworkError, MastrParseError, MastrValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -159,4 +159,54 @@ test("units() rejects a filter with ~or~ before any request (MastrValidationErro
     (err) => err instanceof MastrValidationError && /Invalid filter: "~or~" is not supported/.test(err.message),
   );
   assert.equal(mt.calls.length, 0);
+});
+
+test("a malformed 200 envelope throws MastrParseError instead of reading as 0 matches", async () => {
+  const path = "/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung";
+  const cases: [unknown, string][] = [
+    [null, "a JSON object with Data and Total"],
+    ["hello", "a JSON object with Data and Total"],
+    [[1, 2, 3], "a JSON object with Data and Total"],
+    [{}, "a numeric Total"],
+    [{ Data: [{ a: 1 }], Errors: null }, "a numeric Total"],
+    [{ Data: "not-an-array", Total: "lots" }, "a numeric Total"],
+    [{ Data: [], Total: -1 }, "a numeric Total"],
+    [{ Data: [], Total: 1.5 }, "a numeric Total"],
+    [{ Data: "not-an-array", Total: 3 }, "a Data array"],
+    [{ Data: null, Total: 3 }, "a Data array"],
+  ];
+  for (const [body, expected] of cases) {
+    const { client } = clientFor(body);
+    await assert.rejects(
+      () => client.stromerzeugung(),
+      (err) =>
+        err instanceof MastrParseError &&
+        err.message === `Unexpected response shape from ${path}: expected ${expected}.`,
+      JSON.stringify(body),
+    );
+  }
+});
+
+test("any non-null Errors in a 200 envelope throws MastrApiError with its messages", async () => {
+  for (const [errors, detail] of [
+    [{ "": { errors: ["Invalid filter"] } }, "Invalid filter"],
+    [["bad filter", "bad filter", "other"], "bad filter; other"],
+    [{ x: { errors: [{ ErrorMessage: "Feld unbekannt" }] } }, "Feld unbekannt"],
+  ] as const) {
+    const { client } = clientFor({ Data: [], Total: 0, Errors: errors });
+    await assert.rejects(
+      () => client.stromerzeugung(),
+      (err) => err instanceof MastrApiError && err.detail === detail && err.message.endsWith(`: ${detail}`),
+    );
+  }
+  const { client } = clientFor({ Data: [], Total: 0, Errors: 42 });
+  await assert.rejects(
+    () => client.stromerzeugung(),
+    (err) => err instanceof MastrApiError && err.detail === undefined && /^MaStR error for GET /.test(err.message),
+  );
+});
+
+test("Data null with Total 0 is an empty page", async () => {
+  const { client } = clientFor({ Data: null, Total: 0, Errors: null });
+  assert.deepEqual(await client.stromerzeugung(), { total: 0, data: [] });
 });

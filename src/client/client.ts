@@ -10,11 +10,11 @@
 //   const page = await c.stromerzeugung({ pageSize: 10, filter: "Energieträger~eq~'2495'" });
 //   page.total; // total solar units
 
-import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
-import { MastrApiError } from "./errors.js";
+import { RequestEngine, describeMastrErrors, type EngineOptions } from "./engine.js";
+import { MastrApiError, MastrParseError } from "./errors.js";
 import { validateFilter } from "./filter.js";
 import type { QueryParams } from "./query.js";
-import type { FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery, UnitResponse } from "./types.js";
+import type { FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery } from "./types.js";
 
 const SERVICE = "/Einheit/EinheitJson";
 
@@ -69,6 +69,15 @@ export function isoifyDates<T>(value: T): T {
   return value;
 }
 
+/** True for a JSON object (not null, not an array). */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function shapeError(path: string, expected: string): MastrParseError {
+  return new MastrParseError(`Unexpected response shape from ${path}: expected ${expected}.`);
+}
+
 export class MastrClient {
   private readonly engine: RequestEngine;
 
@@ -93,19 +102,29 @@ export class MastrClient {
       filter: query.filter ?? "",
     };
     const path = `${SERVICE}/GetErweiterteOeffentlicheEinheit${CATEGORY_SUFFIX[category]}`;
-    const res = await this.engine.getJson<UnitResponse | null>(path, params);
-    if (res && typeof res.Errors === "string" && res.Errors.length > 0) {
+    const res = await this.engine.getJson<unknown>(path, params);
+    if (!isObject(res)) throw shapeError(path, "a JSON object with Data and Total");
+    // MaStR answers HTTP 200 with a logical error in `Errors`: a string such as "Die
+    // Anfrage ist Null.", or a Kendo ModelState object. Anything but null is an error
+    // (a broken reply must not read as "no matches"). The text is server-controlled
+    // and reaches stderr, so describeMastrErrors sanitises it.
+    if (res["Errors"] !== undefined && res["Errors"] !== null) {
       throw new MastrApiError({
         url: this.engine.buildUrl(path, params),
         method: "GET",
         body: JSON.stringify(res),
-        // MaStR answers HTTP 200 with a logical error string; it is server-
-        // controlled and reaches stderr, so strip control characters to prevent
-        // terminal escape-sequence injection.
-        detail: sanitizeServerText(res.Errors),
+        detail: describeMastrErrors(res["Errors"]),
       });
     }
-    return { total: res?.Total ?? 0, data: (res?.Data ?? []) as MastrUnit[] };
+    const total = res["Total"];
+    if (typeof total !== "number" || !Number.isSafeInteger(total) || total < 0) {
+      throw shapeError(path, "a numeric Total");
+    }
+    const data = res["Data"];
+    // A reply with no matches may carry `Data: null`; with a positive Total it must be an array.
+    if (data === null && total === 0) return { total, data: [] };
+    if (!Array.isArray(data)) throw shapeError(path, "a Data array");
+    return { total, data: data as MastrUnit[] };
   }
 
   /** Electricity-generation units (`Stromerzeugung`). */

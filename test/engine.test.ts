@@ -37,10 +37,24 @@ test("getJson parses and returns the JSON body", async () => {
   assert.deepEqual(await e.getJson("/x"), fx.unitPage);
 });
 
-test("getJson returns null on an empty/204 body", async () => {
-  const mt = makeMockTransport(() => rawResponse("", "application/json", 204));
+test("getJson throws MastrParseError on an empty/204 body (never a silent null)", async () => {
+  for (const [body, status] of [["", 204], ["", 200], ["  ", 200]] as const) {
+    const mt = makeMockTransport(() => rawResponse(body, "application/json", status));
+    const e = new RequestEngine({ transport: mt.transport });
+    await assert.rejects(
+      () => e.getJson("/x"),
+      (err) => err instanceof MastrParseError && err.message === "Empty response body from /x",
+    );
+  }
+});
+
+test("a non-2xx with a Kendo ModelState Errors object uses its messages as the detail", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ Errors: { "": { errors: ["Invalid filter"] } } }, 400));
   const e = new RequestEngine({ transport: mt.transport });
-  assert.equal(await e.getJson("/x"), null);
+  await assert.rejects(
+    () => e.getJson("/x"),
+    (err) => err instanceof MastrApiError && /HTTP 400 for GET .*: Invalid filter$/.test(err.message),
+  );
 });
 
 test("getJson throws MastrParseError on invalid JSON", async () => {
