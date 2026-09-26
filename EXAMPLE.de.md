@@ -3,7 +3,8 @@
 Echte Beispiele für die Claude-Code-Skills des Plugins `mastr`, eines pro Skill: eine
 Anfrage, die `mastr`-Befehle, die der Skill ausgeführt hat, und Claudes Antwort.
 
-Jedes Beispiel lief am 15. September 2026 mit `mastr` 0.0.4 gegen die Live-API.
+Jedes Beispiel lief am 15. September 2026 mit `mastr` 0.0.4 gegen die Live-API, außer
+mastr-filters, das am 26. September 2026 mit 0.0.8 neu lief.
 Die Daten ändern sich, Ihre Ergebnisse werden also abweichen; mit den gezeigten IDs und
 Schlüsseln können Sie die Anfragen selbst ausprobieren. Lange Listen sind gekürzt.
 
@@ -16,22 +17,30 @@ Skills: [mastr-filters](#mastr-filters) · [mastr-search](#mastr-search) · [mas
 > Wie filtere ich im MaStR nach Batteriespeichern in Betrieb in Brandenburg über 10 MW, die größten zuerst?
 
 ```bash
-mastr filters stromerzeugung --compact
+mastr filters stromerzeugung --compact > filters.json
+jq '.[] | {FilterName, Type}' filters.json
+jq '.[] | select(.FilterName=="Bundesland" or .FilterName=="Energieträger" or .FilterName=="Betriebs-Status" or .FilterName=="Speichertechnologie") | {FilterName, codes: [.ListObject[] | "\(.Value)=\(.Name)"]}' filters.json
 mastr stromerzeugung --filter "Bundesland~eq~'1400'" --total
 mastr stromerzeugung --filter "Bundesland~eq~'1400'~and~Energieträger~eq~'2496'" --total
 mastr stromerzeugung --filter "Bundesland~eq~'1400'~and~Energieträger~eq~'2496'~and~Betriebs-Status~eq~'35'" --total
 F="Bundesland~eq~'1400'~and~Energieträger~eq~'2496'~and~Betriebs-Status~eq~'35'~and~Speichertechnologie~eq~'524'"
 mastr stromerzeugung --filter "$F" --total
-mastr stromerzeugung --filter "$F~and~Bruttoleistung~gt~'10000'" --total                    # ungefiltert: kein FilterName
-mastr stromerzeugung --filter "$F~and~Bruttoleistung der Einheit~gte~'10000'" --total       # 0: gte ist kein Operator
+mastr stromerzeugung --filter "$F~and~Bruttoleistung der Einheit~gte~'10000'" --total       # Exit 2: unbekannter Operator, nichts gesendet
 mastr stromerzeugung --filter "$F~and~Bruttoleistung der Einheit~gt~'10000'" --total
-mastr stromerzeugung --filter "$F~and~Bruttoleistung der Einheit~gt~'10000'" --sort "Bruttoleistung der Einheit-desc" --page-size 3 --compact   # 0 Zeilen
+mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'
 mastr stromerzeugung --filter "$F~and~Bruttoleistung der Einheit~gt~'10000'" --sort "Bruttoleistung-desc" --page-size 15 --iso-dates --compact
 ```
 
-Die Operatorliste des Skills kennt kein „größer als". `gt` funktioniert, `gte` liefert dagegen
-ohne Warnung 0. Die Sortierung nach dem FilterName ergab 0 Zeilen und den Hinweis der CLI auf
-stderr. Der Sortierschlüssel ist das Datensatzfeld `Bruttoleistung`.
+Die FilterNames und Codes stammen aus `mastr filters` (`Bruttoleistung der Einheit` ist eine
+`number`-Spalte). Die `gte`-Probe erreicht das Register nicht mehr. Die CLI weist sie vor jeder
+Anfrage zurück:
+
+```
+error: option '--filter <spec>' argument 'Bundesland~eq~'1400'~and~Energieträger~eq~'2496'~and~Betriebs-Status~eq~'35'~and~Speichertechnologie~eq~'524'~and~Bruttoleistung der Einheit~gte~'10000'' is invalid. Unknown operator "gte" in condition 5. The operators are eq, neq, sw, ct, nct, ew, null, nn, gt, lt (gt/lt are strict; there is no gte/lte); the register returns 0 rows for any other.
+```
+
+Der Skill nahm das strikte `gt`. Den Sortierschlüssel las er vor dem Sortieren aus einem Datensatz
+(`Bruttoleistung`, nicht der FilterName), so lieferte die sortierte Abfrage gleich alle 11 Zeilen.
 
 ```
 Batteriespeicher in Betrieb in Brandenburg, > 10 MW, größte zuerst
@@ -41,15 +50,15 @@ Batteriespeicher in Betrieb in Brandenburg, > 10 MW, größte zuerst
   Energieträger                eq   2496    Speicher
   Betriebs-Status              eq   35      In Betrieb
   Speichertechnologie          eq   524     Batterie
-  Bruttoleistung der Einheit   gt   10000   kW (Zahlenfeld; gt ist echt größer)
+  Bruttoleistung der Einheit   gt   10000   kW (Zahlenfeld; gt ist echt größer, gte gibt es nicht)
 
   --filter "Bundesland~eq~'1400'~and~Energieträger~eq~'2496'~and~Betriebs-Status~eq~'35'~and~Speichertechnologie~eq~'524'~and~Bruttoleistung der Einheit~gt~'10000'"
   --sort   "Bruttoleistung-desc"
 
-Kontrolle mit --total: 300.199 → 94.302 → 92.789 → 92.773 → 11 Einheiten
+Kontrolle mit --total: 302.120 → 95.172 → 93.623 → 93.606 → 11 Einheiten
 Erste Zeilen: Big Battery Lausitz 66.000 kW (SEE905930139120, Spremberg, 2020-11-19)
-              BESS Kahsel 32.200 kW (SEE975222107571, 2026-07-27)
-              BESS Löwenberger Land II 22.500 kW (SEE937755233493, 2026-07-05)
+              BESS Kahsel 32.200 kW (SEE975222107571, Neuhausen, 2026-07-27)
+              BESS Löwenberger Land II 22.500 kW (SEE937755233493, Löwenberger Land, 2026-07-05)
 ```
 
 Als Nächstes angeboten: den Filter an mastr-search übergeben, um alle 11 Zeilen zu listen.
