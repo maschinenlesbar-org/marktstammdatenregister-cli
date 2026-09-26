@@ -210,3 +210,19 @@ test("Data null with Total 0 is an empty page", async () => {
   const { client } = clientFor({ Data: null, Total: 0, Errors: null });
   assert.deepEqual(await client.stromerzeugung(), { total: 0, data: [] });
 });
+
+test("filterColumns() throws on an Errors envelope or a non-array reply instead of returning []", async () => {
+  const { client: c1 } = clientFor(fx.nullRequestError);
+  await assert.rejects(
+    () => c1.filterColumns("stromerzeugung"),
+    (err) => err instanceof MastrApiError && err.detail === "Die Anfrage ist Null.",
+  );
+  for (const body of [{ Data: null, Total: 0 }, "x", [1, 2], null]) {
+    const { client } = clientFor(body);
+    await assert.rejects(
+      () => client.filterColumns("stromerzeugung"),
+      (err) => err instanceof MastrParseError && /expected a JSON array of filter columns\.$/.test(err.message),
+      JSON.stringify(body),
+    );
+  }
+});

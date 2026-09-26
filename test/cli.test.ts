@@ -281,3 +281,13 @@ test("an empty 200 body or a malformed envelope exits 1 with nothing on stdout",
     assert.match(cli.err.join("\n"), /Empty response body|Unexpected response shape|Invalid filter/, body);
   }
 });
+
+test("filters exits 1 on an Errors envelope or an empty body (not [] with exit 0)", async () => {
+  const errs = makeCli(() => jsonResponse(fx.nullRequestError));
+  assert.equal(await run(["filters", "stromerzeugung"], errs.deps), 1);
+  assert.deepEqual(errs.out, []);
+  assert.match(errs.err.join("\n"), /Die Anfrage ist Null/);
+  const empty = makeCli(() => ({ status: 200, headers: {}, body: Buffer.alloc(0) }));
+  assert.equal(await run(["filters", "stromerzeugung"], empty.deps), 1);
+  assert.deepEqual(empty.out, []);
+});

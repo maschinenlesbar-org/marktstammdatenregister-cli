@@ -144,10 +144,25 @@ export class MastrClient {
     return this.units("gasverbrauch", query);
   }
 
-  /** The filterable columns (names, types, dropdown codes) for a category. */
+  /**
+   * The filterable columns (names, types, dropdown codes) for a category. An `Errors`
+   * envelope throws `MastrApiError`, any other non-array reply `MastrParseError` —
+   * never an empty list, which would read as "this category has no filters".
+   */
   async filterColumns(category: UnitCategory): Promise<FilterColumn[]> {
     const path = `${SERVICE}/GetFilterColumnsErweiterteOeffentlicheEinheit${CATEGORY_SUFFIX[category]}`;
-    const res = await this.engine.getJson<FilterColumn[] | null>(path);
-    return Array.isArray(res) ? res : [];
+    const res = await this.engine.getJson<unknown>(path);
+    if (isObject(res) && res["Errors"] !== undefined && res["Errors"] !== null) {
+      throw new MastrApiError({
+        url: this.engine.buildUrl(path),
+        method: "GET",
+        body: JSON.stringify(res),
+        detail: describeMastrErrors(res["Errors"]),
+      });
+    }
+    if (!Array.isArray(res) || !res.every(isObject)) {
+      throw shapeError(path, "a JSON array of filter columns");
+    }
+    return res as FilterColumn[];
   }
 }
