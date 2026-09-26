@@ -334,3 +334,19 @@ test("a ~ inside a quoted --filter value is a usage error naming the cause", asy
   assert.equal(cli.mt.calls.length, 0);
   assert.match(cli.err.join("\n"), /A filter value cannot contain "~"/);
 });
+
+test("a --base-url with a query, fragment or surrounding whitespace is rejected (exit 2, no request)", async () => {
+  for (const [bad, message] of [
+    ["http://127.0.0.1:1/ok#frag", /cannot have a query \(\?\) or fragment \(#\)/],
+    ["http://127.0.0.1:1/ok?x=1", /cannot have a query \(\?\) or fragment \(#\)/],
+    [" http://127.0.0.1:1/ok", /surrounding whitespace/],
+  ] as const) {
+    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    assert.equal(await run(["--base-url", bad, "stromerzeugung"], cli.deps), 2, bad);
+    assert.equal(cli.mt.calls.length, 0, bad);
+    assert.match(cli.err.join("\n"), message, bad);
+  }
+  const prefix = makeCli(() => jsonResponse(fx.unitPage));
+  assert.equal(await run(["--base-url", "http://127.0.0.1:1/mirror/MaStR/", "stromerzeugung"], prefix.deps), 0);
+  assert.match(prefix.mt.last().url, /^http:\/\/127\.0\.0\.1:1\/mirror\/MaStR\/Einheit\//);
+});

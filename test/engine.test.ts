@@ -201,3 +201,14 @@ test("parseRetryAfter reads seconds and IMF-fixdates only", () => {
   assert.equal(parseRetryAfter("1.5", now), undefined);
   assert.equal(parseRetryAfter(undefined, now), undefined);
 });
+
+test("a base URL with a query or fragment is rejected at construction", () => {
+  for (const baseUrl of ["https://example.test/MaStR?x=1", "https://example.test/MaStR#f"]) {
+    const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
+    assert.throws(
+      () => new RequestEngine({ baseUrl, transport: mt.transport }),
+      (err) => err instanceof MastrNetworkError && /must not contain a query or fragment/.test(err.message),
+    );
+    assert.equal(mt.calls.length, 0);
+  }
+});

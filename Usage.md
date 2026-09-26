@@ -10,7 +10,7 @@ mastr [global options] <command> [command options]
 
 | Option | Description |
 |---|---|
-| `--base-url <url>` | API base URL (default `https://www.marktstammdatenregister.de/MaStR`) |
+| `--base-url <url>` | API base URL (default `https://www.marktstammdatenregister.de/MaStR`; http/https, a path prefix is fine, no `?query`, `#fragment` or surrounding whitespace) |
 | `--timeout <ms>` | time limit per request in ms, whole response included (0 = no timeout; at most 2147483647) |
 | `--user-agent <ua>` | User-Agent header value |
 | `--max-retries <n>` | retries for transient 429/503 responses (0..10; each waits the server's `Retry-After`, up to 30 s — a longer one is not retried; without one: 200 ms, 400 ms, …) |
