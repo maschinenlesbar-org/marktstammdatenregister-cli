@@ -10,7 +10,8 @@ keep them verbatim.
 | **Stromerzeugung / Stromverbrauch** | `stromerzeugung` / `stromverbrauch` | Electricity generation / consumption units. |
 | **Gaserzeugung / Gasverbrauch** | `gaserzeugung` / `gasverbrauch` | Gas generation / consumption units. |
 | **Energieträger** | `EnergietraegerName` / filter | Energy carrier — Solare Strahlungsenergie (solar), Wind, Biomasse, … Filtered by a numeric code (e.g. `2495` = solar). |
-| **Bruttoleistung / Nettonennleistung** | fields | Gross / net rated capacity, in **kW**. |
+| **Bruttoleistung / Nettonennleistung** | fields | Gross / net rated capacity, in **kW**. Only `stromerzeugung` rows have them. |
+| **Gas capacities** | fields | `gaserzeugung`: `Erzeugungsleistung` (gas generation), and for gas storage `MaxEinspeicherleistung` / `MaxAusspeicherleistung` (injection / withdrawal, **kWh/h**) and `MaxArbeitsvolumen` (working gas volume, **kWh**). `gasverbrauch`: `MaximaleGasbezugsLeistung` (maximum gas intake). The rows state no unit for `Erzeugungsleistung` and `MaximaleGasbezugsLeistung`. `stromverbrauch` rows carry no capacity field. |
 | **Betriebs-Status** | `BetriebsStatusName` / filter | Operating status — `In Betrieb` (in operation), `In Planung`, `Endgültig stillgelegt`, … (filtered by code, e.g. `35` = In Betrieb). |
 | **Anlagenbetreiber / Netzbetreiber** | `AnlagenbetreiberName` / `NetzbetreiberNamen` | Plant operator / grid operator. Operator names are often **anonymised** (`natürliche Person (ABR…)`). |
 | **Total** | `total` | The full number of units matching the query, across all pages (respects the filter). Returned for free — use `--total`. |
@@ -19,8 +20,9 @@ keep them verbatim.
 
 ## Reading a record
 
-- **Capacities are in kW**; divide by 1000 for MW. Gross (`Bruttoleistung`) ≠ net
-  (`Nettonennleistung`) — say which.
+- **Electricity capacities are in kW**; divide by 1000 for MW. Gross (`Bruttoleistung`) ≠
+  net (`Nettonennleistung`) — say which. Both exist only in `stromerzeugung`; the gas
+  categories have their own capacity fields (see *Gas capacities*), which are not kW.
 - **Dates are `/Date(ms)/`** — convert with `--iso-dates` before showing a human.
 - **Coordinates (`Breitengrad`/`Laengengrad`) may be null**, and some location data is
   withheld for small (< 30 kW) units — by law, not a defect.

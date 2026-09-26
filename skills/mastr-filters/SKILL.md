@@ -91,7 +91,11 @@ mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'
 ```
 
 Pick the key that matches the column (`Bruttoleistung`, `Nettonennleistung`,
-`InbetriebnahmeDatum`, `EinheitRegistrierungsdatum`, …).
+`InbetriebnahmeDatum`, `EinheitRegistrierungsdatum`, …). **The keys differ per category:**
+`Bruttoleistung`/`Nettonennleistung` exist only in `stromerzeugung`; gas generation and
+storage sort by `Erzeugungsleistung`, `MaxEinspeicherleistung`, `MaxAusspeicherleistung`
+or `MaxArbeitsvolumen`, gas consumption by `MaximaleGasbezugsLeistung`, and
+`stromverbrauch` has no capacity key. List the keys of the category you query.
 **A wrong sort key is worse than a wrong filter: it returns 0 rows** (not an error, not
 the unfiltered set), so a query that goes to `total: 0` right after you add `--sort`
 almost always has a bad sort key. The CLI prints a stderr note in that case.

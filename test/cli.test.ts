@@ -256,3 +256,19 @@ test("--filter with a comma list inside one value is sent as is", async () => {
   assert.equal(await run(["stromerzeugung", "--filter", "Energieträger~eq~'2497,2498'", "--total"], cli.deps), 0);
   assert.equal(queryOf(cli.mt.last()).get("filter"), "Energieträger~eq~'2497,2498'");
 });
+
+test("the 0-results --sort note suggests a sort key that exists in that category", async () => {
+  const expected = {
+    stromerzeugung: "Bruttoleistung",
+    stromverbrauch: "InbetriebnahmeDatum",
+    gaserzeugung: "Erzeugungsleistung",
+    gasverbrauch: "MaximaleGasbezugsLeistung",
+  };
+  for (const [category, key] of Object.entries(expected)) {
+    const cli = makeCli(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
+    assert.equal(await run([category, "--sort", "Bruttoleistung-desc", "--total"], cli.deps), 0);
+    const err = cli.err.join("\n");
+    assert.match(err, new RegExp(`record field names \\(e\\.g\\. ${key}\\)`), category);
+    if (category !== "stromerzeugung") assert.doesNotMatch(err, /e\.g\. Bruttoleistung/, category);
+  }
+});

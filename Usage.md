@@ -35,7 +35,7 @@ mastr [global options] <command> [command options]
 |---|---|
 | `--page <n>` | 1-based page (default 1) |
 | `--page-size <n>` | rows per page (1..5000, default 25) |
-| `--sort <spec>` | `FieldKey-asc` or `FieldKey-desc`, e.g. `Bruttoleistung-desc`. `FieldKey` is a record field name, not a `FilterName` |
+| `--sort <spec>` | `FieldKey-asc` or `FieldKey-desc`, e.g. `Bruttoleistung-desc`. `FieldKey` is a record field name of **that category**, not a `FilterName` (`Bruttoleistung` exists only in `stromerzeugung`; see [Capacity fields](#capacity-fields-per-category)) |
 | `--filter <spec>` | filter expression (see below) |
 | `--total` | print only the total match count, not the rows |
 
@@ -83,7 +83,7 @@ mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Bruttoleistung der E
 mastr stromerzeugung --total                        # 9063887
 mastr stromerzeugung --page-size 5 --iso-dates      # first 5 units, ISO dates
 mastr filters stromerzeugung --compact | jq '.[] | {FilterName, Type}'
-mastr gasverbrauch --sort "Bruttoleistung-desc" --page-size 10 --compact | jq '.data'
+mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --compact | jq '.data'
 ```
 
 ## Exit codes
@@ -110,6 +110,22 @@ mastr gasverbrauch --sort "Bruttoleistung-desc" --page-size 10 --compact | jq '.
 - **Dates** are Microsoft `/Date(ms)/` strings; `--iso-dates` converts them, or use the
   library's `parseMsDate()`.
 - **You cannot sum capacity server-side** — there is no aggregate endpoint. Use `--total`
-  for counts; sum `Bruttoleistung` client-side only for small result sets.
+  for counts; sum the capacity field client-side only for small result sets.
+
+## Capacity fields per category
+
+The rows differ per category; `Bruttoleistung`/`Nettonennleistung` exist **only** in
+`stromerzeugung` (sorting another category by them returns 0 rows).
+
+| Category | Capacity fields (record keys, usable in `--sort`) | Unit |
+|---|---|---|
+| `stromerzeugung` | `Bruttoleistung` (gross), `Nettonennleistung` (net) | kW |
+| `stromverbrauch` | none in the rows (only the flag `EinheitenUeber50MW`) | — |
+| `gaserzeugung` | `Erzeugungsleistung` (gas generation); gas storage: `MaxEinspeicherleistung`, `MaxAusspeicherleistung` (injection / withdrawal) and `MaxArbeitsvolumen` (working gas volume) | storage: kWh/h, volume kWh (as the register's detail page shows); `Erzeugungsleistung`: not stated in the rows |
+| `gasverbrauch` | `MaximaleGasbezugsLeistung` (maximum gas intake) | not stated in the rows |
+
+The matching filters are `Bruttoleistung der Einheit` (stromerzeugung),
+`Gaserzeugungsleistung` and `Maximale Gasbezugsleistung` — check the exact names with
+`mastr filters <category>`.
 - The data is © the Bundesnetzagentur under DL-DE-BY-2.0 — see
   [DATA_LICENSE.md](DATA_LICENSE.md); attribution is required.

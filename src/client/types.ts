@@ -13,9 +13,9 @@ export type UnitCategory = "stromerzeugung" | "stromverbrauch" | "gaserzeugung" 
 
 /**
  * A unit ("Einheit") record. The API returns a very wide row (~90 fields) whose
- * populated columns vary by category (a solar unit carries module fields a gas
- * consumer does not), so only the broadly-useful, category-independent fields are
- * typed; the index signature carries the rest. Natural-person and confidential data
+ * columns vary by category (a solar unit carries module fields a gas consumer does
+ * not), so only broadly useful fields are typed — each says where it occurs when not
+ * in every category; the index signature carries the rest. Natural-person and confidential data
  * are withheld upstream, so operator names may be anonymised (e.g.
  * `"natürliche Person (ABR…)"`).
  */
@@ -28,13 +28,23 @@ export interface MastrUnit {
   /** Operating status name, e.g. `"In Betrieb"`. */
   BetriebsStatusName?: string;
   BetriebsStatusId?: number;
-  /** Energy carrier name, e.g. `"Solare Strahlungsenergie"`. */
+  /** Energy carrier name, e.g. `"Solare Strahlungsenergie"` (`stromerzeugung`). */
   EnergietraegerName?: string;
   EnergietraegerId?: number;
-  /** Gross capacity in kW. */
+  /** Gross capacity in kW. Only in `stromerzeugung` rows. */
   Bruttoleistung?: number;
-  /** Net rated capacity in kW. */
+  /** Net rated capacity in kW. Only in `stromerzeugung` rows. */
   Nettonennleistung?: number;
+  /** Gas generation capacity (`gaserzeugung`; the rows state no unit). */
+  Erzeugungsleistung?: number | null;
+  /** Gas storage injection capacity in kWh/h (`gaserzeugung`). */
+  MaxEinspeicherleistung?: number | null;
+  /** Gas storage withdrawal capacity in kWh/h (`gaserzeugung`). */
+  MaxAusspeicherleistung?: number | null;
+  /** Gas storage working gas volume in kWh (`gaserzeugung`). */
+  MaxArbeitsvolumen?: number | null;
+  /** Maximum gas intake (`gasverbrauch`; the rows state no unit). */
+  MaximaleGasbezugsLeistung?: number | null;
   Bundesland?: string;
   Landkreis?: string;
   Gemeinde?: string;

@@ -10,7 +10,8 @@ deutsch; übernehmen Sie sie unverändert.
 | **Stromerzeugung / Stromverbrauch** | `stromerzeugung` / `stromverbrauch` | Einheiten zur Stromerzeugung bzw. zum Stromverbrauch. |
 | **Gaserzeugung / Gasverbrauch** | `gaserzeugung` / `gasverbrauch` | Einheiten zur Gaserzeugung bzw. zum Gasverbrauch. |
 | **Energieträger** | `EnergietraegerName` / Filter | Solare Strahlungsenergie, Wind, Biomasse, … Gefiltert wird über einen numerischen Code (z. B. `2495` = Solar). |
-| **Bruttoleistung / Nettonennleistung** | Felder | Brutto- bzw. Nettonennleistung, in **kW**. |
+| **Bruttoleistung / Nettonennleistung** | Felder | Brutto- bzw. Nettonennleistung, in **kW**. Nur Zeilen aus `stromerzeugung` haben sie. |
+| **Gasleistungen** | Felder | `gaserzeugung`: `Erzeugungsleistung` (Gaserzeugung), bei Gasspeichern `MaxEinspeicherleistung` / `MaxAusspeicherleistung` (Ein- bzw. Ausspeicherleistung, **kWh/h**) und `MaxArbeitsvolumen` (Arbeitsgasvolumen, **kWh**). `gasverbrauch`: `MaximaleGasbezugsLeistung` (maximale Gasbezugsleistung). Für `Erzeugungsleistung` und `MaximaleGasbezugsLeistung` nennen die Zeilen keine Einheit. Zeilen aus `stromverbrauch` haben kein Leistungsfeld. |
 | **Betriebs-Status** | `BetriebsStatusName` / Filter | Betriebsstatus – `In Betrieb`, `In Planung`, `Endgültig stillgelegt`, … (gefiltert über einen Code, z. B. `35` = In Betrieb). |
 | **Anlagenbetreiber / Netzbetreiber** | `AnlagenbetreiberName` / `NetzbetreiberNamen` | Betreiber der Anlage bzw. des Netzes. Betreibernamen sind oft **anonymisiert** (`natürliche Person (ABR…)`). |
 | **Total** | `total` | Die Gesamtzahl der Einheiten, die zur Abfrage passen, über alle Seiten (berücksichtigt den Filter). Wird ohne Zusatzaufwand mitgeliefert – nutzen Sie `--total`. |
@@ -19,8 +20,10 @@ deutsch; übernehmen Sie sie unverändert.
 
 ## Einen Datensatz lesen
 
-- **Leistungen sind in kW angegeben**; für MW durch 1.000 teilen. Brutto (`Bruttoleistung`) ≠ netto
-  (`Nettonennleistung`) – geben Sie an, welche gemeint ist.
+- **Elektrische Leistungen sind in kW angegeben**; für MW durch 1.000 teilen. Brutto
+  (`Bruttoleistung`) ≠ netto (`Nettonennleistung`) – geben Sie an, welche gemeint ist. Beide gibt
+  es nur in `stromerzeugung`; die Gaskategorien haben eigene Leistungsfelder (siehe
+  *Gasleistungen*), die nicht in kW angegeben sind.
 - **Datumsangaben haben die Form `/Date(ms)/`** – wandeln Sie sie mit `--iso-dates` um, bevor Sie
   sie Menschen zeigen.
 - **Koordinaten (`Breitengrad`/`Laengengrad`) können null sein**, und bei kleinen Einheiten

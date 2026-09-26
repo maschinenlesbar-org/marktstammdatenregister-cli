@@ -8,11 +8,14 @@ import type { MastrClient } from "../../client/client.js";
 import type { UnitCategory, UnitQuery } from "../../client/types.js";
 import { action, parseBoundedInt, parseFilter, parseNonEmpty, renderJson } from "../shared.js";
 
-const CATEGORIES: { name: UnitCategory; desc: string }[] = [
-  { name: "stromerzeugung", desc: "Electricity-generation units (Stromerzeugung)" },
-  { name: "stromverbrauch", desc: "Electricity-consumption units (Stromverbrauch)" },
-  { name: "gaserzeugung", desc: "Gas-generation units (Gaserzeugung)" },
-  { name: "gasverbrauch", desc: "Gas-consumption units (Gasverbrauch)" },
+// `sortKey` is a record field that exists in that category's rows (live 2026-09-26):
+// only stromerzeugung rows carry Bruttoleistung/Nettonennleistung, so the stderr hint
+// must not suggest it for the other three.
+const CATEGORIES: { name: UnitCategory; desc: string; sortKey: string }[] = [
+  { name: "stromerzeugung", desc: "Electricity-generation units (Stromerzeugung)", sortKey: "Bruttoleistung" },
+  { name: "stromverbrauch", desc: "Electricity-consumption units (Stromverbrauch)", sortKey: "InbetriebnahmeDatum" },
+  { name: "gaserzeugung", desc: "Gas-generation units (Gaserzeugung)", sortKey: "Erzeugungsleistung" },
+  { name: "gasverbrauch", desc: "Gas-consumption units (Gasverbrauch)", sortKey: "MaximaleGasbezugsLeistung" },
 ];
 
 const RUN: Record<UnitCategory, (c: MastrClient, q: UnitQuery) => ReturnType<MastrClient["units"]>> = {
@@ -45,7 +48,7 @@ export function registerCommands(program: Command, deps: CliDeps): void {
       .option(
         "--sort <spec>",
         "sort: FieldKey-asc | FieldKey-desc, where FieldKey is a record field name, not a " +
-          "FilterName (e.g. Bruttoleistung-desc)",
+          `FilterName (e.g. ${cat.sortKey}-desc)`,
         parseNonEmpty,
       )
       .option(
@@ -66,7 +69,7 @@ export function registerCommands(program: Command, deps: CliDeps): void {
           if (page.total === 0 && typeof opts["sort"] === "string") {
             deps.io.err(
               "Note: 0 results with --sort set. If you expected matches, an unknown sort " +
-                "key returns 0 rows. Sort keys are record field names (e.g. Bruttoleistung), " +
+                `key returns 0 rows. Sort keys are record field names (e.g. ${cat.sortKey}), ` +
                 "not the FilterNames from `mastr filters`; list them with " +
                 `\`mastr ${cat.name} --page-size 1 --compact | jq '.data[0] | keys'\`.`,
             );

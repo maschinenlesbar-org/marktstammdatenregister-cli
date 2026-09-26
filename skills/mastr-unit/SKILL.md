@@ -34,7 +34,10 @@ This skill also filters JSON with `jq`. **Validate it too** — run `command -v 
 | `MaStRNummer` | the unit's registry number (e.g. `SEE984033548619`) |
 | `EinheitName` | display name |
 | `EnergietraegerName` | energy carrier (Solare Strahlungsenergie, Wind, …) |
-| `Bruttoleistung` / `Nettonennleistung` | gross / net rated capacity, in **kW** |
+| `Bruttoleistung` / `Nettonennleistung` | gross / net rated capacity, in **kW** — `stromerzeugung` only |
+| `Erzeugungsleistung` | gas generation capacity (`gaserzeugung`; the rows state no unit) |
+| `MaxEinspeicherleistung` / `MaxAusspeicherleistung` / `MaxArbeitsvolumen` | gas storage injection / withdrawal capacity in **kWh/h**, working gas volume in **kWh** (`gaserzeugung`) |
+| `MaximaleGasbezugsLeistung` | maximum gas intake (`gasverbrauch`; the rows state no unit) |
 | `BetriebsStatusName` | operating status (`In Betrieb`, `In Planung`, …) |
 | `Bundesland` / `Ort` / `Plz` | federal state / town / postcode |
 | `Breitengrad` / `Laengengrad` | latitude / longitude (may be withheld) |
@@ -60,8 +63,11 @@ mastr stromerzeugung --filter "MaStR-Nr. der Einheit~eq~'SEE984033548619'" --iso
 
 - **Dates are Microsoft `/Date(ms)/` strings** — always pass `--iso-dates` (or note
   they are epoch-milliseconds) before showing a date to a human.
-- **Capacities are in kW**, gross (`Bruttoleistung`) vs net (`Nettonennleistung`) — say
-  which; divide by 1000 for MW.
+- **Electricity capacities are in kW**, gross (`Bruttoleistung`) vs net
+  (`Nettonennleistung`) — say which; divide by 1000 for MW. **Only `stromerzeugung` rows
+  have them:** gas units use the gas fields above (storage in kWh/h and kWh, the others
+  without a stated unit — don't call them kW), and `stromverbrauch` rows carry no
+  capacity at all.
 - **Operator names are often anonymised** (`natürliche Person (ABR…)`) and **some
   location data is withheld** for units < 30 kW — this is by law (natural-person /
   confidential data are not published), not a bug. Don't try to de-anonymise.
