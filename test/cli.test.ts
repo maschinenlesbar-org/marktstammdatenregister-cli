@@ -327,3 +327,10 @@ test("well-formed --filter specs pass (unary ops with '', unquoted codes, an apo
     assert.equal(queryOf(cli.mt.last()).get("filter"), spec);
   }
 });
+
+test("a ~ inside a quoted --filter value is a usage error naming the cause", async () => {
+  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  assert.equal(await run(["stromerzeugung", "--filter", "Anzeige-Name der Einheit~ct~'a~b'", "--total"], cli.deps), 2);
+  assert.equal(cli.mt.calls.length, 0);
+  assert.match(cli.err.join("\n"), /A filter value cannot contain "~"/);
+});

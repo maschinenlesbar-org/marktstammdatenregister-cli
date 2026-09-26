@@ -56,7 +56,11 @@ FilterName~op~'value'~and~FilterName~op~'value'~…
 - **value:** single-quoted; for a dropdown use its **code** (`Value`), not its label;
   decimals take a point (`'4999.999'`), dates work as `'2025-01-01'` or `'01.01.2025'`.
   `null`/`nn` still need a value: `Ort~null~''` (a bare `Ort~null` is ignored upstream
-  and returns the unfiltered register, so the CLI rejects it)
+  and returns the unfiltered register, so the CLI rejects it). **A value cannot contain
+  `~`:** the register splits the whole filter on every `~` and has no escape or quoting
+  for it (`ct 'a~b'` would silently become `ct 'a'`), so the CLI rejects it; search for a
+  part of the text without the `~` instead. A single `'` inside a value is fine
+  (`ct 'd'Arc'`). Library users build specs from input with `buildFilter()`
 - **checked before sending:** every condition needs a FilterName, a known operator and
   a value, a value that opens a single quote must close it, conditions are joined by
   `~and~` only, and nothing may dangle at the end (`…~and~`). Anything else is a usage

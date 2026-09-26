@@ -58,7 +58,9 @@ mastr filters stromerzeugung --compact \
 - **value:** in single quotes; for a dropdown use its **`Value` code**, not the label.
   Decimals take a point (`'4999.999'`; `'4999,999'` returns 0 rows). Dates work as
   `'2025-01-01'` or `'01.01.2025'`. `null`/`nn` still take a value: `Ort~null~''` (a bare
-  `Ort~null` would be ignored upstream, so the CLI rejects it).
+  `Ort~null` would be ignored upstream, so the CLI rejects it). **A value cannot contain
+  `~`** — the register splits on every `~` and has no escape, so the CLI rejects it;
+  match a part of the text without the `~` (e.g. `ct`). A single `'` inside a value is fine.
 - **conjunction:** only `and` between conditions. **There is no working `or`:** the
   register keeps only the part before the first `~or~` and silently drops the rest, so
   the CLI rejects `~or~` (exit 2). For an OR between codes of **one dropdown column**,

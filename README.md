@@ -70,6 +70,21 @@ solar.total; // total matching units
 parseMsDate(String(solar.data[0]?.EinheitRegistrierungsdatum)); // Date | null
 ```
 
+Build filters from user input with `buildFilter`, not string interpolation: a filter
+value cannot contain `~` (the register splits on it and has no escape), so
+`` `Ort~eq~'${input}'` `` lets an input like `Münster'~and~Energieträger~eq~'2497` add a
+condition. `buildFilter` quotes each value and throws `MastrValidationError` for a `~`:
+
+```ts
+import { buildFilter } from "@maschinenlesbar.org/marktstammdatenregister-cli";
+
+const filter = buildFilter([
+  { name: "Ort", op: "eq", value: town },                        // quoted, ~ refused
+  { name: "Energieträger", op: "eq", value: ["2497", "2498"] },  // comma list = any of
+]);
+await mastr.stromerzeugung({ filter, pageSize: 1 });
+```
+
 ## Documentation
 
 - [Usage.md](Usage.md) — commands, filter syntax, exit codes

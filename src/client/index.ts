@@ -2,8 +2,8 @@
 
 export { MastrClient, parseMsDate, isoifyDates } from "./client.js";
 export type { MastrClientOptions } from "./client.js";
-export { FILTER_OPERATORS, filterProblem, validateFilter } from "./filter.js";
-export type { FilterOperator } from "./filter.js";
+export { FILTER_OPERATORS, buildFilter, filterProblem, validateFilter } from "./filter.js";
+export type { FilterCondition, FilterOperator } from "./filter.js";
 export {
   RequestEngine,
   DEFAULT_BASE_URL,

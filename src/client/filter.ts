@@ -70,6 +70,16 @@ export function filterProblem(spec: string): string | undefined {
       return `Condition ${n} ("${name}~${op}") has no value. ${SHAPE}`;
     }
     if (value.startsWith("'") && (value.length < 2 || !value.endsWith("'"))) {
+      // A later part that closes the quote means the value itself held a "~".
+      const close = parts.findIndex((part, j) => j > i + 2 && part.endsWith("'"));
+      if (close !== -1) {
+        const meant = parts.slice(i + 2, close + 1).join("~");
+        return (
+          `The value ${meant} in condition ${n} contains "~". A filter value cannot contain "~": ` +
+          `the register splits the filter on every "~" and has no escape, so it would read ${value}' ` +
+          "and treat the rest as further conditions. Leave the ~ out (e.g. match a part with ct)."
+        );
+      }
       return `The value of condition ${n} (${value}) has no closing single quote. ${SHAPE}`;
     }
     i += 3;
@@ -90,6 +100,80 @@ export function filterProblem(spec: string): string | undefined {
       return 'The filter ends with "~and~": a condition must follow it.';
     }
   }
+}
+
+/** One condition for {@link buildFilter}. */
+export interface FilterCondition {
+  /** The FilterName, e.g. `"Ort"` or `"Energieträger"` (see `filterColumns()`). */
+  name: string;
+  /** The operator. */
+  op: FilterOperator;
+  /**
+   * The value, quoted by `buildFilter`. For a dropdown column pass its code; an array
+   * becomes the comma list the register reads as "any of these codes". Ignored for
+   * `null`/`nn` (sent as `''`). Must not contain `~` (nor `,` in an array item).
+   */
+  value?: string | number | readonly (string | number)[];
+}
+
+/**
+ * Build a filter spec from conditions joined by `~and~`, quoting each value. Unlike
+ * string interpolation (`Ort~eq~'${input}'`), a value can't add conditions: one with a
+ * `~` (the register's separator, which has no escape) throws `MastrValidationError`, so
+ * `Münster'~and~Energieträger~eq~'2497` is refused instead of becoming a second
+ * condition.
+ *
+ *   buildFilter([{ name: "Ort", op: "eq", value: "Münster" },
+ *                { name: "Energieträger", op: "eq", value: ["2497", "2498"] }])
+ *   // → "Ort~eq~'Münster'~and~Energieträger~eq~'2497,2498'"
+ */
+export function buildFilter(conditions: readonly FilterCondition[]): string {
+  if (!Array.isArray(conditions) || conditions.length === 0) {
+    throw new MastrValidationError("Invalid filter: expected at least one condition.");
+  }
+  const parts = conditions.map((c, index) => {
+    const n = index + 1;
+    if (typeof c?.name !== "string" || c.name.trim() === "" || c.name.includes("~")) {
+      throw new MastrValidationError(
+        `Invalid filter: condition ${n} needs a non-blank FilterName without "~", got ${JSON.stringify(c?.name)}.`,
+      );
+    }
+    if (!OPERATORS.has(c.op)) {
+      throw new MastrValidationError(
+        `Invalid filter: unknown operator ${JSON.stringify(c.op)} in condition ${n}; expected one of ${FILTER_OPERATORS.join(", ")}.`,
+      );
+    }
+    if (UNARY_OPERATORS.has(c.op)) return `${c.name}~${c.op}~''`;
+    const items: readonly unknown[] = Array.isArray(c.value) ? c.value : [c.value];
+    if (items.length === 0) {
+      throw new MastrValidationError(`Invalid filter: condition ${n} ("${c.name}") has an empty value list.`);
+    }
+    const texts = items.map((item) => {
+      if ((typeof item !== "string" && typeof item !== "number") || String(item).trim() === "") {
+        throw new MastrValidationError(
+          `Invalid filter: condition ${n} ("${c.name}") needs a non-blank value, got ${JSON.stringify(item)}.`,
+        );
+      }
+      const text = String(item);
+      if (text.includes("~")) {
+        throw new MastrValidationError(
+          `Invalid filter: the value ${JSON.stringify(text)} in condition ${n} contains "~", which the ` +
+            "register reads as a separator (there is no escape).",
+        );
+      }
+      if (items.length > 1 && text.includes(",")) {
+        throw new MastrValidationError(
+          `Invalid filter: the list item ${JSON.stringify(text)} in condition ${n} contains ",", which ` +
+            "separates the codes of a list.",
+        );
+      }
+      return text;
+    });
+    return `${c.name}~${c.op}~'${texts.join(",")}'`;
+  });
+  const spec = parts.join("~and~");
+  validateFilter(spec);
+  return spec;
 }
 
 /** Throw a {@link MastrValidationError} if {@link filterProblem} finds a problem. */
