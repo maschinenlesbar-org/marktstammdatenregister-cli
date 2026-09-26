@@ -23,6 +23,7 @@ export {
   MastrNetworkError,
   MastrValidationError,
   MastrParseError,
+  redactUrl,
 } from "./errors.js";
 
 export * from "./types.js";

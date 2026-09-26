@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RequestEngine, parseRetryAfter } from "../src/client/engine.js";
-import { MastrApiError, MastrNetworkError, MastrParseError } from "../src/client/errors.js";
+import { MastrApiError, MastrNetworkError, MastrParseError, redactUrl } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -211,4 +211,18 @@ test("a base URL with a query or fragment is rejected at construction", () => {
     );
     assert.equal(mt.calls.length, 0);
   }
+});
+
+test("redactUrl hides userinfo and leaves other URLs alone", () => {
+  assert.equal(redactUrl("http://user:secret@h.test/a?b=1"), "http://***@h.test/a?b=1");
+  assert.equal(redactUrl("http://user@h.test/"), "http://***@h.test/");
+  assert.equal(redactUrl("https://h.test/x"), "https://h.test/x");
+  assert.equal(redactUrl("not a url"), "not a url");
+});
+
+test("base-URL errors redact userinfo", () => {
+  assert.throws(
+    () => new RequestEngine({ baseUrl: "ftp://user:secret@h.test/" }),
+    (err) => err instanceof MastrNetworkError && !/secret/.test(err.message) && /\*\*\*@h\.test/.test(err.message),
+  );
 });

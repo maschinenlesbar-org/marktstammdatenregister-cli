@@ -350,3 +350,12 @@ test("a --base-url with a query, fragment or surrounding whitespace is rejected 
   assert.equal(await run(["--base-url", "http://127.0.0.1:1/mirror/MaStR/", "stromerzeugung"], prefix.deps), 0);
   assert.match(prefix.mt.last().url, /^http:\/\/127\.0\.0\.1:1\/mirror\/MaStR\/Einheit\//);
 });
+
+test("userinfo in --base-url is redacted in error messages but still sent", async () => {
+  const cli = makeCli(() => jsonResponse({ message: "nope" }, 404));
+  assert.equal(await run(["--base-url", "http://user:pw@127.0.0.1:1/r404", "stromerzeugung"], cli.deps), 4);
+  const err = cli.err.join("\n");
+  assert.doesNotMatch(err, /user:pw|:pw@/);
+  assert.match(err, /HTTP 404 for GET http:\/\/\*\*\*@127\.0\.0\.1:1\/r404\/Einheit\/.*: nope/);
+  assert.match(cli.mt.last().url, /^http:\/\/user:pw@127\.0\.0\.1:1\//);
+});

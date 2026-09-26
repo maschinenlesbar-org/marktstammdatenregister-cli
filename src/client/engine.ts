@@ -5,7 +5,7 @@
 
 import { nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { MastrApiError, MastrNetworkError, MastrParseError } from "./errors.js";
+import { MastrApiError, MastrNetworkError, MastrParseError, redactUrl } from "./errors.js";
 
 export const DEFAULT_BASE_URL = "https://www.marktstammdatenregister.de/MaStR";
 const DEFAULT_USER_AGENT = "marktstammdatenregister-cli";
@@ -138,15 +138,15 @@ function assertHttpScheme(baseUrl: string): void {
   try {
     url = new URL(baseUrl);
   } catch {
-    throw new MastrNetworkError(`Invalid base URL: ${baseUrl}`);
+    throw new MastrNetworkError(`Invalid base URL: ${redactUrl(baseUrl)}`);
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new MastrNetworkError(
-      `Unsupported protocol "${url.protocol}" in base URL: ${baseUrl}`,
+      `Unsupported protocol "${url.protocol}" in base URL: ${redactUrl(baseUrl)}`,
     );
   }
   if (/[?#]/.test(baseUrl)) {
-    throw new MastrNetworkError(`Base URL must not contain a query or fragment: ${baseUrl}`);
+    throw new MastrNetworkError(`Base URL must not contain a query or fragment: ${redactUrl(baseUrl)}`);
   }
 }
 
