@@ -51,9 +51,16 @@ FilterName~op~'value'~and~FilterName~op~'value'~…
 - **operators:** `eq` (=), `neq` (≠), `sw` (starts-with), `ct` (contains),
   `nct` (not-contains), `ew` (ends-with), `null` (empty), `nn` (not empty), and for
   `number`/`date` columns `gt` (>) and `lt` (<). `gt`/`lt` are strict; there is no
-  `gte`/`lte`, and an unknown operator returns 0 rows
+  `gte`/`lte`. An unknown or upper-case operator is rejected (exit 2) — the register
+  would return 0 rows for it
 - **value:** single-quoted; for a dropdown use its **code** (`Value`), not its label;
-  decimals take a point (`'4999.999'`), dates work as `'2025-01-01'` or `'01.01.2025'`
+  decimals take a point (`'4999.999'`), dates work as `'2025-01-01'` or `'01.01.2025'`.
+  `null`/`nn` still need a value: `Ort~null~''` (a bare `Ort~null` is ignored upstream
+  and returns the unfiltered register, so the CLI rejects it)
+- **checked before sending:** every condition needs a FilterName, a known operator and
+  a value, a value that opens a single quote must close it, conditions are joined by
+  `~and~` only, and nothing may dangle at the end (`…~and~`). Anything else is a usage
+  error (exit 2). The FilterName itself can't be checked (see below)
 - **conjunction:** only `and`. **There is no working `or`:** the register keeps only the
   part before the first `~or~` and silently drops the rest (a wrong count, no error), so
   the CLI rejects `~or~` (exit 2). For an OR between codes of **one dropdown column**,
@@ -92,7 +99,7 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
 |---|---|
 | `0` | success (help/version included); an empty result also exits 0 |
 | `1` | API/logical error (e.g. the server's `Errors` field), or a catch-all |
-| `2` | usage error (bad flags, unknown command, bad `--filter`/`--page-size`, redirecting base URL) |
+| `2` | usage error (bad flags, unknown command, a malformed `--filter` — shape, operator, `~or~` — or a bad `--page-size`, redirecting base URL) |
 | `4` | HTTP 404 |
 | `6` | network / transport failure (DNS, connection, timeout, response size-cap) |
 
@@ -106,7 +113,8 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
   (`Bruttoleistung der Einheit-desc` returns 0 rows); list them with
   `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. (Contrast
   `--filter`, where a wrong field is silently *ignored* and you get the unfiltered set,
-  but a wrong operator also returns 0 rows, with a stderr note naming the known ones.)
+  and a wrong operator is rejected before sending; a filter that still gives 0 rows
+  gets a stderr note about its values.)
 - **Dates** are Microsoft `/Date(ms)/` strings; `--iso-dates` converts them, or use the
   library's `parseMsDate()`.
 - **You cannot sum capacity server-side** — there is no aggregate endpoint. Use `--total`

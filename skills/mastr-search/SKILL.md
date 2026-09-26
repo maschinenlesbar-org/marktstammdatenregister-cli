@@ -72,7 +72,8 @@ mastr stromerzeugung --page 2 --page-size 100 --compact
   CLI prints a stderr note). Sort keys are record field names (`Bruttoleistung`), not
   the FilterNames from `mastr filters` (`Bruttoleistung der Einheit` gives 0 rows); list
   them with `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`.
-- **A wrong filter operator also returns 0 rows.** Range filters use `gt`/`lt`
-  (strict; there is no `gte`/`lte`) — see **mastr-filters**.
+- **A malformed `--filter` exits 2 without a request** (unknown operator such as `gte`,
+  `~or~`, missing value, dangling `~and~`). Range filters use `gt`/`lt` (strict; there is
+  no `gte`/`lte`) — see **mastr-filters**.
 - **Reading a record** (fields, dates, anonymisation) → the **mastr-unit** skill.
 - Cite the source: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0).

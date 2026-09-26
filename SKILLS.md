@@ -18,8 +18,9 @@ They compose: **mastr-filters → mastr-search → mastr-unit**.
 - The `mastr` CLI on PATH: `npm install -g @maschinenlesbar.org/marktstammdatenregister-cli`.
 - **No API key** — the public MaStR search is open.
 - **Notes:** filtering uses the register's own `FilterName~op~'value'` syntax (a wrong
-  field name is silently ignored — verify with `mastr filters` and `--total`; a wrong
-  operator returns 0 rows, and ranges use the strict `gt`/`lt`); a sort key is a record
+  field name is silently ignored — verify with `mastr filters` and `--total`; a malformed
+  spec, an unknown operator or `~or~` is rejected before sending, and ranges use the
+  strict `gt`/`lt`); a sort key is a record
   field name such as `Bruttoleistung`, not a FilterName (a wrong one returns 0 rows); dates
   come as `/Date(ms)/` (use `--iso-dates`); there is no server-side capacity sum, only
   the `--total` count.

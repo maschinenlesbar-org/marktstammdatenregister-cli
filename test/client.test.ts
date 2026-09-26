@@ -226,3 +226,15 @@ test("filterColumns() throws on an Errors envelope or a non-array reply instead 
     );
   }
 });
+
+test("units() rejects a malformed filter before any request (MastrValidationError)", async () => {
+  const { client, mt } = clientFor(fx.unitPage);
+  for (const filter of ["foo", "Ort~EQ~'x'", "Ort~eq~'x'~and~"]) {
+    await assert.rejects(
+      () => client.stromerzeugung({ filter }),
+      (err) => err instanceof MastrValidationError && /^Invalid filter: /.test(err.message),
+      filter,
+    );
+  }
+  assert.equal(mt.calls.length, 0);
+});

@@ -52,11 +52,13 @@ mastr filters stromerzeugung --compact \
 - **operators:** `eq` (=), `neq` (≠), `sw` (starts-with), `ct` (contains),
   `nct` (not-contains), `ew` (ends-with), `null` (is empty), `nn` (not empty),
   `gt` (>) and `lt` (<) for `number` and `date` columns. `gt`/`lt` are **strict**, and
-  there is **no `gte`/`lte`** (`gte`, `ge`, `lte`, `le` all return 0 rows). For "at least
+  there is **no `gte`/`lte`** (the register returns 0 rows for `gte`, `ge`, `lte`, `le`,
+  so the CLI rejects any unknown or upper-case operator with exit 2). For "at least
   5000 kW" use `gt` just below the bound: `~gt~'4999.999'`.
 - **value:** in single quotes; for a dropdown use its **`Value` code**, not the label.
   Decimals take a point (`'4999.999'`; `'4999,999'` returns 0 rows). Dates work as
-  `'2025-01-01'` or `'01.01.2025'`.
+  `'2025-01-01'` or `'01.01.2025'`. `null`/`nn` still take a value: `Ort~null~''` (a bare
+  `Ort~null` would be ignored upstream, so the CLI rejects it).
 - **conjunction:** only `and` between conditions. **There is no working `or`:** the
   register keeps only the part before the first `~or~` and silently drops the rest, so
   the CLI rejects `~or~` (exit 2). For an OR between codes of **one dropdown column**,
@@ -106,10 +108,11 @@ almost always has a bad sort key. The CLI prints a stderr note in that case.
 - **A wrong/misspelled FilterName is silently ignored** — you get the unfiltered set.
   Always confirm the exact `FilterName` from `mastr filters` first, and sanity-check
   with `--total` (the count should drop).
-- **A wrong operator returns 0 rows**, not an error and not the unfiltered set:
-  `~gte~'5000'` gives `total: 0`. Use only the operators above; if a filter drops to 0,
-  check the operator (the CLI prints a stderr note naming the known ones) and the decimal
-  separator.
+- **A malformed filter is a usage error (exit 2), not a query:** an unknown or upper-case
+  operator (`~gte~`, `~EQ~`), a missing value, an unclosed quote, a dangling `~and~` or
+  `~or~`. Read the message, fix the spec and rerun; nothing was sent. If a well-formed
+  filter drops to 0, check the values (code not label, decimal point) — the CLI prints a
+  stderr note.
 - **Never use `~or~`** — the register would drop everything after it; the CLI refuses it.
   Use a comma list inside one dropdown value instead.
 - **Columns differ per category** — run `mastr filters <category>` for the right one.

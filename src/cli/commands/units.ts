@@ -54,8 +54,8 @@ export function registerCommands(program: Command, deps: CliDeps): void {
       .option(
         "--filter <spec>",
         "filter: FilterName~op~'value'~and~… (see `filters`; ops eq|neq|sw|ct|nct|ew|null|nn|gt|lt, " +
-          "gt/lt strict; an unknown op returns 0 rows). No ~or~: for several dropdown codes " +
-          "use one comma list, e.g. Energieträger~eq~'2497,2498'",
+          "gt/lt strict; null/nn take ''). A malformed spec or unknown op is rejected. No ~or~: " +
+          "for several dropdown codes use one comma list, e.g. Energieträger~eq~'2497,2498'",
         parseFilter,
       )
       .option("--total", "print only the total match count, not the rows")
@@ -74,11 +74,13 @@ export function registerCommands(program: Command, deps: CliDeps): void {
                 `\`mastr ${cat.name} --page-size 1 --compact | jq '.data[0] | keys'\`.`,
             );
           }
+          // An unknown operator is already a usage error (filterProblem); what is left
+          // that silently gives 0 rows is a value the register can't match.
           if (page.total === 0 && typeof opts["filter"] === "string") {
             deps.io.err(
-              "Note: 0 results with --filter set. If you expected matches, check the operators: " +
-                "the known ones are eq, neq, sw, ct, nct, ew, null, nn, gt and lt; an unknown " +
-                "operator (e.g. gte) returns 0 rows.",
+              "Note: 0 results with --filter set. If you expected matches, check the values: a " +
+                "dropdown takes its code (the Value from `mastr filters`), not its label, decimals " +
+                "take a point ('4999.999'), and gt/lt are strict.",
             );
           }
           renderJson(deps, global, opts["total"] === true ? page.total : page);

@@ -47,8 +47,10 @@ Categories: `stromerzeugung`, `stromverbrauch`, `gaserzeugung`, `gasverbrauch`.
 there is **no working `~or~`** (the register drops everything after it, so the CLI
 rejects it) — for several codes of one dropdown, list them in one value:
 `Energieträger~eq~'2497,2498'`. Discover the German field names and dropdown codes with `mastr filters <category>`. A
-**wrong `FilterName` is silently ignored** (you get the unfiltered set), while a **wrong
-operator** (e.g. `gte`) or a **wrong `--sort` key returns 0 rows**. Verify filter names
+**wrong `FilterName` is silently ignored** (you get the unfiltered set), and a **wrong
+`--sort` key returns 0 rows**; a malformed spec or an unknown operator (e.g. `gte`) is
+rejected before any request (exit 2), because the register would answer it with a wrong
+count. Verify filter names
 with `mastr filters` and sanity-check with `--total`; sort keys are record field names
 (`Bruttoleistung`), not FilterNames — list them with
 `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. **Dates** come as Microsoft

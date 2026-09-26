@@ -86,13 +86,13 @@ test("0 results with --sort set prints a note about the likely bad sort field", 
   assert.doesNotMatch(err, /--filter/);
 });
 
-test("0 results with --filter set prints a note listing the known operators", async () => {
+test("0 results with --filter set prints a note about the values", async () => {
   const cli = makeCli(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
-  const code = await run(["stromerzeugung", "--filter", "Bruttoleistung der Einheit~gte~'5000'", "--total"], cli.deps);
+  const code = await run(["stromerzeugung", "--filter", "Bruttoleistung der Einheit~gt~'4999,999'", "--total"], cli.deps);
   assert.equal(code, 0);
   const err = cli.err.join("\n");
   assert.match(err, /0 results with --filter/);
-  assert.match(err, /eq, neq, sw, ct, nct, ew, null, nn, gt and lt/);
+  assert.match(err, /not its label, decimals take a point/);
   assert.doesNotMatch(err, /--sort/);
 });
 
@@ -290,4 +290,40 @@ test("filters exits 1 on an Errors envelope or an empty body (not [] with exit 0
   const empty = makeCli(() => ({ status: 200, headers: {}, body: Buffer.alloc(0) }));
   assert.equal(await run(["filters", "stromerzeugung"], empty.deps), 1);
   assert.deepEqual(empty.out, []);
+});
+
+test("a malformed --filter is a usage error (exit 2, no request)", async () => {
+  const cases: [string, RegExp][] = [
+    ["foo", /Condition 1 \("foo"\) is incomplete/],
+    ["Ort~eq", /Condition 1 \("Ort~eq"\) is incomplete/],
+    ["Ort~null", /Condition 1 \("Ort~null"\) is incomplete/],
+    ["~eq~'1'", /Condition 1 has no FilterName/],
+    ["Energieträger~eq~'2495'~and~", /ends with "~and~"/],
+    ["Energieträger~eq~'2495'~and~ ", /ends with "~and~"/],
+    ["Energieträger~eq~'2495'~und~Ort~eq~'x'", /Expected ~and~ after condition 1, got "~und~"/],
+    ["Energieträger~EQ~'2495'", /Unknown operator "EQ" in condition 1\..*use "eq"/],
+    ["Bruttoleistung der Einheit~gte~'5000'", /Unknown operator "gte".*there is no gte\/lte/],
+    ["Ort~eq~'Münster'~and~Ort~ct~ ", /Condition 2 \("Ort~ct"\) has no value/],
+    ["Ort~eq~'Münster", /value of condition 1 \('Münster\) has no closing single quote/],
+  ];
+  for (const [spec, message] of cases) {
+    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 2, spec);
+    assert.equal(cli.mt.calls.length, 0, spec);
+    assert.match(cli.err.join("\n"), message, spec);
+  }
+});
+
+test("well-formed --filter specs pass (unary ops with '', unquoted codes, an apostrophe in a value)", async () => {
+  for (const spec of [
+    "Ort~null~''",
+    "Ort~nn~''~and~Energieträger~eq~2497",
+    "Anzeige-Name der Einheit~ct~'d'Arc'",
+    "Bruttoleistung der Einheit~gt~'5000'~and~Bruttoleistung der Einheit~lt~'6000'",
+    "MaStR-Nr. der Einheit~eq~'SEE984033548619'",
+  ]) {
+    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 0, spec);
+    assert.equal(queryOf(cli.mt.last()).get("filter"), spec);
+  }
 });
