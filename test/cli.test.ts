@@ -359,3 +359,21 @@ test("userinfo in --base-url is redacted in error messages but still sent", asyn
   assert.match(err, /HTTP 404 for GET http:\/\/\*\*\*@127\.0\.0\.1:1\/r404\/Einheit\/.*: nope/);
   assert.match(cli.mt.last().url, /^http:\/\/user:pw@127\.0\.0\.1:1\//);
 });
+
+test("bidi controls from the server are stripped on stderr and escaped on stdout", async () => {
+  const RLO = String.fromCharCode(0x202e);
+  const errCli = makeCli(() => jsonResponse({ Data: null, Total: 0, Errors: `bad text${RLO}evil\nError: forged` }));
+  assert.equal(await run(["stromerzeugung"], errCli.deps), 1);
+  const err = errCli.err.join("\n");
+  assert.equal(err.includes(RLO), false);
+  assert.equal(err.split("\n").length, 1);
+  assert.match(err, /: bad textevil Error: forged$/);
+
+  const unit = { ...fx.unitPage.Data[0], EinheitName: `PV${RLO}1` };
+  const outCli = makeCli(() => jsonResponse({ ...fx.unitPage, Data: [unit] }));
+  assert.equal(await run(["stromerzeugung", "--compact"], outCli.deps), 0);
+  const text = outCli.out.join("\n");
+  assert.equal(text.includes(RLO), false);
+  assert.match(text, /PV\\u202e1/);
+  assert.equal((JSON.parse(text) as { data: { EinheitName: string }[] }).data[0]?.EinheitName, `PV${RLO}1`);
+});

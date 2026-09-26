@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RequestEngine, parseRetryAfter } from "../src/client/engine.js";
+import { RequestEngine, parseRetryAfter, sanitizeServerText } from "../src/client/engine.js";
 import { MastrApiError, MastrNetworkError, MastrParseError, redactUrl } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -225,4 +225,13 @@ test("base-URL errors redact userinfo", () => {
     () => new RequestEngine({ baseUrl: "ftp://user:secret@h.test/" }),
     (err) => err instanceof MastrNetworkError && !/secret/.test(err.message) && /\*\*\*@h\.test/.test(err.message),
   );
+});
+
+test("sanitizeServerText drops bidi controls and folds line breaks into one line", () => {
+  const RLO = String.fromCharCode(0x202e);
+  const bidi = [0x061c, 0x200e, 0x200f, 0x202a, 0x202e, 0x2066, 0x2069].map((c) => String.fromCharCode(c)).join("");
+  assert.equal(sanitizeServerText(`bad text${RLO}evil`), "bad textevil");
+  assert.equal(sanitizeServerText(`a${bidi}b`), "ab");
+  assert.equal(sanitizeServerText("line1\nError: forged\r\n\tx  "), "line1 Error: forged x");
+  assert.equal(sanitizeServerText("a\u2028b"), "a b");
 });

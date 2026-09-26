@@ -84,24 +84,48 @@ export function parseRetryAfter(
 }
 
 /**
- * Strip control characters (C0 except tab/newline, DEL, and C1) out of a string
- * that originates in an attacker-controlled response — the error `detail` and the
- * echoed Content-Type. `JSON.parse` decodes an escaped ESC in an error body into a
- * real ESC byte, so without this a hostile/MITM'd endpoint could drive ANSI/OSC
- * escape sequences into the user's terminal when the message is printed to stderr.
- * This only needs to cover text that flows into an error message: the CLI's JSON
- * output is escaped separately (`escapeControlChars` in cli/shared.ts), as
- * `JSON.stringify` alone leaves DEL and the C1 range raw. Implemented as a code-point
- * filter so no raw control byte ever appears in this source file.
+ * True for the Unicode bidirectional formatting characters: ALM (U+061C), LRM/RLM
+ * (U+200E/U+200F), the embeddings and overrides U+202A–U+202E and the isolates
+ * U+2066–U+2069. A terminal applies them to the text that follows, so an override
+ * in server text can reorder what the user sees ("Trojan Source" spoofing).
+ */
+export function isBidiControl(code: number): boolean {
+  return (
+    code === 0x061c ||
+    code === 0x200e ||
+    code === 0x200f ||
+    (code >= 0x202a && code <= 0x202e) ||
+    (code >= 0x2066 && code <= 0x2069)
+  );
+}
+
+/**
+ * Make a string that originates in an attacker-controlled response — the error
+ * `detail` (a JSON field, an `Errors` value or a text snippet) and the echoed
+ * Content-Type — safe to print into an error message on stderr:
+ *
+ * - C0 and C1 controls and DEL are dropped. `JSON.parse` decodes an escaped ESC into
+ *   a real ESC byte; printed raw, a hostile or MITM'd endpoint could drive ANSI/OSC
+ *   sequences into the terminal.
+ * - Bidi formatting characters (isBidiControl) are dropped, so server text cannot
+ *   reorder the visible message.
+ * - Every run of whitespace — newlines, tabs, U+2028/U+2029 included — becomes one
+ *   space and the ends are trimmed, so the text stays on one line and a server
+ *   cannot forge an `Error:` line of its own.
+ *
+ * The CLI's JSON output is escaped separately (`escapeControlChars` in
+ * cli/shared.ts): `JSON.stringify` alone leaves DEL, C1 and bidi characters raw.
+ * Written as a code-point filter so no raw control byte appears in this source.
  */
 export function sanitizeServerText(text: string): string {
   let out = "";
   for (const ch of text) {
     const n = ch.codePointAt(0) ?? 0;
-    if (n <= 8 || (n >= 0x0b && n <= 0x1f) || (n >= 0x7f && n <= 0x9f)) continue;
+    const whitespaceControl = n >= 0x09 && n <= 0x0d;
+    if (!whitespaceControl && (n <= 0x1f || (n >= 0x7f && n <= 0x9f) || isBidiControl(n))) continue;
     out += ch;
   }
-  return out;
+  return out.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -114,7 +138,7 @@ export function describeMastrErrors(errors: unknown): string | undefined {
   const found: string[] = [];
   const walk = (value: unknown, depth: number): void => {
     if (typeof value === "string") {
-      const text = sanitizeServerText(value).replace(/\s+/g, " ").trim();
+      const text = sanitizeServerText(value);
       if (text !== "" && !found.includes(text)) found.push(text);
     } else if (value !== null && typeof value === "object" && depth < 5) {
       for (const v of Object.values(value)) walk(v, depth + 1);
