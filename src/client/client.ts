@@ -12,6 +12,7 @@
 
 import { RequestEngine, sanitizeServerText, type EngineOptions } from "./engine.js";
 import { MastrApiError } from "./errors.js";
+import { validateFilter } from "./filter.js";
 import type { QueryParams } from "./query.js";
 import type { FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery, UnitResponse } from "./types.js";
 
@@ -79,8 +80,11 @@ export class MastrClient {
    * Fetch one page of units for a category. Sends the full Kendo param set —
    * `sort`, `page`, `pageSize`, `group`, `filter` — always, because the server
    * rejects a request with `group`/`filter` missing ("Die Anfrage ist Null.").
+   * A filter the register would misread (e.g. `~or~`) is rejected with a
+   * `MastrValidationError` before any request; see {@link validateFilter}.
    */
   async units(category: UnitCategory, query: UnitQuery = {}): Promise<UnitPage> {
+    if (query.filter !== undefined) validateFilter(query.filter);
     const params: QueryParams = {
       sort: query.sort ?? "",
       page: query.page ?? DEFAULT_PAGE,

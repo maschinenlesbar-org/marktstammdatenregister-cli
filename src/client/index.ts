@@ -2,6 +2,7 @@
 
 export { MastrClient, parseMsDate, isoifyDates } from "./client.js";
 export type { MastrClientOptions } from "./client.js";
+export { filterProblem, validateFilter } from "./filter.js";
 export { RequestEngine, DEFAULT_BASE_URL } from "./engine.js";
 export type { EngineOptions, RawResponse } from "./engine.js";
 export { MAX_TIMEOUT_MS, nodeHttpTransport } from "./http.js";

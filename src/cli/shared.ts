@@ -7,6 +7,7 @@ import type { CliDeps } from "./io.js";
 import type { MastrClientOptions } from "../client/client.js";
 import { isoifyDates } from "../client/client.js";
 import { MastrParseError } from "../client/errors.js";
+import { filterProblem } from "../client/filter.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -31,6 +32,17 @@ export function parseNonEmpty(value: string): string {
   if (value.trim() === "") {
     throw new InvalidArgumentError("Expected a non-empty value.");
   }
+  return value;
+}
+
+/**
+ * commander value-parser for `--filter`: non-blank, and not a spec the register would
+ * misread (see `filterProblem`), so it becomes a usage error before any request.
+ */
+export function parseFilter(value: string): string {
+  parseNonEmpty(value);
+  const problem = filterProblem(value);
+  if (problem !== undefined) throw new InvalidArgumentError(problem);
   return value;
 }
 

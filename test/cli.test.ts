@@ -237,3 +237,22 @@ test("renderJson maps a deep-nesting RangeError to a typed MastrParseError (MAST
   // Fail-secure: nothing partial was written to stdout.
   assert.equal(out.length, 0);
 });
+
+test("--filter with ~or~ is rejected (exit 2, no request) and points at the comma list", async () => {
+  for (const spec of [
+    "Energieträger~eq~'2497'~or~Energieträger~eq~'2498'",
+    "Ort~eq~'x'~OR~Ort~eq~'Münster'",
+  ]) {
+    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 2, spec);
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), /"~or~" is not supported/);
+    assert.match(cli.err.join("\n"), /Energieträger~eq~'2497,2498'/);
+  }
+});
+
+test("--filter with a comma list inside one value is sent as is", async () => {
+  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  assert.equal(await run(["stromerzeugung", "--filter", "Energieträger~eq~'2497,2498'", "--total"], cli.deps), 0);
+  assert.equal(queryOf(cli.mt.last()).get("filter"), "Energieträger~eq~'2497,2498'");
+});

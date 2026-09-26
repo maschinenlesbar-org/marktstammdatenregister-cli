@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient, parseMsDate, isoifyDates } from "../src/client/client.js";
-import { MastrApiError, MastrNetworkError } from "../src/client/errors.js";
+import { MastrApiError, MastrNetworkError, MastrValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -150,4 +150,13 @@ test("MastrClient rejects a non-http(s) base URL even with a custom transport", 
     );
     assert.equal(mt.calls.length, 0);
   }
+});
+
+test("units() rejects a filter with ~or~ before any request (MastrValidationError)", async () => {
+  const { client, mt } = clientFor(fx.unitPage);
+  await assert.rejects(
+    () => client.stromerzeugung({ filter: "Energieträger~eq~'2497'~or~Energieträger~eq~'2498'" }),
+    (err) => err instanceof MastrValidationError && /Invalid filter: "~or~" is not supported/.test(err.message),
+  );
+  assert.equal(mt.calls.length, 0);
 });

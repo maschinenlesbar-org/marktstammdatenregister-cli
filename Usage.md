@@ -45,7 +45,7 @@ the filter), `data` is the current page.
 ## Filter syntax
 
 ```
-FilterName~op~'value'~[and|or]~FilterName~op~'value'~…
+FilterName~op~'value'~and~FilterName~op~'value'~…
 ```
 
 - **operators:** `eq` (=), `neq` (≠), `sw` (starts-with), `ct` (contains),
@@ -54,11 +54,20 @@ FilterName~op~'value'~[and|or]~FilterName~op~'value'~…
   `gte`/`lte`, and an unknown operator returns 0 rows
 - **value:** single-quoted; for a dropdown use its **code** (`Value`), not its label;
   decimals take a point (`'4999.999'`), dates work as `'2025-01-01'` or `'01.01.2025'`
+- **conjunction:** only `and`. **There is no working `or`:** the register keeps only the
+  part before the first `~or~` and silently drops the rest (a wrong count, no error), so
+  the CLI rejects `~or~` (exit 2). For an OR between codes of **one dropdown column**,
+  list them comma-separated in one value: `Energieträger~eq~'2497,2498'`. The comma
+  list works only for dropdown codes (`Ort~eq~'Münster,Berlin'`
+  returns 0 rows); OR across different columns needs one query per condition
 - discover the `FilterName`s and codes with `mastr filters <category>`
 
 ```bash
 # Solar (Energieträger 2495) units in operation (Betriebs-Status 35)
 mastr stromerzeugung --filter "Energieträger~eq~'2495'~and~Betriebs-Status~eq~'35'" --total
+
+# Wind (2497) or solar (2495) units: a comma list inside one dropdown value
+mastr stromerzeugung --filter "Energieträger~eq~'2497,2495'" --total
 
 # Wind (2497) units above 5,000 kW gross
 mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Bruttoleistung der Einheit~gt~'5000'" --total

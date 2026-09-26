@@ -6,7 +6,7 @@ import { Argument, type Command } from "commander";
 import type { CliDeps } from "../io.js";
 import type { MastrClient } from "../../client/client.js";
 import type { UnitCategory, UnitQuery } from "../../client/types.js";
-import { action, parseBoundedInt, parseNonEmpty, renderJson } from "../shared.js";
+import { action, parseBoundedInt, parseFilter, parseNonEmpty, renderJson } from "../shared.js";
 
 const CATEGORIES: { name: UnitCategory; desc: string }[] = [
   { name: "stromerzeugung", desc: "Electricity-generation units (Stromerzeugung)" },
@@ -50,9 +50,10 @@ export function registerCommands(program: Command, deps: CliDeps): void {
       )
       .option(
         "--filter <spec>",
-        "filter: FilterName~op~'value'~[and|or]~… (see `filters`; ops eq|neq|sw|ct|nct|ew|null|nn|gt|lt, " +
-          "gt/lt strict; an unknown op returns 0 rows)",
-        parseNonEmpty,
+        "filter: FilterName~op~'value'~and~… (see `filters`; ops eq|neq|sw|ct|nct|ew|null|nn|gt|lt, " +
+          "gt/lt strict; an unknown op returns 0 rows). No ~or~: for several dropdown codes " +
+          "use one comma list, e.g. Energieträger~eq~'2497,2498'",
+        parseFilter,
       )
       .option("--total", "print only the total match count, not the rows")
       .action(

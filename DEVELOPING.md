@@ -57,6 +57,7 @@ live — the OpenAPI spec is thin, so trust the live behaviour:
 |---|---|---|
 | **The Kendo null-request trap** | The endpoint binds a `[DataSourceRequest]`. Omit `group`/`filter` and the whole request binds to null → `{"Errors":"Die Anfrage ist Null."}`. **All five params (`sort`, `page`, `pageSize`, `group`, `filter`) must be present, even empty.** | `client.ts` `units()` always sends the full set; `query.ts` sends empty strings (not dropped) |
 | **Logical errors on HTTP 200** | Failures come back as HTTP 200 with a non-null `Errors` string. | `client.ts` checks `Errors` and throws `MastrApiError` |
+| **`~or~` is silently truncated** | The search keeps only the part before the first `~or~` and drops every later condition, no error (2026-09-26: `2497` alone and `2497~or~…2498` both 43633). An OR between codes of one dropdown works as a comma list in one value (`Energieträger~eq~'2497,2498'` → 52448). | `filter.ts` `filterProblem()`: the client throws `MastrValidationError`, the CLI's `--filter` parser a usage error |
 | **Microsoft dates** | Dates are `"/Date(ms)/"` strings, not ISO. | `parseMsDate()` / `isoifyDates()`; CLI `--iso-dates` |
 | **No aggregate endpoint** | `AggregateResults` is null; there is no server-side capacity sum — only the `Total` count. | documented; the CLI offers `--total` (count) but not a sum |
 | **Wide, category-varying rows** | ~90 fields; a solar unit carries columns a gas consumer lacks. | `MastrUnit` types the common fields + an index signature |

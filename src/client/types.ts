@@ -86,9 +86,12 @@ export interface UnitQuery {
   /** Sort spec: `FieldKey-asc` or `FieldKey-desc`, e.g. `"Bruttoleistung-desc"`. */
   sort?: string;
   /**
-   * Filter spec: `FilterName~op~'value'~[and|or]~…` with ops
-   * `eq|neq|sw|ct|nct|ew|null|nn`, e.g. `"Energieträger~eq~'2495'"`. Discover the
-   * `FilterName`s and dropdown codes via {@link MastrClient.filterColumns}.
+   * Filter spec: `FilterName~op~'value'~and~…` with ops
+   * `eq|neq|sw|ct|nct|ew|null|nn|gt|lt`, e.g. `"Energieträger~eq~'2495'"`. There is
+   * no working `~or~` (the register drops everything after it, so the client rejects
+   * it); for several codes of one dropdown column list them in one value:
+   * `"Energieträger~eq~'2497,2498'"`. Discover the `FilterName`s and dropdown codes
+   * via {@link MastrClient.filterColumns}.
    */
   filter?: string;
 }

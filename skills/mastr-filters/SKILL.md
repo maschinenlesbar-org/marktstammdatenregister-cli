@@ -47,7 +47,7 @@ mastr filters stromerzeugung --compact \
 
 ## The filter grammar
 
-`--filter "FilterName~op~'value'~[and|or]~FilterName~op~'value'~…"`
+`--filter "FilterName~op~'value'~and~FilterName~op~'value'~…"`
 
 - **operators:** `eq` (=), `neq` (≠), `sw` (starts-with), `ct` (contains),
   `nct` (not-contains), `ew` (ends-with), `null` (is empty), `nn` (not empty),
@@ -57,11 +57,19 @@ mastr filters stromerzeugung --compact \
 - **value:** in single quotes; for a dropdown use its **`Value` code**, not the label.
   Decimals take a point (`'4999.999'`; `'4999,999'` returns 0 rows). Dates work as
   `'2025-01-01'` or `'01.01.2025'`.
-- **conjunctions:** `and` / `or` between conditions.
+- **conjunction:** only `and` between conditions. **There is no working `or`:** the
+  register keeps only the part before the first `~or~` and silently drops the rest, so
+  the CLI rejects `~or~` (exit 2). For an OR between codes of **one dropdown column**,
+  put them comma-separated in one value: `Energieträger~eq~'2497,2498'`. This works for
+  dropdown codes only (`Ort~eq~'Münster,Berlin'` gives 0 rows); an OR across different
+  columns needs one `--total` query per condition (and the overlap subtracted).
 
 ```bash
 # Solar units in operation
 mastr stromerzeugung --filter "Energieträger~eq~'2495'~and~Betriebs-Status~eq~'35'" --total
+
+# Wind or solar units: several codes of one dropdown as a comma list
+mastr stromerzeugung --filter "Energieträger~eq~'2497,2495'" --total
 
 # Wind units above 5 MW gross (Bruttoleistung is in kW)
 mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Bruttoleistung der Einheit~gt~'5000'" --total
@@ -98,6 +106,8 @@ almost always has a bad sort key. The CLI prints a stderr note in that case.
   `~gte~'5000'` gives `total: 0`. Use only the operators above; if a filter drops to 0,
   check the operator (the CLI prints a stderr note naming the known ones) and the decimal
   separator.
+- **Never use `~or~`** — the register would drop everything after it; the CLI refuses it.
+  Use a comma list inside one dropdown value instead.
 - **Columns differ per category** — run `mastr filters <category>` for the right one.
 - **Field names are German with umlauts** (`Energieträger`, `Betriebs-Status`) — copy
   them verbatim, and quote the whole `--filter` value in the shell.
