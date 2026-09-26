@@ -4,7 +4,7 @@
 
 import { Argument, type Command } from "commander";
 import type { CliDeps } from "../io.js";
-import type { MastrClient } from "../../client/client.js";
+import { MAX_PAGE, MAX_PAGE_SIZE, type MastrClient } from "../../client/client.js";
 import type { UnitCategory, UnitQuery } from "../../client/types.js";
 import { action, parseBoundedInt, parseFilter, parseNonEmpty, renderJson } from "../shared.js";
 
@@ -43,8 +43,8 @@ export function registerCommands(program: Command, deps: CliDeps): void {
     program
       .command(cat.name)
       .description(cat.desc)
-      .option("--page <n>", "1-based page number", parseBoundedInt(1, 1_000_000), 1)
-      .option("--page-size <n>", "rows per page (1..5000)", parseBoundedInt(1, 5000), 25)
+      .option("--page <n>", "1-based page number", parseBoundedInt(1, MAX_PAGE), 1)
+      .option("--page-size <n>", `rows per page (1..${MAX_PAGE_SIZE})`, parseBoundedInt(1, MAX_PAGE_SIZE), 25)
       .option(
         "--sort <spec>",
         "sort: FieldKey-asc | FieldKey-desc, where FieldKey is a record field name, not a " +

@@ -11,7 +11,7 @@
 //   page.total; // total solar units
 
 import { RequestEngine, describeMastrErrors, type EngineOptions } from "./engine.js";
-import { MastrApiError, MastrParseError } from "./errors.js";
+import { MastrApiError, MastrParseError, MastrValidationError } from "./errors.js";
 import { validateFilter } from "./filter.js";
 import type { QueryParams } from "./query.js";
 import type { FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery } from "./types.js";
@@ -28,18 +28,45 @@ const CATEGORY_SUFFIX: Record<UnitCategory, string> = {
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 25;
+/** Largest `page` the client (and the CLI's `--page`) accepts. */
+export const MAX_PAGE = 1_000_000;
+/** Largest `pageSize` the client (and the CLI's `--page-size`) accepts. */
+export const MAX_PAGE_SIZE = 5000;
+
+/** The category's endpoint suffix; an unknown category (from plain JS) throws. */
+function categorySuffix(category: UnitCategory): string {
+  if (typeof category !== "string" || !Object.hasOwn(CATEGORY_SUFFIX, category)) {
+    throw new MastrValidationError(
+      `Invalid category: expected one of ${Object.keys(CATEGORY_SUFFIX).join(", ")}, got ${JSON.stringify(category)}.`,
+    );
+  }
+  return CATEGORY_SUFFIX[category];
+}
+
+/** Check an optional integer paging option against 1..max. */
+function checkPaging(name: string, value: unknown, max: number): void {
+  if (value === undefined) return;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > max) {
+    throw new MastrValidationError(
+      `Invalid ${name}: expected an integer from 1 to ${max}, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}.`,
+    );
+  }
+}
 
 /** Options for the MaStR client (engine options only — the API needs no auth). */
 export type MastrClientOptions = EngineOptions;
 
 /**
  * Parse a MaStR Microsoft-AJAX date string (`"/Date(1548979200000)/"`) into a Date.
- * Returns null if the string is not in that format.
+ * The offset form `"/Date(1548979200000+0100)/"` is accepted too; its milliseconds
+ * are UTC already, the offset only names the sender's zone. Returns null if the
+ * string is not in that format or the value is outside the Date range.
  */
 export function parseMsDate(value: string): Date | null {
-  const m = /^\/Date\((-?\d+)\)\/$/.exec(value);
+  const m = /^\/Date\((-?\d+)(?:[+-]\d{4})?\)\/$/.exec(value);
   if (!m) return null;
-  return new Date(Number(m[1]));
+  const date = new Date(Number(m[1]));
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 /**
@@ -48,10 +75,10 @@ export function parseMsDate(value: string): Date | null {
  */
 export function isoifyDates<T>(value: T): T {
   if (typeof value === "string") {
+    // parseMsDate returns null for an out-of-range value, so `.toISOString()` never
+    // throws; such a string is left as-is.
     const d = parseMsDate(value);
-    // An out-of-range milliseconds value yields an Invalid Date (a truthy object);
-    // guard against it so `.toISOString()` never throws — leave the string as-is.
-    return (d && !Number.isNaN(d.getTime()) ? d.toISOString() : value) as unknown as T;
+    return (d ? d.toISOString() : value) as unknown as T;
   }
   if (Array.isArray(value)) {
     return value.map((v) => isoifyDates(v)) as unknown as T;
@@ -89,10 +116,14 @@ export class MastrClient {
    * Fetch one page of units for a category. Sends the full Kendo param set —
    * `sort`, `page`, `pageSize`, `group`, `filter` — always, because the server
    * rejects a request with `group`/`filter` missing ("Die Anfrage ist Null.").
-   * A filter the register would misread (e.g. `~or~`) is rejected with a
-   * `MastrValidationError` before any request; see {@link validateFilter}.
+   * An unknown category, a `page` outside 1..`MAX_PAGE`, a `pageSize` outside
+   * 1..`MAX_PAGE_SIZE` or a filter the register would misread (e.g. `~or~`, see
+   * {@link validateFilter}) is rejected with a `MastrValidationError` before any request.
    */
   async units(category: UnitCategory, query: UnitQuery = {}): Promise<UnitPage> {
+    const suffix = categorySuffix(category);
+    checkPaging("page", query.page, MAX_PAGE);
+    checkPaging("pageSize", query.pageSize, MAX_PAGE_SIZE);
     if (query.filter !== undefined) validateFilter(query.filter);
     const params: QueryParams = {
       sort: query.sort ?? "",
@@ -101,7 +132,7 @@ export class MastrClient {
       group: "",
       filter: query.filter ?? "",
     };
-    const path = `${SERVICE}/GetErweiterteOeffentlicheEinheit${CATEGORY_SUFFIX[category]}`;
+    const path = `${SERVICE}/GetErweiterteOeffentlicheEinheit${suffix}`;
     const res = await this.engine.getJson<unknown>(path, params);
     if (!isObject(res)) throw shapeError(path, "a JSON object with Data and Total");
     // MaStR answers HTTP 200 with a logical error in `Errors`: a string such as "Die
@@ -150,7 +181,7 @@ export class MastrClient {
    * never an empty list, which would read as "this category has no filters".
    */
   async filterColumns(category: UnitCategory): Promise<FilterColumn[]> {
-    const path = `${SERVICE}/GetFilterColumnsErweiterteOeffentlicheEinheit${CATEGORY_SUFFIX[category]}`;
+    const path = `${SERVICE}/GetFilterColumnsErweiterteOeffentlicheEinheit${categorySuffix(category)}`;
     const res = await this.engine.getJson<unknown>(path);
     if (isObject(res) && res["Errors"] !== undefined && res["Errors"] !== null) {
       throw new MastrApiError({

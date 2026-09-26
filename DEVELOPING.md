@@ -61,7 +61,7 @@ live — the OpenAPI spec is thin, so trust the live behaviour:
 | **`~or~` is silently truncated** | The search keeps only the part before the first `~or~` and drops every later condition, no error (2026-09-26: `2497` alone and `2497~or~…2498` both 43633). An OR between codes of one dropdown works as a comma list in one value (`Energieträger~eq~'2497,2498'` → 52448). | `filter.ts` `filterProblem()`: the client throws `MastrValidationError`, the CLI's `--filter` parser a usage error |
 | **No escape for `~` in a value** | The register splits the filter on every `~`, even inside quotes: `ct 'a~b'` gives the same count as `ct 'a'`, and interpolated input (`Ort~eq~'${input}'`) can add conditions. | `filterProblem()` names a `~` inside a quoted value; library callers use `buildFilter()`, which quotes values and refuses a `~` |
 | **Malformed filters are misread, not refused** | A spec that is not `FilterName~op~value(~and~…)*` goes through: `foo` or a dangling `~and~` gives the unfiltered set, an unknown or upper-case operator (`gte`, `EQ`) 0 rows, `Ort~null` without `''` is ignored. | `filterProblem()` checks the shape the register splits on `~` (FilterName, known lower-case operator, value, `and`) before any request. A wrong FilterName still can't be detected. |
-| **Microsoft dates** | Dates are `"/Date(ms)/"` strings, not ISO. | `parseMsDate()` / `isoifyDates()`; CLI `--iso-dates` |
+| **Microsoft dates** | Dates are `"/Date(ms)/"` strings, not ISO (the offset form `/Date(ms+hhmm)/` is accepted too; not seen live). | `parseMsDate()` (null for an out-of-range value) / `isoifyDates()`; CLI `--iso-dates` |
 | **No aggregate endpoint** | `AggregateResults` is null; there is no server-side capacity sum — only the `Total` count. | documented; the CLI offers `--total` (count) but not a sum |
 | **Wide, category-varying rows** | ~90 fields; a solar unit carries columns a gas consumer lacks. | `MastrUnit` types the common fields + an index signature |
 | **Withheld data** | Natural-person and confidential data are not published (operator names anonymised; some location data withheld for units < 30 kW). | documented; fields are optional/nullable |
@@ -69,6 +69,11 @@ live — the OpenAPI spec is thin, so trust the live behaviour:
 The engine sends `X-Requested-With: XMLHttpRequest` (the endpoint is an XHR backend).
 Redirects are **not** followed — a 3xx (e.g. a wrong base URL bouncing to a portal
 page) surfaces as an error and maps to the usage exit code.
+
+The client validates its own inputs before any request, for library callers the CLI's
+parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),
+`pageSize` outside 1..`MAX_PAGE_SIZE` (5000) and a malformed filter throw
+`MastrValidationError` (`Invalid <name>: expected …, got <v>.`).
 
 ## Testing
 

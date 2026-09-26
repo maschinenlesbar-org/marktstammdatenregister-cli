@@ -238,3 +238,35 @@ test("units() rejects a malformed filter before any request (MastrValidationErro
   }
   assert.equal(mt.calls.length, 0);
 });
+
+test("units() rejects an unknown category and out-of-range paging before any request", async () => {
+  const { client, mt } = clientFor(fx.unitPage);
+  const bad: [unknown, Record<string, unknown>, RegExp][] = [
+    ["foo", {}, /^Invalid category: expected one of stromerzeugung, stromverbrauch, gaserzeugung, gasverbrauch, got "foo"\.$/],
+    ["__proto__", {}, /^Invalid category: .*got "__proto__"\.$/],
+    ["toString", {}, /^Invalid category: /],
+    ["stromerzeugung", { page: -5 }, /^Invalid page: expected an integer from 1 to 1000000, got -5\.$/],
+    ["stromerzeugung", { page: 1.5 }, /^Invalid page: /],
+    ["stromerzeugung", { pageSize: 0 }, /^Invalid pageSize: expected an integer from 1 to 5000, got 0\.$/],
+    ["stromerzeugung", { pageSize: 5001 }, /^Invalid pageSize: /],
+    ["stromerzeugung", { pageSize: "10" }, /^Invalid pageSize: .*got "10"\.$/],
+    ["stromerzeugung", { page: Number.NaN }, /^Invalid page: .*got NaN\.$/],
+  ];
+  for (const [category, query, message] of bad) {
+    await assert.rejects(
+      () => client.units(category as "stromerzeugung", query),
+      (err) => err instanceof MastrValidationError && message.test(err.message),
+      `${String(category)} ${JSON.stringify(query)}`,
+    );
+  }
+  await assert.rejects(() => client.filterColumns("foo" as "stromerzeugung"), MastrValidationError);
+  assert.equal(mt.calls.length, 0);
+});
+
+test("parseMsDate accepts the offset form and returns null for an out-of-range value", () => {
+  assert.equal(parseMsDate("/Date(1548979200000+0100)/")?.toISOString(), "2019-02-01T00:00:00.000Z");
+  assert.equal(parseMsDate("/Date(1548979200000-0500)/")?.getTime(), 1548979200000);
+  assert.equal(parseMsDate("/Date(99999999999999999)/"), null);
+  assert.equal(parseMsDate("/Date(1548979200000+01)/"), null);
+  assert.deepEqual(JSON.parse(JSON.stringify(isoifyDates({ d: "/Date(0+0200)/" }))), { d: "1970-01-01T00:00:00.000Z" });
+});

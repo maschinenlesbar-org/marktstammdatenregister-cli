@@ -1,6 +1,6 @@
 // Public entry point for the API client library.
 
-export { MastrClient, parseMsDate, isoifyDates } from "./client.js";
+export { MastrClient, parseMsDate, isoifyDates, MAX_PAGE, MAX_PAGE_SIZE } from "./client.js";
 export type { MastrClientOptions } from "./client.js";
 export { FILTER_OPERATORS, buildFilter, filterProblem, validateFilter } from "./filter.js";
 export type { FilterCondition, FilterOperator } from "./filter.js";

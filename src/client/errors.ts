@@ -75,7 +75,10 @@ export class MastrApiError extends MastrError {
 /** A transport-level failure (DNS, connection reset, timeout, ...). */
 export class MastrNetworkError extends MastrError {}
 
-/** A client-side validation error (e.g. a bad category) — no request made. */
+/**
+ * A client-side validation error — an unknown category, a page or pageSize out of
+ * range, a filter the register would misread — thrown before any request.
+ */
 export class MastrValidationError extends MastrError {}
 
 /** The response body could not be parsed as the expected JSON shape. */
