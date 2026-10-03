@@ -9,7 +9,7 @@ import { isoifyDates } from "../client/client.js";
 import { MastrParseError } from "../client/errors.js";
 import { filterProblem } from "../client/filter.js";
 import { isBidiControl } from "../client/engine.js";
-import { nonBlankProblem, sortProblem, type Problem } from "../client/validate.js";
+import { headerValueProblem, nonBlankProblem, sortProblem, type Problem } from "../client/validate.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -105,20 +105,12 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
 }
 
 /**
- * commander value-parser for a value that ends up in an HTTP header (User-Agent).
- * Rejects control characters — a CR/LF (or other C0/DEL byte) would otherwise reach
- * Node's HTTP layer and throw an opaque `ERR_INVALID_CHAR`. Tab (0x09) is allowed;
- * checked by char code so the source stays free of control bytes.
+ * commander value-parser for a value that ends up in an HTTP header (User-Agent):
+ * the library's `headerValueProblem` (not blank, Latin-1 without control
+ * characters; tab is fine), whose reason becomes the usage error. The engine runs
+ * the same rule on `userAgent`.
  */
-export function parseHeaderValue(value: string): string {
-  for (let i = 0; i < value.length; i++) {
-    const c = value.charCodeAt(i);
-    if ((c < 0x20 && c !== 0x09) || c === 0x7f) {
-      throw new InvalidArgumentError("Value contains control characters.");
-    }
-  }
-  return value;
-}
+export const parseHeaderValue = parseWith(headerValueProblem);
 
 export interface GlobalOptions {
   baseUrl?: string;

@@ -100,3 +100,11 @@ test("enforces maxResponseBytes", async () => {
     },
   );
 });
+
+test("a header value Node refuses rejects with a MastrNetworkError, not a raw TypeError", async () => {
+  // driver.request() validates headers synchronously, before any connection.
+  await assert.rejects(
+    () => nodeHttpTransport({ method: "GET", url: "http://127.0.0.1:1/", headers: { "User-Agent": "a€" } }),
+    (err) => err instanceof MastrNetworkError && /^Invalid request: /.test(err.message),
+  );
+});

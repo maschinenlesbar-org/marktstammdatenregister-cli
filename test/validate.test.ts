@@ -111,3 +111,16 @@ test("intRangeProblem accepts safe integers in range and names everything else",
 test("MAX_RETRIES is exported from the package root", () => {
   assert.equal((lib as Record<string, unknown>)["MAX_RETRIES"], 10);
 });
+
+test("headerValueProblem and headerNameProblem", async () => {
+  const { headerValueProblem, headerNameProblem } = await import("../src/client/validate.js");
+  for (const ok of ["mastr", "a\tb", "é ÿ"]) assert.equal(headerValueProblem(ok), undefined, JSON.stringify(ok));
+  for (const ctl of ["a\r\nb", "a\nb", "a\u0000", "a\u007f", "\u001b[31m"]) {
+    assert.equal(headerValueProblem(ctl), "Value contains control characters.", JSON.stringify(ctl));
+  }
+  assert.equal(headerValueProblem("aĀ"), "Value contains characters outside Latin-1 (above U+00FF).");
+  assert.equal(headerValueProblem(" "), "Expected a non-empty value.");
+  assert.equal(headerNameProblem("X-Trace-Id"), undefined);
+  assert.match(headerNameProblem("X Foo") ?? "", /Expected an HTTP header name/);
+  assert.match(headerNameProblem("") ?? "", /Expected an HTTP header name/);
+});

@@ -87,3 +87,52 @@ test("retryDelayMs must be a non-negative integer", () => {
   }
   assert.doesNotThrow(() => new MastrClient({ retryDelayMs: 0 }));
 });
+
+test("parity: a User-Agent with control characters, outside Latin-1 or blank is rejected on both sides", async () => {
+  const cases: [string, RegExp][] = [
+    ["a\r\nX-Injected: 1", /Value contains control characters\./],
+    ["a\u007f", /Value contains control characters\./],
+    ["a\u0000b", /Value contains control characters\./],
+    ["a€b", /Value contains characters outside Latin-1 \(above U\+00FF\)\./],
+    ["", /Expected a non-empty value\./],
+    ["   ", /Expected a non-empty value\./],
+  ];
+  for (const [ua, reason] of cases) {
+    const label = JSON.stringify(ua);
+    const { cli, lib } = await parity(["--compact", "--user-agent", ua, "stromerzeugung", "--page-size", "1"], (transport) =>
+      new MastrClient({ transport, userAgent: ua }).stromerzeugung({ pageSize: 1 }),
+    );
+    assert.equal(cli.code, 2, label);
+    assert.equal(cli.requests.length, 0, label);
+    assert.match(cli.err, reason, label);
+    assert.equal(lib.ok, false, label);
+    assert.ok(!lib.ok && lib.error instanceof MastrValidationError, label);
+    assert.match((lib.error as Error).message, /^Invalid userAgent: /, label);
+    assert.match((lib.error as Error).message, reason, label);
+    assert.equal(lib.requests.length, 0, label);
+  }
+});
+
+test("parity: a tab or a Latin-1 letter in the User-Agent is sent identically", async () => {
+  for (const ua of ["a\tb", "mastr-é"]) {
+    const { cli, lib } = await parity(["--compact", "--user-agent", ua, "stromerzeugung"], (transport) =>
+      new MastrClient({ transport, userAgent: ua }).stromerzeugung(),
+    );
+    assert.equal(cli.code, 0, JSON.stringify(ua));
+    assert.equal(lib.ok, true);
+    assert.equal(cli.requests[0]?.headers?.["User-Agent"], ua);
+    assert.deepEqual(requestShapes(cli.requests), requestShapes(lib.requests));
+  }
+});
+
+test("defaultHeaders names and values are checked when the client is built", () => {
+  assert.throws(
+    () => new MastrClient({ defaultHeaders: { "X-Foo": "a\r\nX-Bar: 2" } }),
+    (err) => err instanceof MastrValidationError && err.message === 'Invalid defaultHeaders["X-Foo"]: Value contains control characters.',
+  );
+  assert.throws(
+    () => new MastrClient({ defaultHeaders: { "X Foo": "ok" } }),
+    (err) => err instanceof MastrValidationError && /^Invalid defaultHeaders name: /.test(err.message),
+  );
+  assert.doesNotThrow(() => new MastrClient({ defaultHeaders: { "X-Trace-Id": "abc" } }));
+});

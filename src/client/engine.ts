@@ -6,7 +6,7 @@
 import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { MastrApiError, MastrNetworkError, MastrParseError, redactUrl } from "./errors.js";
-import { assertValid, intRangeProblem } from "./validate.js";
+import { assertValid, headerNameProblem, headerValueProblem, intRangeProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://www.marktstammdatenregister.de/MaStR";
 const DEFAULT_USER_AGENT = "marktstammdatenregister-cli";
@@ -22,9 +22,12 @@ export interface EngineOptions {
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
   transport?: Transport;
-  /** Value of the User-Agent header. */
+  /**
+   * Value of the User-Agent header: not blank, Latin-1 without control characters
+   * (tab is fine), else a MastrValidationError.
+   */
   userAgent?: string;
-  /** Extra headers sent on every request. */
+  /** Extra headers sent on every request; names must be tokens, values follow the `userAgent` rule. */
   defaultHeaders?: Record<string, string>;
   /**
    * Time limit per request in milliseconds, covering the whole response body, not
@@ -192,6 +195,25 @@ function assertHttpScheme(baseUrl: string): void {
   }
 }
 
+/**
+ * Check a value bound for an HTTP header (`headerValueProblem`) and return it, or
+ * throw a MastrValidationError (`Invalid <name>: <reason>`). The engine runs it on
+ * `userAgent` and every `defaultHeaders` value before any request.
+ */
+export function assertHeaderValue(name: string, value: string): string {
+  return assertValid(name, value, headerValueProblem);
+}
+
+/** Check every `defaultHeaders` name (a token) and value; returns a copy. */
+function checkedHeaders(headers: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    assertValid("defaultHeaders name", name, headerNameProblem);
+    out[name] = assertHeaderValue(`defaultHeaders["${name}"]`, value);
+  }
+  return out;
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -210,8 +232,13 @@ export class RequestEngine {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     assertHttpScheme(this.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
-    this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
-    this.defaultHeaders = options.defaultHeaders ?? {};
+    // Header values are checked up front: a blank one would be sent as is, and a
+    // CR/LF or a character above U+00FF would reach a custom transport raw or make
+    // Node's HTTP layer throw an untyped ERR_INVALID_CHAR. Only an omitted
+    // userAgent selects the default.
+    this.userAgent =
+      options.userAgent === undefined ? DEFAULT_USER_AGENT : assertHeaderValue("userAgent", options.userAgent);
+    this.defaultHeaders = checkedHeaders(options.defaultHeaders ?? {});
     // Range-check the numeric options: a negative, NaN or fractional value would
     // otherwise silently disable the timeout or the size cap, and an unbounded
     // maxRetries would keep retrying against the production register.

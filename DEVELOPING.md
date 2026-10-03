@@ -80,7 +80,11 @@ constructor range-checks the engine options the same way (`intRangeProblem`):
 `timeoutMs` 0..`MAX_TIMEOUT_MS`, `maxRetries` 0..`MAX_RETRIES` (10),
 `maxResponseBytes` and `retryDelayMs` non-negative integers — a negative, `NaN` or
 fractional value would otherwise silently disable the timeout or the size cap. The
-CLI's `--max-retries` parser reads the same exported `MAX_RETRIES`.
+CLI's `--max-retries` parser reads the same exported `MAX_RETRIES`. `userAgent` and
+every `defaultHeaders` value must pass `headerValueProblem` (not blank, Latin-1, no
+control characters but tab; `defaultHeaders` names must be tokens), so a CR/LF never
+reaches a custom transport; `--user-agent` uses the same rule. The default transport
+turns a header Node still refuses into a `MastrNetworkError`, never a raw `TypeError`.
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`
 function (the reason a value is invalid, or `undefined`), in `validate.ts` or next to
