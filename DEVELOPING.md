@@ -73,7 +73,8 @@ page) surfaces as an error and maps to the usage exit code.
 
 The client validates its own inputs before any request, for library callers the CLI's
 parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),
-`pageSize` outside 1..`MAX_PAGE_SIZE` (5000) and a malformed filter throw
+`pageSize` outside 1..`MAX_PAGE_SIZE` (5000), a blank or whitespace-only `sort`
+(`sortProblem`) and a malformed filter throw
 `MastrValidationError` (`Invalid <name>: expected …, got <v>.`).
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`

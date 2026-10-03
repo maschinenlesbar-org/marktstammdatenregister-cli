@@ -21,3 +21,26 @@ export function assertValid<T>(name: string, value: T, problem: Problem<T>): T {
   if (reason !== undefined) throw new MastrValidationError(`Invalid ${name}: ${reason}`);
   return value;
 }
+
+/** A value as it appears in a validation message: strings quoted, the rest as is. */
+function show(value: unknown): string {
+  return typeof value === "string" ? JSON.stringify(value) : String(value);
+}
+
+/**
+ * A string that is not blank: `""` or whitespace only is refused, because the
+ * register reads an empty parameter as "not set" rather than as an error.
+ */
+export const nonBlankProblem: Problem<string> = (value) => {
+  if (typeof value !== "string") return `Expected a string, got ${show(value)}.`;
+  if (value.trim() === "") return "Expected a non-empty value.";
+  return undefined;
+};
+
+/**
+ * A `sort` spec (`FieldKey-asc` / `FieldKey-desc`): not blank. A blank one would go
+ * out as `sort=` (the same as no sort) or `sort=%20%20`, and an explicitly blank
+ * sort is a mistake rather than a request for the default order. The shape itself is
+ * left to the register: an unknown sort key there answers 0 rows.
+ */
+export const sortProblem: Problem<string> = (value) => nonBlankProblem(value);

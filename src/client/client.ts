@@ -13,6 +13,7 @@
 import { RequestEngine, describeMastrErrors, type EngineOptions } from "./engine.js";
 import { MastrApiError, MastrParseError, MastrValidationError } from "./errors.js";
 import { validateFilter } from "./filter.js";
+import { assertValid, sortProblem } from "./validate.js";
 import type { QueryParams } from "./query.js";
 import type { FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery } from "./types.js";
 
@@ -117,13 +118,15 @@ export class MastrClient {
    * `sort`, `page`, `pageSize`, `group`, `filter` — always, because the server
    * rejects a request with `group`/`filter` missing ("Die Anfrage ist Null.").
    * An unknown category, a `page` outside 1..`MAX_PAGE`, a `pageSize` outside
-   * 1..`MAX_PAGE_SIZE` or a filter the register would misread (e.g. `~or~`, see
-   * {@link validateFilter}) is rejected with a `MastrValidationError` before any request.
+   * 1..`MAX_PAGE_SIZE`, a blank `sort` ({@link sortProblem}) or a filter the register
+   * would misread (e.g. `~or~`, see {@link validateFilter}) is rejected with a
+   * `MastrValidationError` before any request.
    */
   async units(category: UnitCategory, query: UnitQuery = {}): Promise<UnitPage> {
     const suffix = categorySuffix(category);
     checkPaging("page", query.page, MAX_PAGE);
     checkPaging("pageSize", query.pageSize, MAX_PAGE_SIZE);
+    if (query.sort !== undefined) assertValid("sort", query.sort, sortProblem);
     if (query.filter !== undefined) validateFilter(query.filter);
     const params: QueryParams = {
       sort: query.sort ?? "",

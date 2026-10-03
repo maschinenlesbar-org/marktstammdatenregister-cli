@@ -9,6 +9,7 @@ import { isoifyDates } from "../client/client.js";
 import { MastrParseError } from "../client/errors.js";
 import { filterProblem } from "../client/filter.js";
 import { isBidiControl } from "../client/engine.js";
+import { nonBlankProblem, sortProblem, type Problem } from "../client/validate.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -28,13 +29,23 @@ export function parseIntArg(value: string): number {
   return n;
 }
 
-/** commander value-parser: a non-empty (after trimming) string. */
-export function parseNonEmpty(value: string): string {
-  if (value.trim() === "") {
-    throw new InvalidArgumentError("Expected a non-empty value.");
-  }
-  return value;
+/**
+ * Build a commander value-parser from a library rule: the rule's reason becomes the
+ * usage error, a valid value passes unchanged.
+ */
+export function parseWith(problem: Problem<string>): (value: string) => string {
+  return (value: string) => {
+    const reason = problem(value);
+    if (reason !== undefined) throw new InvalidArgumentError(reason);
+    return value;
+  };
 }
+
+/** commander value-parser: a non-empty (after trimming) string (the library's `nonBlankProblem`). */
+export const parseNonEmpty = parseWith(nonBlankProblem);
+
+/** commander value-parser for `--sort`: the library's `sortProblem` (not blank). */
+export const parseSort = parseWith(sortProblem);
 
 /**
  * commander value-parser for `--filter`: non-blank, and not a spec the register would

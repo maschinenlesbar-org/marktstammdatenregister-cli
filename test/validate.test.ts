@@ -86,3 +86,12 @@ test("parity() captures a synchronous throw from the library call", async () => 
   assert.equal(l.ok, false);
   assert.equal(l.requests.length, 0);
 });
+
+test("nonBlankProblem and sortProblem reject blank strings and non-strings", async () => {
+  const { nonBlankProblem, sortProblem } = await import("../src/client/validate.js");
+  for (const problem of [nonBlankProblem, sortProblem]) {
+    for (const blank of ["", "   ", "\t", "\n"]) assert.equal(problem(blank), "Expected a non-empty value.");
+    assert.equal(problem(42 as unknown as string), "Expected a string, got 42.");
+    assert.equal(problem("Bruttoleistung-desc"), undefined);
+  }
+});

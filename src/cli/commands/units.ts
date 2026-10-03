@@ -6,7 +6,7 @@ import { Argument, type Command } from "commander";
 import type { CliDeps } from "../io.js";
 import { MAX_PAGE, MAX_PAGE_SIZE, type MastrClient } from "../../client/client.js";
 import type { UnitCategory, UnitQuery } from "../../client/types.js";
-import { action, parseBoundedInt, parseFilter, parseNonEmpty, renderJson } from "../shared.js";
+import { action, parseBoundedInt, parseFilter, parseSort, renderJson } from "../shared.js";
 
 // `sortKey` is a record field that exists in that category's rows (live 2026-09-26):
 // only stromerzeugung rows carry Bruttoleistung/Nettonennleistung, so the stderr hint
@@ -49,7 +49,7 @@ export function registerCommands(program: Command, deps: CliDeps): void {
         "--sort <spec>",
         "sort: FieldKey-asc | FieldKey-desc, where FieldKey is a record field name, not a " +
           `FilterName (e.g. ${cat.sortKey}-desc)`,
-        parseNonEmpty,
+        parseSort,
       )
       .option(
         "--filter <spec>",
