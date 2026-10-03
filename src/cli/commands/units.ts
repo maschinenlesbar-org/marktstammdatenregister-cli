@@ -5,7 +5,7 @@
 import { Argument, type Command } from "commander";
 import type { CliDeps } from "../io.js";
 import { MAX_PAGE, MAX_PAGE_SIZE, type MastrClient } from "../../client/client.js";
-import type { UnitCategory, UnitQuery } from "../../client/types.js";
+import type { CountQuery, UnitCategory, UnitQuery } from "../../client/types.js";
 import { action, parseBoundedInt, parseFilter, parseSort, renderJson } from "../shared.js";
 
 // `sortKey` is a record field that exists in that category's rows (live 2026-09-26):
@@ -25,16 +25,19 @@ const RUN: Record<UnitCategory, (c: MastrClient, q: UnitQuery) => ReturnType<Mas
   gasverbrauch: (c, q) => c.gasverbrauch(q),
 };
 
-/** Build a UnitQuery from this command's parsed options. */
-function buildQuery(opts: Record<string, unknown>): UnitQuery {
-  const q: UnitQuery = {};
-  if (typeof opts["page"] === "number") q.page = opts["page"];
-  if (typeof opts["pageSize"] === "number") q.pageSize = opts["pageSize"];
+/** Build a CountQuery (filter and sort) from this command's parsed options. */
+function buildCountQuery(opts: Record<string, unknown>): CountQuery {
+  const q: CountQuery = {};
   if (typeof opts["sort"] === "string") q.sort = opts["sort"];
   if (typeof opts["filter"] === "string") q.filter = opts["filter"];
-  // `--total` needs only the match count (returned regardless of page size), so
-  // request a single row instead of fetching and discarding a full page.
-  if (opts["total"] === true) q.pageSize = 1;
+  return q;
+}
+
+/** Build a UnitQuery from this command's parsed options. */
+function buildQuery(opts: Record<string, unknown>): UnitQuery {
+  const q: UnitQuery = buildCountQuery(opts);
+  if (typeof opts["page"] === "number") q.page = opts["page"];
+  if (typeof opts["pageSize"] === "number") q.pageSize = opts["pageSize"];
   return q;
 }
 
@@ -58,10 +61,18 @@ export function registerCommands(program: Command, deps: CliDeps): void {
           "for several dropdown codes use one comma list, e.g. Energieträger~eq~'2497,2498'",
         parseFilter,
       )
-      .option("--total", "print only the total match count, not the rows")
+      .option(
+        "--total",
+        "print only the total match count, not the rows (a one-row request; --page and --page-size are ignored)",
+      )
       .action(
         action(deps, async ({ client, global, opts }) => {
-          const page = await RUN[cat.name](client, buildQuery(opts));
+          // `--total` is the library's count(): a one-row request for the match count.
+          const total =
+            opts["total"] === true
+              ? await client.count(cat.name, buildCountQuery(opts))
+              : undefined;
+          const page = total === undefined ? await RUN[cat.name](client, buildQuery(opts)) : { total };
           // An unknown --sort key or --filter operator makes the server return 0 rows
           // (not an error), which reads like "no matches". Nudge the user toward the
           // likely cause. Sort keys are the record's field names (`Bruttoleistung`);
@@ -83,7 +94,7 @@ export function registerCommands(program: Command, deps: CliDeps): void {
                 "take a point ('4999.999'), and gt/lt are strict.",
             );
           }
-          renderJson(deps, global, opts["total"] === true ? page.total : page);
+          renderJson(deps, global, total ?? page);
         }),
       );
   }

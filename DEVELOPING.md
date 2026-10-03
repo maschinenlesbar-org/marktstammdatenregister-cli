@@ -63,7 +63,7 @@ live — the OpenAPI spec is thin, so trust the live behaviour:
 | **No escape for `~` in a value** | The register splits the filter on every `~`, even inside quotes: `ct 'a~b'` gives the same count as `ct 'a'`, and interpolated input (`Ort~eq~'${input}'`) can add conditions. | `filterProblem()` names a `~` inside a quoted value; library callers use `buildFilter()`, which quotes values and refuses a `~` |
 | **Malformed filters are misread, not refused** | A spec that is not `FilterName~op~value(~and~…)*` goes through: `foo` or a dangling `~and~` gives the unfiltered set, an unknown or upper-case operator (`gte`, `EQ`) 0 rows, `Ort~null` without `''` is ignored. | `filterProblem()` checks the shape the register splits on `~` (FilterName, known lower-case operator, value, `and`) before any request. A wrong FilterName still can't be detected. |
 | **Microsoft dates** | Dates are `"/Date(ms)/"` strings, not ISO (the offset form `/Date(ms+hhmm)/` is accepted too; not seen live). | `parseMsDate()` (null for an out-of-range value) / `isoifyDates()`; CLI `--iso-dates` |
-| **No aggregate endpoint** | `AggregateResults` is null; there is no server-side capacity sum — only the `Total` count. | documented; the CLI offers `--total` (count) but not a sum |
+| **No aggregate endpoint** | `AggregateResults` is null; there is no server-side capacity sum — only the `Total` count. | documented; `MastrClient.count()` (the CLI's `--total`) returns the count with a one-row request, but there is no sum |
 | **Wide, category-varying rows** | ~90 fields; a solar unit carries columns a gas consumer lacks. | `MastrUnit` types the common fields + an index signature |
 | **Withheld data** | Natural-person and confidential data are not published (operator names anonymised; some location data withheld for units < 30 kW). | documented; fields are optional/nullable |
 
@@ -88,7 +88,8 @@ turns a header Node still refuses into a `MastrNetworkError`, never a raw `TypeE
 A `baseUrl` with surrounding or inner whitespace or control characters
 (`baseUrlWhitespaceProblem`) is refused on the raw value, before the trailing-slash
 strip: `new URL()` would trim it silently while the engine joins the raw string to
-each path (`/MaStR%20/...`).
+each path (`/MaStR%20/...`). `count(category, { filter, sort })` refuses `page` and
+`pageSize` (`countQueryProblem`): the count is the same on every page.
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`
 function (the reason a value is invalid, or `undefined`), in `validate.ts` or next to

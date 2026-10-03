@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient } from "../src/client/client.js";
 import { MastrValidationError } from "../src/client/errors.js";
-import { parity, requestShapes } from "./helpers.js";
+import { jsonResponse, makeMockTransport, parity, requestShapes } from "./helpers.js";
 
 test("parity: a blank or whitespace-only sort is rejected on both sides, before any request", async () => {
   for (const sort of ["", "   ", "\t"]) {
@@ -172,4 +172,44 @@ test("parity: a base URL with a path prefix and a trailing slash is sent identic
   assert.equal(lib.ok, true);
   assert.match(cli.requests[0]?.url ?? "", /^https:\/\/h\.example\/mirror\/MaStR\/Einheit\//);
   assert.deepEqual(requestShapes(cli.requests), requestShapes(lib.requests));
+});
+
+test("parity: --total and client.count() send the same one-row request and give the same number", async () => {
+  const page = { Data: [{ Id: 1 }], Total: 9063887, Errors: null };
+  for (const [argv, call] of [
+    [["stromerzeugung", "--total", "--page-size", "100", "--page", "3"], (c: MastrClient) => c.count("stromerzeugung")],
+    [["stromerzeugung", "--total"], (c: MastrClient) => c.count("stromerzeugung")],
+    [
+      ["gasverbrauch", "--total", "--filter", "Ort~eq~'Berlin'", "--sort", "MaximaleGasbezugsLeistung-desc"],
+      (c: MastrClient) => c.count("gasverbrauch", { filter: "Ort~eq~'Berlin'", sort: "MaximaleGasbezugsLeistung-desc" }),
+    ],
+  ] as const) {
+    const { cli, lib } = await parity(
+      ["--compact", ...argv],
+      (transport) => call(new MastrClient({ transport })),
+      () => jsonResponse(page),
+    );
+    assert.equal(cli.code, 0, argv.join(" "));
+    assert.equal(lib.ok, true);
+    assert.equal(JSON.parse(cli.out), 9063887);
+    assert.ok(lib.ok && lib.value === 9063887);
+    assert.deepEqual(requestShapes(cli.requests), requestShapes(lib.requests));
+    assert.equal(new URL(lib.requests[0]?.url ?? "").searchParams.get("pageSize"), "1");
+    assert.equal(new URL(lib.requests[0]?.url ?? "").searchParams.get("page"), "1");
+  }
+});
+
+test("count() refuses paging options and checks sort and filter before any request", async () => {
+  const mt = makeMockTransport(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
+  const client = new MastrClient({ transport: mt.transport });
+  await assert.rejects(
+    () => client.count("stromerzeugung", { pageSize: 100 } as never),
+    (err) =>
+      err instanceof MastrValidationError &&
+      err.message === "Invalid count query: pageSize cannot be combined with count(): it counts every match, so paging does not apply.",
+  );
+  await assert.rejects(() => client.count("stromerzeugung", { sort: " " }), MastrValidationError);
+  await assert.rejects(() => client.count("stromerzeugung", { filter: "Ort~or~'x'" }), MastrValidationError);
+  await assert.rejects(() => client.count("bogus" as never), MastrValidationError);
+  assert.equal(mt.calls.length, 0);
 });

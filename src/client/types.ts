@@ -91,6 +91,9 @@ export interface UnitPage {
 }
 
 /** Query parameters for a unit search. `group` is always sent empty by the client. */
+/** The query `count()` takes: the filter and sort of a `UnitQuery`, no paging. */
+export type CountQuery = Pick<UnitQuery, "filter" | "sort">;
+
 export interface UnitQuery {
   /** 1-based page number (default 1). */
   page?: number;

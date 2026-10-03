@@ -5,6 +5,7 @@
 // error, so a rule is written once and the CLI and the library cannot drift apart.
 
 import { MastrValidationError } from "./errors.js";
+import type { UnitQuery } from "./types.js";
 
 /** A rule: the reason `value` is invalid, or `undefined` when it is valid. */
 export type Problem<T = unknown> = (value: T) => string | undefined;
@@ -94,3 +95,16 @@ export const baseUrlWhitespaceProblem: Problem<string> = (value) => {
  * left to the register: an unknown sort key there answers 0 rows.
  */
 export const sortProblem: Problem<string> = (value) => nonBlankProblem(value);
+
+/**
+ * The `UnitQuery` keys that page the rows. The match count is the same on every
+ * page, so `count()` refuses them rather than silently ignore them.
+ */
+export const COUNT_IGNORED_KEYS = ["page", "pageSize"] as const;
+
+/** Why `query` cannot be counted: it sets a paging option. */
+export const countQueryProblem: Problem<UnitQuery> = (query) => {
+  const keys = COUNT_IGNORED_KEYS.filter((key) => query[key] !== undefined);
+  if (keys.length === 0) return undefined;
+  return `${keys.join(", ")} cannot be combined with count(): it counts every match, so paging does not apply.`;
+};

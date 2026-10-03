@@ -13,9 +13,9 @@
 import { RequestEngine, describeMastrErrors, type EngineOptions } from "./engine.js";
 import { MastrApiError, MastrParseError, MastrValidationError } from "./errors.js";
 import { validateFilter } from "./filter.js";
-import { assertValid, sortProblem } from "./validate.js";
+import { assertValid, countQueryProblem, sortProblem } from "./validate.js";
 import type { QueryParams } from "./query.js";
-import type { FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery } from "./types.js";
+import type { CountQuery, FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery } from "./types.js";
 
 const SERVICE = "/Einheit/EinheitJson";
 
@@ -159,6 +159,22 @@ export class MastrClient {
     if (data === null && total === 0) return { total, data: [] };
     if (!Array.isArray(data)) throw shapeError(path, "a Data array");
     return { total, data: data as MastrUnit[] };
+  }
+
+  /**
+   * The number of units in a category that match `filter` (all units without one).
+   * Fetches a single row (`page=1`, `pageSize=1`) and returns the envelope's
+   * `Total`, which counts every match regardless of the page. `sort` is forwarded:
+   * an unknown sort key makes the register answer 0. Paging options are refused
+   * (`countQueryProblem`), as are the inputs `units()` refuses, all with a
+   * `MastrValidationError` before any request.
+   */
+  async count(category: UnitCategory, query: CountQuery = {}): Promise<number> {
+    assertValid("count query", query as UnitQuery, countQueryProblem);
+    const q: UnitQuery = { page: 1, pageSize: 1 };
+    if (query.sort !== undefined) q.sort = query.sort;
+    if (query.filter !== undefined) q.filter = query.filter;
+    return (await this.units(category, q)).total;
   }
 
   /** Electricity-generation units (`Stromerzeugung`). */

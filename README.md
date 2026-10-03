@@ -67,6 +67,7 @@ import { MastrClient, parseMsDate } from "@maschinenlesbar.org/marktstammdatenre
 const mastr = new MastrClient();
 const solar = await mastr.stromerzeugung({ filter: "Energieträger~eq~'2495'", pageSize: 10 });
 solar.total; // total matching units
+await mastr.count("stromerzeugung", { filter: "Energieträger~eq~'2495'" }); // just the count, one-row request
 parseMsDate(String(solar.data[0]?.EinheitRegistrierungsdatum)); // Date | null
 ```
 

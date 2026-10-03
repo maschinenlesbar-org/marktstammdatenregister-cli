@@ -22,6 +22,8 @@ export { buildQueryString } from "./query.js";
 export {
   assertValid,
   baseUrlWhitespaceProblem,
+  COUNT_IGNORED_KEYS,
+  countQueryProblem,
   headerNameProblem,
   headerValueProblem,
   intRangeProblem,

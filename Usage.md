@@ -37,7 +37,7 @@ mastr [global options] <command> [command options]
 | `--page-size <n>` | rows per page (1..5000, default 25) |
 | `--sort <spec>` | `FieldKey-asc` or `FieldKey-desc`, e.g. `Bruttoleistung-desc`. `FieldKey` is a record field name of **that category**, not a `FilterName` (`Bruttoleistung` exists only in `stromerzeugung`; see [Capacity fields](#capacity-fields-per-category)) |
 | `--filter <spec>` | filter expression (see below) |
-| `--total` | print only the total match count, not the rows |
+| `--total` | print only the total match count, not the rows (a one-row request, the library's `count()`; `--page` and `--page-size` are ignored) |
 
 Each data command prints `{ total, data }`: `total` is the full match count (respects
 the filter), `data` is the current page.
