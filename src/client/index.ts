@@ -21,6 +21,7 @@ export type { Transport, HttpRequest, HttpResponse } from "./http.js";
 export { buildQueryString } from "./query.js";
 export {
   assertValid,
+  baseUrlWhitespaceProblem,
   headerNameProblem,
   headerValueProblem,
   intRangeProblem,

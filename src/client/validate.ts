@@ -75,6 +75,19 @@ export const headerNameProblem: Problem<string> = (name) =>
     : `Expected an HTTP header name (a token), got ${show(name)}.`;
 
 /**
+ * A base URL must not carry whitespace or control characters. `new URL()` trims
+ * surrounding whitespace and drops tab/CR/LF silently, but the engine joins the raw
+ * string to each request path, so "https://h/MaStR " would request `/MaStR%20/...`
+ * and a custom transport would see the raw value. Reject rather than guess.
+ */
+export const baseUrlWhitespaceProblem: Problem<string> = (value) => {
+  if (typeof value !== "string") return `Expected a string, got ${show(value)}.`;
+  if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
+  if (/[\s\u0000-\u001f\u007f]/.test(value)) return "A base URL cannot contain whitespace or control characters.";
+  return undefined;
+};
+
+/**
  * A `sort` spec (`FieldKey-asc` / `FieldKey-desc`): not blank. A blank one would go
  * out as `sort=` (the same as no sort) or `sort=%20%20`, and an explicitly blank
  * sort is a mistake rather than a request for the default order. The shape itself is

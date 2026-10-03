@@ -85,6 +85,10 @@ every `defaultHeaders` value must pass `headerValueProblem` (not blank, Latin-1,
 control characters but tab; `defaultHeaders` names must be tokens), so a CR/LF never
 reaches a custom transport; `--user-agent` uses the same rule. The default transport
 turns a header Node still refuses into a `MastrNetworkError`, never a raw `TypeError`.
+A `baseUrl` with surrounding or inner whitespace or control characters
+(`baseUrlWhitespaceProblem`) is refused on the raw value, before the trailing-slash
+strip: `new URL()` would trim it silently while the engine joins the raw string to
+each path (`/MaStR%20/...`).
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`
 function (the reason a value is invalid, or `undefined`), in `validate.ts` or next to

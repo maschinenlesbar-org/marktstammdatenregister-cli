@@ -140,7 +140,7 @@ test("a non-http(s) base URL is rejected at construction, before any request", (
 test("an unparseable base URL is rejected at construction", () => {
   const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
   assert.throws(
-    () => new RequestEngine({ baseUrl: "not a url", transport: mt.transport }),
+    () => new RequestEngine({ baseUrl: "not-a-url", transport: mt.transport }),
     (err) => err instanceof MastrNetworkError && /Invalid base URL/.test(err.message),
   );
   assert.equal(mt.calls.length, 0);

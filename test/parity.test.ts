@@ -136,3 +136,40 @@ test("defaultHeaders names and values are checked when the client is built", () 
   );
   assert.doesNotThrow(() => new MastrClient({ defaultHeaders: { "X-Trace-Id": "abc" } }));
 });
+
+test("parity: a base URL with surrounding or inner whitespace is rejected on both sides", async () => {
+  const cases: [string, RegExp][] = [
+    [" https://h.example/MaStR ", /A base URL cannot have surrounding whitespace\./],
+    ["https://h.example/MaStR ", /A base URL cannot have surrounding whitespace\./],
+    ["https://h.example/MaStR/ ", /A base URL cannot have surrounding whitespace\./],
+    ["https://h.example/MaStR\n", /A base URL cannot have surrounding whitespace\./],
+    ["\thttps://h.example/MaStR", /A base URL cannot have surrounding whitespace\./],
+    ["https://h.example/Ma StR", /A base URL cannot contain whitespace or control characters\./],
+    ["https://h.example/Ma\tStR", /A base URL cannot contain whitespace or control characters\./],
+  ];
+  for (const [baseUrl, reason] of cases) {
+    const label = JSON.stringify(baseUrl);
+    const { cli, lib } = await parity(["--compact", "--base-url", baseUrl, "stromerzeugung"], (transport) =>
+      new MastrClient({ transport, baseUrl }).stromerzeugung(),
+    );
+    assert.equal(cli.code, 2, label);
+    assert.equal(cli.requests.length, 0, label);
+    assert.match(cli.err, reason, label);
+    assert.equal(lib.ok, false, label);
+    assert.ok(!lib.ok && lib.error instanceof MastrValidationError, label);
+    assert.match((lib.error as Error).message, /^Invalid baseUrl: /, label);
+    assert.match((lib.error as Error).message, reason, label);
+    assert.equal(lib.requests.length, 0, label);
+  }
+});
+
+test("parity: a base URL with a path prefix and a trailing slash is sent identically", async () => {
+  const baseUrl = "https://h.example/mirror/MaStR/";
+  const { cli, lib } = await parity(["--compact", "--base-url", baseUrl, "stromerzeugung"], (transport) =>
+    new MastrClient({ transport, baseUrl }).stromerzeugung(),
+  );
+  assert.equal(cli.code, 0);
+  assert.equal(lib.ok, true);
+  assert.match(cli.requests[0]?.url ?? "", /^https:\/\/h\.example\/mirror\/MaStR\/Einheit\//);
+  assert.deepEqual(requestShapes(cli.requests), requestShapes(lib.requests));
+});

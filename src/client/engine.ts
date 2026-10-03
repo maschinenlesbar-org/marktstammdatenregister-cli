@@ -6,7 +6,13 @@
 import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { MastrApiError, MastrNetworkError, MastrParseError, redactUrl } from "./errors.js";
-import { assertValid, headerNameProblem, headerValueProblem, intRangeProblem } from "./validate.js";
+import {
+  assertValid,
+  baseUrlWhitespaceProblem,
+  headerNameProblem,
+  headerValueProblem,
+  intRangeProblem,
+} from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://www.marktstammdatenregister.de/MaStR";
 const DEFAULT_USER_AGENT = "marktstammdatenregister-cli";
@@ -18,7 +24,10 @@ export interface RawResponse {
 }
 
 export interface EngineOptions {
-  /** Base URL of the API. Defaults to the canonical marktstammdatenregister.de base. */
+  /**
+   * Base URL of the API. Defaults to the canonical marktstammdatenregister.de base.
+   * Surrounding or inner whitespace and control characters throw a MastrValidationError.
+   */
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
   transport?: Transport;
@@ -229,7 +238,13 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    // The raw value is checked before the trailing-slash strip, so "https://h/ "
+    // cannot slip past it; only an omitted baseUrl selects the default.
+    const baseUrl =
+      options.baseUrl === undefined
+        ? DEFAULT_BASE_URL
+        : assertValid("baseUrl", options.baseUrl, baseUrlWhitespaceProblem);
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
     assertHttpScheme(this.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
     // Header values are checked up front: a blank one would be sent as is, and a

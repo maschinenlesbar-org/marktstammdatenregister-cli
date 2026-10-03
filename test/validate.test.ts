@@ -124,3 +124,14 @@ test("headerValueProblem and headerNameProblem", async () => {
   assert.match(headerNameProblem("X Foo") ?? "", /Expected an HTTP header name/);
   assert.match(headerNameProblem("") ?? "", /Expected an HTTP header name/);
 });
+
+test("baseUrlWhitespaceProblem", async () => {
+  const { baseUrlWhitespaceProblem } = await import("../src/client/validate.js");
+  assert.equal(baseUrlWhitespaceProblem("https://h.example/MaStR/"), undefined);
+  for (const padded of [" https://h", "https://h ", "https://h/\n", "\thttps://h"]) {
+    assert.equal(baseUrlWhitespaceProblem(padded), "A base URL cannot have surrounding whitespace.", JSON.stringify(padded));
+  }
+  for (const inner of ["https://h/a b", "https://h/a\tb", "https://h/a\u0000b", "https://h/a\u007fb"]) {
+    assert.equal(baseUrlWhitespaceProblem(inner), "A base URL cannot contain whitespace or control characters.", JSON.stringify(inner));
+  }
+});

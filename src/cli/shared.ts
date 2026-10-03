@@ -9,7 +9,13 @@ import { isoifyDates } from "../client/client.js";
 import { MastrParseError } from "../client/errors.js";
 import { filterProblem } from "../client/filter.js";
 import { isBidiControl } from "../client/engine.js";
-import { headerValueProblem, nonBlankProblem, sortProblem, type Problem } from "../client/validate.js";
+import {
+  baseUrlWhitespaceProblem,
+  headerValueProblem,
+  nonBlankProblem,
+  sortProblem,
+  type Problem,
+} from "../client/validate.js";
 
 /**
  * commander value-parser: a plain base-10 non-negative integer.
@@ -68,13 +74,15 @@ export function parseFilter(value: string): string {
  * request URL. The transport check stays the enforcement point for library callers.
  */
 export function parseBaseUrl(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed === "") {
+  if (value.trim() === "") {
     throw new InvalidArgumentError("Expected a non-empty value.");
   }
+  // The library's rule: no surrounding or inner whitespace / control characters.
+  const spacing = baseUrlWhitespaceProblem(value);
+  if (spacing !== undefined) throw new InvalidArgumentError(spacing);
   let parsed: URL;
   try {
-    parsed = new URL(trimmed);
+    parsed = new URL(value);
   } catch {
     throw new InvalidArgumentError("Expected an absolute http(s) URL.");
   }
@@ -85,11 +93,6 @@ export function parseBaseUrl(value: string): string {
   // swallow every request path ("http://h/#f" requests "/" for every command).
   if (/[?#]/.test(value)) {
     throw new InvalidArgumentError("A base URL cannot have a query (?) or fragment (#).");
-  }
-  // new URL() trims surrounding whitespace silently; the raw value is what the
-  // engine uses, so reject it rather than guess.
-  if (value !== value.trim()) {
-    throw new InvalidArgumentError("A base URL cannot have surrounding whitespace.");
   }
   return value;
 }
