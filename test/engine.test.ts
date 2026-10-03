@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RequestEngine, parseRetryAfter, sanitizeServerText } from "../src/client/engine.js";
-import { MastrApiError, MastrNetworkError, MastrParseError, redactUrl } from "../src/client/errors.js";
+import { MastrApiError, MastrParseError, MastrValidationError, redactUrl } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -131,7 +131,7 @@ test("a non-http(s) base URL is rejected at construction, before any request", (
     const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
     assert.throws(
       () => new RequestEngine({ baseUrl, transport: mt.transport }),
-      (err) => err instanceof MastrNetworkError && /Unsupported protocol/.test(err.message),
+      (err) => err instanceof MastrValidationError && /Only http and https URLs are supported/.test(err.message),
     );
     assert.equal(mt.calls.length, 0);
   }
@@ -141,7 +141,7 @@ test("an unparseable base URL is rejected at construction", () => {
   const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
   assert.throws(
     () => new RequestEngine({ baseUrl: "not-a-url", transport: mt.transport }),
-    (err) => err instanceof MastrNetworkError && /Invalid base URL/.test(err.message),
+    (err) => err instanceof MastrValidationError && err.message === "Invalid baseUrl: Expected an absolute http(s) URL.",
   );
   assert.equal(mt.calls.length, 0);
 });
@@ -207,7 +207,7 @@ test("a base URL with a query or fragment is rejected at construction", () => {
     const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
     assert.throws(
       () => new RequestEngine({ baseUrl, transport: mt.transport }),
-      (err) => err instanceof MastrNetworkError && /must not contain a query or fragment/.test(err.message),
+      (err) => err instanceof MastrValidationError && /cannot have a query \(\?\) or fragment \(#\)/.test(err.message),
     );
     assert.equal(mt.calls.length, 0);
   }
@@ -220,10 +220,10 @@ test("redactUrl hides userinfo and leaves other URLs alone", () => {
   assert.equal(redactUrl("not a url"), "not a url");
 });
 
-test("base-URL errors redact userinfo", () => {
+test("base-URL errors never echo the URL, so userinfo cannot leak", () => {
   assert.throws(
     () => new RequestEngine({ baseUrl: "ftp://user:secret@h.test/" }),
-    (err) => err instanceof MastrNetworkError && !/secret/.test(err.message) && /\*\*\*@h\.test/.test(err.message),
+    (err) => err instanceof MastrValidationError && !/secret|user/.test(err.message),
   );
 });
 

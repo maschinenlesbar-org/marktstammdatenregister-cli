@@ -10,7 +10,7 @@ import { MastrParseError } from "../client/errors.js";
 import { filterProblem } from "../client/filter.js";
 import { isBidiControl } from "../client/engine.js";
 import {
-  baseUrlWhitespaceProblem,
+  baseUrlProblem,
   headerValueProblem,
   nonBlankProblem,
   sortProblem,
@@ -65,37 +65,12 @@ export function parseFilter(value: string): string {
 }
 
 /**
- * commander value-parser for `--base-url`: non-empty and http/https-only.
- *
- * The transport already rejects any non-http(s) scheme, so this is defence in
- * depth — but doing the check at parse time turns a bad scheme (e.g. `file:` /
- * `data:` / `ftp:`) into a friendly usage error (exit 2) with the value the user
- * actually typed, rather than a network error (exit 6) echoing the fully built
- * request URL. The transport check stays the enforcement point for library callers.
+ * commander value-parser for `--base-url`: the library's `baseUrlProblem` (non-blank,
+ * no whitespace, an absolute http(s) URL without a query or fragment), whose reason
+ * becomes a usage error (exit 2) naming the value the user typed. The CLI keeps no
+ * rules of its own; the client constructor enforces the same rule for library callers.
  */
-export function parseBaseUrl(value: string): string {
-  if (value.trim() === "") {
-    throw new InvalidArgumentError("Expected a non-empty value.");
-  }
-  // The library's rule: no surrounding or inner whitespace / control characters.
-  const spacing = baseUrlWhitespaceProblem(value);
-  if (spacing !== undefined) throw new InvalidArgumentError(spacing);
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    throw new InvalidArgumentError("Expected an absolute http(s) URL.");
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new InvalidArgumentError("Only http and https URLs are supported.");
-  }
-  // Paths are appended to the base URL as a string, so a query or fragment would
-  // swallow every request path ("http://h/#f" requests "/" for every command).
-  if (/[?#]/.test(value)) {
-    throw new InvalidArgumentError("A base URL cannot have a query (?) or fragment (#).");
-  }
-  return value;
-}
+export const parseBaseUrl = parseWith(baseUrlProblem);
 
 /** Build a commander value-parser for an integer constrained to [min, max]. */
 export function parseBoundedInt(min: number, max: number): (value: string) => number {

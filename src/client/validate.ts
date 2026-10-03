@@ -89,6 +89,30 @@ export const baseUrlWhitespaceProblem: Problem<string> = (value) => {
 };
 
 /**
+ * Every rule for a base URL, in order: a non-blank string, no whitespace or control
+ * characters ({@link baseUrlWhitespaceProblem}), an absolute URL, the `http:` or
+ * `https:` scheme, and no query or fragment — request paths are appended to the
+ * base URL as a string, so a `?` or `#` would swallow every path (`http://h/?x=1`
+ * requests `/?x=1/Einheit/...`, `http://h/#f` requests `/`). Userinfo is allowed
+ * (error messages redact it). The reasons never echo the URL.
+ */
+export const baseUrlProblem: Problem<string> = (value) => {
+  const blank = nonBlankProblem(value);
+  if (blank !== undefined) return blank;
+  const spacing = baseUrlWhitespaceProblem(value);
+  if (spacing !== undefined) return spacing;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return "Expected an absolute http(s) URL.";
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return "Only http and https URLs are supported.";
+  if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
+  return undefined;
+};
+
+/**
  * A `sort` spec (`FieldKey-asc` / `FieldKey-desc`): not blank. A blank one would go
  * out as `sort=` (the same as no sort) or `sort=%20%20`, and an explicitly blank
  * sort is a mistake rather than a request for the default order. The shape itself is

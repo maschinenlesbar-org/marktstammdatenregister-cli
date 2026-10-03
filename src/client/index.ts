@@ -7,6 +7,7 @@ export type { FilterCondition, FilterOperator } from "./filter.js";
 export {
   RequestEngine,
   assertHeaderValue,
+  validateBaseUrl,
   DEFAULT_BASE_URL,
   MAX_RETRIES,
   MAX_RETRY_AFTER_MS,
@@ -21,6 +22,7 @@ export type { Transport, HttpRequest, HttpResponse } from "./http.js";
 export { buildQueryString } from "./query.js";
 export {
   assertValid,
+  baseUrlProblem,
   baseUrlWhitespaceProblem,
   COUNT_IGNORED_KEYS,
   countQueryProblem,

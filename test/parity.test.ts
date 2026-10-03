@@ -5,7 +5,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient } from "../src/client/client.js";
-import { MastrValidationError } from "../src/client/errors.js";
+import { MastrNetworkError, MastrValidationError } from "../src/client/errors.js";
+import { validateBaseUrl } from "../src/index.js";
+import { run } from "../src/cli/run.js";
 import { jsonResponse, makeMockTransport, parity, requestShapes } from "./helpers.js";
 
 test("parity: a blank or whitespace-only sort is rejected on both sides, before any request", async () => {
@@ -212,4 +214,45 @@ test("count() refuses paging options and checks sort and filter before any reque
   await assert.rejects(() => client.count("stromerzeugung", { filter: "Ort~or~'x'" }), MastrValidationError);
   await assert.rejects(() => client.count("bogus" as never), MastrValidationError);
   assert.equal(mt.calls.length, 0);
+});
+
+test("parity: an invalid base URL is a validation error on both sides, never a network error", async () => {
+  const cases: [string, string][] = [
+    ["", "Expected a non-empty value."],
+    ["   ", "Expected a non-empty value."],
+    ["h.example", "Expected an absolute http(s) URL."],
+    ["ftp://h.example/", "Only http and https URLs are supported."],
+    ["file:///etc/", "Only http and https URLs are supported."],
+    ["https://h.example/MaStR?x=1", "A base URL cannot have a query (?) or fragment (#)."],
+    ["https://h.example/MaStR#f", "A base URL cannot have a query (?) or fragment (#)."],
+  ];
+  for (const [baseUrl, reason] of cases) {
+    const label = JSON.stringify(baseUrl);
+    const { cli, lib } = await parity(["--compact", "--base-url", baseUrl, "stromerzeugung", "--page-size", "1"], (transport) =>
+      new MastrClient({ transport, baseUrl }).stromerzeugung({ pageSize: 1 }),
+    );
+    assert.equal(cli.code, 2, label);
+    assert.equal(cli.requests.length, 0, label);
+    assert.ok(cli.err.includes(reason), label);
+    assert.equal(lib.ok, false, label);
+    assert.ok(!lib.ok && lib.error instanceof MastrValidationError, label);
+    assert.ok(!(lib.error instanceof MastrNetworkError), label);
+    assert.equal((lib.error as Error).message, `Invalid baseUrl: ${reason}`, label);
+    assert.equal(lib.requests.length, 0, label);
+  }
+});
+
+test("a bad base URL rejected by the library, not the CLI parser, still exits 2", async () => {
+  const err: string[] = [];
+  const code = await run(["stromerzeugung"], {
+    io: { out: () => {}, err: (s) => err.push(s) },
+    createClient: (opts) => new MastrClient({ ...opts, baseUrl: "ftp://h.example/" }),
+  });
+  assert.equal(code, 2);
+  assert.deepEqual(err, ["Error: Invalid baseUrl: Only http and https URLs are supported."]);
+});
+
+test("validateBaseUrl returns the value without trailing slashes, or throws MastrValidationError", () => {
+  assert.equal(validateBaseUrl("https://h.example/MaStR//"), "https://h.example/MaStR");
+  assert.throws(() => validateBaseUrl("ftp://h.example"), MastrValidationError);
 });

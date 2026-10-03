@@ -135,3 +135,15 @@ test("baseUrlWhitespaceProblem", async () => {
     assert.equal(baseUrlWhitespaceProblem(inner), "A base URL cannot contain whitespace or control characters.", JSON.stringify(inner));
   }
 });
+
+test("baseUrlProblem checks blank, whitespace, parse, scheme, query and fragment in that order", async () => {
+  const { baseUrlProblem } = await import("../src/client/validate.js");
+  assert.equal(baseUrlProblem("https://h.example/MaStR/"), undefined);
+  assert.equal(baseUrlProblem("http://user:pw@h.example/"), undefined);
+  assert.equal(baseUrlProblem(""), "Expected a non-empty value.");
+  assert.equal(baseUrlProblem(" https://h"), "A base URL cannot have surrounding whitespace.");
+  assert.equal(baseUrlProblem("nope"), "Expected an absolute http(s) URL.");
+  assert.equal(baseUrlProblem("data:text/plain,x"), "Only http and https URLs are supported.");
+  assert.equal(baseUrlProblem("https://h/?x"), "A base URL cannot have a query (?) or fragment (#).");
+  assert.equal(baseUrlProblem(5 as unknown as string), "Expected a string, got 5.");
+});

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient, parseMsDate, isoifyDates } from "../src/client/client.js";
-import { MastrApiError, MastrNetworkError, MastrParseError, MastrValidationError } from "../src/client/errors.js";
+import { MastrApiError, MastrParseError, MastrValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -146,7 +146,7 @@ test("MastrClient rejects a non-http(s) base URL even with a custom transport", 
     const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
     assert.throws(
       () => new MastrClient({ baseUrl, transport: mt.transport }),
-      (err) => err instanceof MastrNetworkError && /Unsupported protocol/.test(err.message),
+      (err) => err instanceof MastrValidationError && /Only http and https URLs are supported/.test(err.message),
     );
     assert.equal(mt.calls.length, 0);
   }

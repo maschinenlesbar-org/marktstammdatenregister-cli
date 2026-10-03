@@ -85,10 +85,13 @@ every `defaultHeaders` value must pass `headerValueProblem` (not blank, Latin-1,
 control characters but tab; `defaultHeaders` names must be tokens), so a CR/LF never
 reaches a custom transport; `--user-agent` uses the same rule. The default transport
 turns a header Node still refuses into a `MastrNetworkError`, never a raw `TypeError`.
-A `baseUrl` with surrounding or inner whitespace or control characters
-(`baseUrlWhitespaceProblem`) is refused on the raw value, before the trailing-slash
-strip: `new URL()` would trim it silently while the engine joins the raw string to
-each path (`/MaStR%20/...`). `count(category, { filter, sort })` refuses `page` and
+The constructor checks `baseUrl` with the exported `validateBaseUrl` (`baseUrlProblem`:
+blank, surrounding or inner whitespace or control characters, not an absolute
+http(s) URL, a query or fragment) and throws `MastrValidationError` — a configuration
+error, not a `MastrNetworkError`, which stays for transport failures (the default
+transport still gates the scheme per request). It runs on the raw value, before the
+trailing-slash strip: `new URL()` would trim whitespace silently while the engine joins
+the raw string to each path (`/MaStR%20/...`). `--base-url` uses the same rule. `count(category, { filter, sort })` refuses `page` and
 `pageSize` (`countQueryProblem`): the count is the same on every page.
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`

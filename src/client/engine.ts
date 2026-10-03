@@ -5,10 +5,10 @@
 
 import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { MastrApiError, MastrNetworkError, MastrParseError, redactUrl } from "./errors.js";
+import { MastrApiError, MastrParseError } from "./errors.js";
 import {
   assertValid,
-  baseUrlWhitespaceProblem,
+  baseUrlProblem,
   headerNameProblem,
   headerValueProblem,
   intRangeProblem,
@@ -26,7 +26,9 @@ export interface RawResponse {
 export interface EngineOptions {
   /**
    * Base URL of the API. Defaults to the canonical marktstammdatenregister.de base.
-   * Surrounding or inner whitespace and control characters throw a MastrValidationError.
+   * A value that breaks a rule of {@link validateBaseUrl} (blank, whitespace or
+   * control characters, not an absolute http(s) URL, a query or fragment) throws a
+   * MastrValidationError.
    */
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
@@ -179,29 +181,16 @@ export function describeMastrErrors(errors: unknown): string | undefined {
 }
 
 /**
- * Reject a base URL whose scheme is not http(s), or that has a query or fragment.
- * The default transport already gates the scheme per hop, but the engine is
- * exported as a library and may be handed a custom transport that does no such
- * check, so gate the configured base URL here too (a `file:`/`ftp:` base URL fails
- * fast with a typed error). Request paths are appended to the base URL as a string,
- * so a `?` or `#` in it would swallow every path: `http://h/?x=1` requests
- * `/?x=1/Einheit/...` and `http://h/#f` requests `/`.
+ * Check a base URL against every rule of {@link baseUrlProblem} — blank, whitespace
+ * or control characters, not an absolute URL, a scheme other than `http:`/`https:`,
+ * a query or fragment — and return it with trailing slashes stripped. A bad value
+ * throws a MastrValidationError (`Invalid baseUrl: <reason>`): it is a configuration
+ * error, not a transport failure. The default transport still gates the scheme per
+ * request, but the engine may be handed a custom transport that does no such check,
+ * so the configured value is checked here, on the raw string.
  */
-function assertHttpScheme(baseUrl: string): void {
-  let url: URL;
-  try {
-    url = new URL(baseUrl);
-  } catch {
-    throw new MastrNetworkError(`Invalid base URL: ${redactUrl(baseUrl)}`);
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new MastrNetworkError(
-      `Unsupported protocol "${url.protocol}" in base URL: ${redactUrl(baseUrl)}`,
-    );
-  }
-  if (/[?#]/.test(baseUrl)) {
-    throw new MastrNetworkError(`Base URL must not contain a query or fragment: ${redactUrl(baseUrl)}`);
-  }
+export function validateBaseUrl(raw: string): string {
+  return assertValid("baseUrl", raw, baseUrlProblem).replace(/\/+$/, "");
 }
 
 /**
@@ -240,12 +229,7 @@ export class RequestEngine {
   constructor(options: EngineOptions = {}) {
     // The raw value is checked before the trailing-slash strip, so "https://h/ "
     // cannot slip past it; only an omitted baseUrl selects the default.
-    const baseUrl =
-      options.baseUrl === undefined
-        ? DEFAULT_BASE_URL
-        : assertValid("baseUrl", options.baseUrl, baseUrlWhitespaceProblem);
-    this.baseUrl = baseUrl.replace(/\/+$/, "");
-    assertHttpScheme(this.baseUrl);
+    this.baseUrl = validateBaseUrl(options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
     // Header values are checked up front: a blank one would be sent as is, and a
     // CR/LF or a character above U+00FF would reach a custom transport raw or make
