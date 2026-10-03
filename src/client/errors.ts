@@ -77,7 +77,9 @@ export class MastrNetworkError extends MastrError {}
 
 /**
  * A client-side validation error — an unknown category, a page or pageSize out of
- * range, a filter the register would misread — thrown before any request.
+ * range, a filter the register would misread — thrown before any request, with the
+ * message `Invalid <name>: <reason>` (see `assertValid`). The CLI maps it to the
+ * usage exit code 2.
  */
 export class MastrValidationError extends MastrError {}
 

@@ -31,6 +31,7 @@ src/
     http.ts      # Transport interface + default node:http/https transport
     engine.ts    # URL building, GET, retry/backoff, JSON decode, error mapping
     errors.ts    # MastrError / MastrApiError / MastrNetworkError / MastrValidationError / MastrParseError
+    validate.ts  # input rules (Problem functions) + assertValid(), shared by library and CLI
     client.ts    # MastrClient (+ parseMsDate / isoifyDates)
     index.ts
   cli/
@@ -74,6 +75,17 @@ The client validates its own inputs before any request, for library callers the 
 parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),
 `pageSize` outside 1..`MAX_PAGE_SIZE` (5000) and a malformed filter throw
 `MastrValidationError` (`Invalid <name>: expected …, got <v>.`).
+
+**The library owns every input rule.** A rule is a pure, exported `…Problem(value)`
+function (the reason a value is invalid, or `undefined`), in `validate.ts` or next to
+the code it guards (`filterProblem` in `filter.ts`). The library enforces it with
+`assertValid(name, value, problem)`, which throws `MastrValidationError` with
+`Invalid <name>: <reason>` before any request (constructors throw, async methods
+reject). The CLI's commander parsers call the same function and turn the reason into a
+usage error; a `MastrValidationError` raised during an action exits 2 with
+`Error: <message>`. Parity tests (`parity()` in `test/helpers.ts`) send one input
+through `run()` and through the library on one mock transport and expect the same
+outcome.
 
 ## Testing
 
