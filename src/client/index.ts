@@ -7,6 +7,7 @@ export type { FilterCondition, FilterOperator } from "./filter.js";
 export {
   RequestEngine,
   DEFAULT_BASE_URL,
+  MAX_RETRIES,
   MAX_RETRY_AFTER_MS,
   parseRetryAfter,
   describeMastrErrors,
@@ -17,7 +18,7 @@ export type { EngineOptions, RawResponse } from "./engine.js";
 export { MAX_TIMEOUT_MS, nodeHttpTransport } from "./http.js";
 export type { Transport, HttpRequest, HttpResponse } from "./http.js";
 export { buildQueryString } from "./query.js";
-export { assertValid, nonBlankProblem, sortProblem } from "./validate.js";
+export { assertValid, intRangeProblem, nonBlankProblem, sortProblem } from "./validate.js";
 export type { Problem } from "./validate.js";
 export type { QueryParams, QueryValue } from "./query.js";
 export {

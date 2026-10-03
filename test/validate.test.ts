@@ -95,3 +95,19 @@ test("nonBlankProblem and sortProblem reject blank strings and non-strings", asy
     assert.equal(problem("Bruttoleistung-desc"), undefined);
   }
 });
+
+test("intRangeProblem accepts safe integers in range and names everything else", async () => {
+  const { intRangeProblem } = await import("../src/client/validate.js");
+  const p = intRangeProblem(0, 10);
+  for (const ok of [0, 5, 10]) assert.equal(p(ok), undefined);
+  assert.equal(p(11), "expected an integer from 0 to 10, got 11.");
+  assert.equal(p(-1), "expected an integer from 0 to 10, got -1.");
+  assert.equal(p(1.5), "expected an integer from 0 to 10, got 1.5.");
+  assert.equal(p(NaN), "expected an integer from 0 to 10, got NaN.");
+  assert.equal(p(Infinity), "expected an integer from 0 to 10, got Infinity.");
+  assert.equal(p("3" as unknown as number), 'expected an integer from 0 to 10, got "3".');
+});
+
+test("MAX_RETRIES is exported from the package root", () => {
+  assert.equal((lib as Record<string, unknown>)["MAX_RETRIES"], 10);
+});

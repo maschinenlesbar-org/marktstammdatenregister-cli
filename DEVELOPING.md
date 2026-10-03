@@ -75,7 +75,12 @@ The client validates its own inputs before any request, for library callers the 
 parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),
 `pageSize` outside 1..`MAX_PAGE_SIZE` (5000), a blank or whitespace-only `sort`
 (`sortProblem`) and a malformed filter throw
-`MastrValidationError` (`Invalid <name>: expected …, got <v>.`).
+`MastrValidationError` (`Invalid <name>: expected …, got <v>.`). The client
+constructor range-checks the engine options the same way (`intRangeProblem`):
+`timeoutMs` 0..`MAX_TIMEOUT_MS`, `maxRetries` 0..`MAX_RETRIES` (10),
+`maxResponseBytes` and `retryDelayMs` non-negative integers — a negative, `NaN` or
+fractional value would otherwise silently disable the timeout or the size cap. The
+CLI's `--max-retries` parser reads the same exported `MAX_RETRIES`.
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`
 function (the reason a value is invalid, or `undefined`), in `validate.ts` or next to
