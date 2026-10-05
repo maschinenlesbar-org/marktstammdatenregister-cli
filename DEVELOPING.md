@@ -96,7 +96,8 @@ reaches a custom transport; `--user-agent` uses the same rule. The default trans
 turns a header Node still refuses into a `MastrNetworkError`, never a raw `TypeError`.
 The constructor checks `baseUrl` with the exported `validateBaseUrl` (`baseUrlProblem`:
 blank, surrounding or inner whitespace or control characters, not an absolute
-http(s) URL, a query or fragment) and throws `MastrValidationError` — a configuration
+http(s) URL, a query or fragment, a `%` in the userinfo that isn't an escape — Node would
+fail to decode it for the Authorization header at request time) and throws `MastrValidationError` — a configuration
 error, not a `MastrNetworkError`, which stays for transport failures (the default
 transport still gates the scheme per request). It runs on the raw value, before the
 trailing-slash strip: `new URL()` would trim whitespace silently while the engine joins
