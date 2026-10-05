@@ -91,6 +91,10 @@ don't parse as a URL and the scheme-less `user:pw@host`) and redacts those strin
 JSON-quoted, from every line the CLI prints — commander's usage errors echo rejected values,
 and a pattern can't delimit a password holding a space, quote, `#`, `?` or `/`.
 `redactUrl` falls back to the same exact-string redaction for a value that doesn't parse.
+In the library the engine keeps the base URL and the default headers in real `#private`
+fields, so `console.log(client)`, `util.inspect` and `JSON.stringify` never show them, and
+it scrubs the base URL's userinfo (raw and percent-decoded) from error bodies and details,
+`Errors` envelopes, transport error text and the `cause` chain it attaches.
 
 The client validates its own inputs before any request, for library callers the CLI's
 parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),

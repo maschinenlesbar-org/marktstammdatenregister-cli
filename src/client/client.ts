@@ -146,8 +146,8 @@ export class MastrClient {
       throw new MastrApiError({
         url: this.engine.buildUrl(path, params),
         method: "GET",
-        body: JSON.stringify(res),
-        detail: describeMastrErrors(res["Errors"]),
+        body: this.engine.scrub(JSON.stringify(res)),
+        detail: describeMastrErrors(res["Errors"], (text) => this.engine.scrub(text)),
       });
     }
     const total = res["Total"];
@@ -206,8 +206,8 @@ export class MastrClient {
       throw new MastrApiError({
         url: this.engine.buildUrl(path),
         method: "GET",
-        body: JSON.stringify(res),
-        detail: describeMastrErrors(res["Errors"]),
+        body: this.engine.scrub(JSON.stringify(res)),
+        detail: describeMastrErrors(res["Errors"], (text) => this.engine.scrub(text)),
       });
     }
     if (!Array.isArray(res) || !res.every(isObject)) {

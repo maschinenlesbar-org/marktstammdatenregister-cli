@@ -12,7 +12,15 @@ import {
   type Transport,
 } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { MastrApiError, MastrError, MastrNetworkError, MastrParseError, redactUrl } from "./errors.js";
+import {
+  MastrApiError,
+  MastrError,
+  MastrNetworkError,
+  MastrParseError,
+  credentialsIn,
+  redactCredentials,
+  redactUrl,
+} from "./errors.js";
 import {
   assertValid,
   baseUrlProblem,
@@ -172,13 +180,14 @@ export function sanitizeServerText(text: string): string {
  * Describe a Kendo `Errors` value for an error message: a string as is; otherwise
  * (a ModelState object such as `{"": {"errors": ["Invalid filter"]}}`, or an array)
  * every string found in it, sanitised, blanks and repeats dropped, joined "; ".
- * Returns `undefined` when nothing readable is left.
+ * Returns `undefined` when nothing readable is left. `clean` runs on each raw string
+ * first (the engine passes its credential scrubber).
  */
-export function describeMastrErrors(errors: unknown): string | undefined {
+export function describeMastrErrors(errors: unknown, clean: (text: string) => string = (text) => text): string | undefined {
   const found: string[] = [];
   const walk = (value: unknown, depth: number): void => {
     if (typeof value === "string") {
-      const text = sanitizeServerText(value);
+      const text = sanitizeServerText(clean(value));
       if (text !== "" && !found.includes(text)) found.push(text);
     } else if (value !== null && typeof value === "object" && depth < 5) {
       for (const v of Object.values(value)) walk(v, depth + 1);
@@ -296,10 +305,15 @@ const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 export class RequestEngine {
-  private readonly baseUrl: string;
+  // Real private fields (not TypeScript's `private`): util.inspect, console.log and
+  // JSON.stringify of a client never show them, so a password in the base URL (or a
+  // credential in a default header) can't be logged by accident.
+  readonly #baseUrl: string;
+  /** The base URL's userinfo, raw and percent-decoded, for scrubbing server and transport text. */
+  readonly #credentials: string[];
   private readonly transport: Transport;
   private readonly userAgent: string;
-  private readonly defaultHeaders: Record<string, string>;
+  readonly #defaultHeaders: Record<string, string>;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
@@ -309,7 +323,15 @@ export class RequestEngine {
   constructor(options: EngineOptions = {}) {
     // The raw value is checked before the trailing-slash strip, so "https://h/ "
     // cannot slip past it; only an omitted baseUrl selects the default.
-    this.baseUrl = validateBaseUrl(options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl);
+    const baseUrl = options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl;
+    this.#baseUrl = validateBaseUrl(baseUrl);
+    this.#credentials = credentialsIn(baseUrl).flatMap((raw) => {
+      try {
+        return [raw, decodeURIComponent(raw)];
+      } catch {
+        return [raw];
+      }
+    });
     this.transport = options.transport ?? nodeHttpTransport;
     // Header values are checked up front: a blank one would be sent as is, and a
     // CR/LF or a character above U+00FF would reach a custom transport raw or make
@@ -317,7 +339,7 @@ export class RequestEngine {
     // userAgent selects the default.
     this.userAgent =
       options.userAgent === undefined ? DEFAULT_USER_AGENT : assertHeaderValue("userAgent", options.userAgent);
-    this.defaultHeaders = checkedHeaders(options.defaultHeaders ?? {});
+    this.#defaultHeaders = checkedHeaders(options.defaultHeaders ?? {});
     // Range-check the numeric options: a negative, NaN or fractional value would
     // otherwise silently disable the timeout or the size cap, and an unbounded
     // maxRetries would keep retrying against the production register.
@@ -333,11 +355,42 @@ export class RequestEngine {
     this.sleep = options.sleep ?? realSleep;
   }
 
+  /**
+   * `text` without the base URL's credentials: server text (an error body that echoes the
+   * request URL) and transport text (fetch's "Failed to fetch <url>") can carry them. The
+   * client runs it on the `Errors` envelopes it turns into errors.
+   */
+  scrub(text: string): string {
+    return this.#credentials.length === 0 ? text : redactCredentials(text, this.#credentials);
+  }
+
+  /**
+   * A transport failure as the `cause` of the error the engine raises: the original when its
+   * text carries no credentials, otherwise a copy with them scrubbed (message, `code` and the
+   * cause chain kept), so logging the error with its causes can't reveal the base URL's
+   * password.
+   */
+  private scrubCause(cause: unknown, depth = 0): unknown {
+    if (this.#credentials.length === 0 || depth > 5) return cause;
+    if (typeof cause === "string") return this.scrub(cause);
+    if (!(cause instanceof Error)) return cause;
+    const inner = this.scrubCause(cause.cause, depth + 1);
+    const message = this.scrub(cause.message);
+    if (message === cause.message && inner === cause.cause && !this.scrub(cause.stack ?? "").includes("***@")) {
+      return cause;
+    }
+    const copy = new Error(message, inner === undefined ? undefined : { cause: inner });
+    copy.name = cause.name;
+    const code = (cause as { code?: unknown }).code;
+    if (code !== undefined) Object.assign(copy, { code });
+    return copy;
+  }
+
   /** Build a fully-qualified URL from a path and optional query parameters. */
   buildUrl(path: string, query?: QueryParams): string {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const qs = query ? buildQueryString(query) : "";
-    return `${this.baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;
+    return `${this.#baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;
   }
 
   /**
@@ -380,7 +433,7 @@ export class RequestEngine {
   async request(path: string, query?: QueryParams, accept = "application/json"): Promise<RawResponse> {
     const url = this.buildUrl(path, query);
     const headers: Record<string, string> = {
-      ...this.defaultHeaders,
+      ...this.#defaultHeaders,
       Accept: accept,
       "User-Agent": this.userAgent,
       // The MaStR search backend is a Kendo/DataTables endpoint that expects an
@@ -410,9 +463,18 @@ export class RequestEngine {
         // The default transport rejects with MastrNetworkError only; an injected one may
         // throw anything (fetch's TypeError, a string, null). Keep the library's contract:
         // every failure is a MastrError.
+        if (cause instanceof MastrNetworkError) {
+          // Its text may echo the request URL; re-raise it scrubbed when it does.
+          const message = this.scrub(cause.message);
+          const inner = this.scrubCause(cause.cause);
+          if (message === cause.message && inner === cause.cause) throw cause;
+          throw new MastrNetworkError(message, inner === undefined ? undefined : { cause: inner });
+        }
         if (cause instanceof MastrError) throw cause;
         const reason = cause instanceof Error ? cause.message : String(cause);
-        throw new MastrNetworkError(`GET ${redactUrl(url)} failed: ${sanitizeServerText(reason)}`, { cause });
+        throw new MastrNetworkError(`GET ${redactUrl(url)} failed: ${sanitizeServerText(this.scrub(reason))}`, {
+          cause: this.scrubCause(cause),
+        });
       }
 
       // An injected transport may resolve with anything; a malformed HttpResponse would
@@ -472,7 +534,7 @@ export class RequestEngine {
   }
 
   private toApiError(url: string, status: number, body: Buffer): MastrApiError {
-    const text = body.toString("utf8");
+    const text = this.scrub(body.toString("utf8"));
     let detail: string | undefined;
     try {
       const parsed = JSON.parse(text) as { Errors?: unknown; message?: unknown; detail?: unknown };
