@@ -56,7 +56,11 @@ FilterName~op~'value'~and~FilterName~op~'value'~…
   `gte`/`lte`. An unknown or upper-case operator is rejected (exit 2) — the register
   would return 0 rows for it
 - **value:** single-quoted; for a dropdown use its **code** (`Value`), not its label;
-  decimals take a point (`'4999.999'`), dates work as `'2025-01-01'` or `'01.01.2025'`.
+  decimals take a point (`'4999.999'`) and no thousands separator (`'5.000'` means 5),
+  dates work as `'2025-01-01'` or `'01.01.2025'` (a slash date is read day-first:
+  `'01/02/2025'` is 1 February), booleans take `'1'`/`'0'`. A value the register can't read
+  (a decimal comma, an exponent, an invalid date, `'true'`) gets its error reply: exit 1,
+  "the register rejected the request".
   `null`/`nn` still need a value: `Ort~null~''` (a bare `Ort~null` is ignored upstream
   and returns the unfiltered register, so the CLI rejects it). Every other operator needs a
   non-blank value: `''` or `' '` is rejected (on a dropdown the register did not even

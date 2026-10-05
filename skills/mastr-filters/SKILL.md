@@ -50,15 +50,22 @@ mastr filters stromerzeugung --compact \
 `--filter "FilterName~op~'value'~and~FilterName~op~'value'~…"`
 
 - **operators:** `eq` (=), `neq` (≠), `sw` (starts-with), `ct` (contains),
-  `nct` (not-contains), `ew` (ends-with), `null` (is empty), `nn` (not empty),
-  `gt` (>) and `lt` (<) for `number` and `date` columns. `gt`/`lt` are **strict**, and
+  `nct` (not-contains), `ew` (ends-with), `null` (is empty), `nn` (not empty) — these
+  two on `text` columns only (the register refuses them on number, dropdown and boolean
+  columns, so the CLI rejects that with exit 2) — and `gt` (>) and `lt` (<) for `number`
+  and `date` columns. `gt`/`lt` are **strict**, and
   there is **no `gte`/`lte`** (the register returns 0 rows for `gte`, `ge`, `lte`, `le`,
   so the CLI rejects any unknown or upper-case operator with exit 2). For "at least
   5000 kW" use `gt` just below the bound: `~gt~'4999.999'`.
-- **value:** in single quotes; for a dropdown use its **`Value` code**, not the label.
-  Decimals take a point (`'4999.999'`; `'4999,999'` returns 0 rows). Dates work as
-  `'2025-01-01'` or `'01.01.2025'`. `null`/`nn` still take a value: `Ort~null~''` (a bare
-  `Ort~null` would be ignored upstream, so the CLI rejects it). **A value cannot contain
+- **value:** in single quotes; for a dropdown use its **`Value` code**, not the label
+  (the CLI rejects a label or an unlisted code with exit 2 and names the code).
+  Decimals take a point (`'4999.999'`) and no thousands separator (`'5.000'` means 5);
+  a decimal comma, an exponent or text in a number column gets the register's error reply
+  (exit 1, "the register rejected the request"). Dates work as `'2025-01-01'` or
+  `'01.01.2025'`; a slash date is read day-first (`'01/02/2025'` is 1 February), so prefer
+  ISO. Booleans take `'1'`/`'0'` (`'true'` gets the register's error). Every operator but
+  `null`/`nn` needs a non-blank value (`''` is rejected). `null`/`nn` still take a value:
+  `Ort~null~''` (a bare `Ort~null` would be ignored upstream, so the CLI rejects it). **A value cannot contain
   `~`** — the register splits on every `~` and has no escape, so the CLI rejects it;
   match a part of the text without the `~` (e.g. `ct`). A single `'` inside a value is fine.
 - **conjunction:** only `and` between conditions. **There is no working `or`:** the
@@ -67,6 +74,7 @@ mastr filters stromerzeugung --compact \
   put them comma-separated in one value: `Energieträger~eq~'2497,2498'`. This works for
   dropdown codes only (`Ort~eq~'Münster,Berlin'` gives 0 rows); an OR across different
   columns needs one `--total` query per condition (and the overlap subtracted).
+  Giving `--filter` several times is the same as joining the parts with `~and~`.
 
 ```bash
 # Solar units in operation
@@ -106,15 +114,21 @@ almost always has a bad sort key. The CLI prints a stderr note in that case.
 
 ## Traps
 
-- **Use the dropdown `Value` code, not the display name** (`'2495'`, not `'Solar'`).
-- **A wrong/misspelled FilterName is silently ignored** — you get the unfiltered set.
-  Always confirm the exact `FilterName` from `mastr filters` first, and sanity-check
-  with `--total` (the count should drop).
+- **Use the dropdown `Value` code, not the display name** (`'2495'`, not `'Solar'`); the
+  CLI rejects a label and tells you its code.
+- **A FilterName the category doesn't have is a usage error** (exit 2, with "did you
+  mean"): the register itself would ignore it and return the unfiltered set, so the CLI
+  checks every name — and every `eq`/`neq` dropdown code — against the category's columns
+  before sending (one extra request). Spacing, a decomposed umlaut and the case of a name
+  are fixed for you. Still take the names from `mastr filters` and sanity-check with
+  `--total` (the count should drop).
 - **A malformed filter is a usage error (exit 2), not a query:** an unknown or upper-case
-  operator (`~gte~`, `~EQ~`), a missing value, an unclosed quote, a dangling `~and~` or
-  `~or~`. Read the message, fix the spec and rerun; nothing was sent. If a well-formed
-  filter drops to 0, check the values (code not label, decimal point) — the CLI prints a
-  stderr note.
+  operator (`~gte~`, `~EQ~`), a missing or `''` value, an unclosed quote, a dangling
+  `~and~` or `~or~`, an unknown FilterName or code, `null`/`nn` on a non-text column. Read
+  the message, fix the spec and rerun; no unit query was sent. Exit 1 with "the register
+  rejected the request" means a value it can't read (decimal comma, bad date, `'true'`).
+  If a well-formed filter drops to 0, check the values (`eq` on text matches the whole
+  text; `ct` matches a part) — the CLI prints a stderr note.
 - **Never use `~or~`** — the register would drop everything after it; the CLI refuses it.
   Use a comma list inside one dropdown value instead.
 - **Columns differ per category** — run `mastr filters <category>` for the right one.

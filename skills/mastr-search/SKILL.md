@@ -65,15 +65,20 @@ mastr stromerzeugung --page 2 --page-size 100 --compact
   `Bruttoleistung` you would have to fetch (and cap) pages and sum client-side — only
   feasible for small result sets. Say so rather than pretending.
 - **`--page-size` is capped at 5000.** For big pulls, page; don't crank it arbitrarily.
-- **Filtering needs the exact FilterName + code** — resolve them with **mastr-filters**;
-  a wrong field name is ignored and you silently get the unfiltered total.
+- **Filtering needs the exact FilterName + code** — resolve them with **mastr-filters**.
+  The register would ignore a wrong field name and return the unfiltered total, so the
+  CLI rejects a FilterName or dropdown code the category doesn't have (exit 2, with "did
+  you mean"). Several `--filter` flags are joined with `~and~`; any other option given
+  twice exits 2.
 - **A wrong `--sort` field returns 0 rows, not an error.** If a query drops to
   `total: 0` only after you add `--sort`, the sort column key is probably wrong (the
   CLI prints a stderr note). Sort keys are record field names (`Bruttoleistung`), not
   the FilterNames from `mastr filters` (`Bruttoleistung der Einheit` gives 0 rows); list
   them with `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`.
-- **A malformed `--filter` exits 2 without a request** (unknown operator such as `gte`,
-  `~or~`, missing value, dangling `~and~`). Range filters use `gt`/`lt` (strict; there is
+- **A malformed `--filter` exits 2 without a unit query** (unknown operator such as `gte`,
+  `~or~`, missing value, dangling `~and~`, unknown FilterName or code). Exit 1 with "the
+  register rejected the request" means a value it can't read (a decimal comma, a bad
+  date). Range filters use `gt`/`lt` (strict; there is
   no `gte`/`lte`) — see **mastr-filters**.
 - **Reading a record** (fields, dates, anonymisation) → the **mastr-unit** skill.
 - Cite the source: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0).
