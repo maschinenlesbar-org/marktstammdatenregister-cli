@@ -3,8 +3,8 @@
 Echte Beispiele für die Claude-Code-Skills des Plugins `mastr`, eines pro Skill: eine
 Anfrage, die `mastr`-Befehle, die der Skill ausgeführt hat, und Claudes Antwort.
 
-Jedes Beispiel lief am 15. September 2026 mit `mastr` 0.0.4 gegen die Live-API, außer
-mastr-filters, das am 26. September 2026 mit 0.0.8 neu lief.
+Jedes Beispiel lief am 6. Oktober 2026 mit `mastr` 0.2.0 gegen die Live-API; diese Version
+prüft die FilterNames und Auswahl-Codes eines Filters vor dem Senden gegen die Spalten der Kategorie.
 Die Daten ändern sich, Ihre Ergebnisse werden also abweichen; mit den gezeigten IDs und
 Schlüsseln können Sie die Anfragen selbst ausprobieren. Lange Listen sind gekürzt.
 
@@ -20,9 +20,7 @@ Skills: [mastr-filters](#mastr-filters) · [mastr-search](#mastr-search) · [mas
 mastr filters stromerzeugung --compact > filters.json
 jq '.[] | {FilterName, Type}' filters.json
 jq '.[] | select(.FilterName=="Bundesland" or .FilterName=="Energieträger" or .FilterName=="Betriebs-Status" or .FilterName=="Speichertechnologie") | {FilterName, codes: [.ListObject[] | "\(.Value)=\(.Name)"]}' filters.json
-mastr stromerzeugung --filter "Bundesland~eq~'1400'" --total
 mastr stromerzeugung --filter "Bundesland~eq~'1400'~and~Energieträger~eq~'2496'" --total
-mastr stromerzeugung --filter "Bundesland~eq~'1400'~and~Energieträger~eq~'2496'~and~Betriebs-Status~eq~'35'" --total
 F="Bundesland~eq~'1400'~and~Energieträger~eq~'2496'~and~Betriebs-Status~eq~'35'~and~Speichertechnologie~eq~'524'"
 mastr stromerzeugung --filter "$F" --total
 mastr stromerzeugung --filter "$F~and~Bruttoleistung der Einheit~gte~'10000'" --total       # Exit 2: unbekannter Operator, nichts gesendet
@@ -32,7 +30,8 @@ mastr stromerzeugung --filter "$F~and~Bruttoleistung der Einheit~gt~'10000'" --s
 ```
 
 Die FilterNames und Codes stammen aus `mastr filters` (`Bruttoleistung der Einheit` ist eine
-`number`-Spalte). Die `gte`-Probe erreicht das Register nicht mehr. Die CLI weist sie vor jeder
+`number`-Spalte); die CLI prüfte die Namen und Codes jedes Filteraufrufs vor dem Senden gegen
+dieselbe Spaltenliste. Die `gte`-Probe erreicht das Register nicht; die CLI weist sie vor jeder
 Anfrage zurück:
 
 ```
@@ -55,8 +54,8 @@ Batteriespeicher in Betrieb in Brandenburg, > 10 MW, größte zuerst
   --filter "Bundesland~eq~'1400'~and~Energieträger~eq~'2496'~and~Betriebs-Status~eq~'35'~and~Speichertechnologie~eq~'524'~and~Bruttoleistung der Einheit~gt~'10000'"
   --sort   "Bruttoleistung-desc"
 
-Kontrolle mit --total: 302.120 → 95.172 → 93.623 → 93.606 → 11 Einheiten
-Erste Zeilen: Big Battery Lausitz 66.000 kW (SEE905930139120, Spremberg, 2020-11-19)
+Kontrolle mit --total: 95.814 Speicher in Brandenburg → 94.210 Batterien in Betrieb → 11 über 10 MW
+Erste Zeilen: Big Battery Lausitz 66.000 kW (SEE905930139120, Landkreis Spree-Neiße, 2020-11-19)
               BESS Kahsel 32.200 kW (SEE975222107571, Neuhausen, 2026-07-27)
               BESS Löwenberger Land II 22.500 kW (SEE937755233493, Löwenberger Land, 2026-07-05)
 ```
@@ -72,29 +71,27 @@ mastr stromerzeugung --total
 mastr stromerzeugung --filter "Energieträger~eq~'2497'" --total
 mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Wind an Land oder auf See~eq~'889'" --total
 mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Wind an Land oder auf See~eq~'889'~and~Betriebs-Status~eq~'35'" --total
-mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Wind an Land oder auf See~eq~'889'~and~Betriebs-Status~eq~'31'" --total
 mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Wind an Land oder auf See~eq~'889'~and~Betriebs-Status~eq~'35'" --sort "Bruttoleistung-desc" --page-size 2000 --iso-dates --compact
 ```
 
-Das MaStR kann Leistungen nicht serverseitig summieren. Bei 1.776 Treffern holte der Skill alle
-auf einer Seite (7,3 MB) und summierte `Bruttoleistung` lokal, gruppiert nach `WindparkName`.
+Das MaStR kann Leistungen nicht serverseitig summieren. Bei 1.808 Treffern holte der Skill alle
+auf einer Seite (7,5 MB) und summierte `Bruttoleistung` lokal, gruppiert nach `WindparkName`.
 
 ```
-Offshore-Wind in Betrieb: 1.776 Einheiten, 11.013.743 kW brutto ≈ 11,0 GW
-  Nordsee 9,19 GW · Ostsee 1,83 GW
-  Zum Vergleich: 9.458.587 Stromerzeugungseinheiten, 43.517 Windeinheiten, 1.909 offshore
-  (weitere 133 Offshore-Einheiten „In Planung")
+Offshore-Wind in Betrieb: 1.808 Einheiten, 11.493.743 kW brutto ≈ 11,5 GW
+  Nordsee 9,37 GW · Ostsee 2,13 GW
+  Zum Vergleich: 9.568.968 Stromerzeugungseinheiten, 44.248 Windeinheiten, 1.909 offshore (alle Status)
 
-Größte Windparks (47 insgesamt)
-  Borkum Riffgrund 3   83 Einheiten   958,6 MW   Siemens Gamesa   in Betrieb seit 2025-12-03 … 2026-08-17
-  EnBW He Dreiht       51 Einheiten   765,0 MW   Vestas V236-15MW 2025-11-25 … 2026-08-21
+Größte Windparks (48 insgesamt)
+  Borkum Riffgrund 3   83 Einheiten   958,7 MW   Siemens Gamesa   in Betrieb seit 2025-12-03 … 2026-08-17
+  EnBW He Dreiht       58 Einheiten   870,0 MW   Vestas           2025-11-25 … 2026-09-17
   Windpark Hohe See    71 Einheiten   521,9 MW   Siemens          2019
   Baltic Eagle         50 Einheiten   476,3 MW   Vestas           2024
   Borkum Riffgrund 2   56 Einheiten   464,8 MW   MHI Vestas       2018
   OWP Veja Mate        67 Einheiten   422,1 MW   Siemens          2017
-  … 41 weitere
+  … 42 weitere
 
-Neu in 2026 bisher: 98 Einheiten, 1.280,3 MW (EnBW He Dreiht, Borkum Riffgrund 3, NC 1)
+Neu in 2026 bisher: 130 Einheiten, 1.760,3 MW (Borkum Riffgrund 3, EnBW He Dreiht, NC 1, OWP Windanker)
 Größte Einzelanlagen: 15.000 kW, z. B. SEE920051579655 (HD A1, EnBW He Dreiht)
 Quelle: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0)
 ```
@@ -107,9 +104,9 @@ Quelle: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0)
 mastr stromerzeugung --filter "MaStR-Nr. der Einheit~eq~'SEE920051579655'" --iso-dates --compact
 ```
 
-Ein Aufruf mit `total: 1`. Der Datensatz hat 118 Felder; der Skill las die befüllten. Das Feld
-`NetzbetreiberMaStRNummer` kommt als HTML-Link (`<a href="/MaStR/Akteur/…">`), die Nummer stammt
-deshalb aus `NetzbetreiberNamen`.
+Ein Aufruf mit `total: 1` (dazu die Spaltenliste, gegen die die CLI den FilterName prüft). Der
+Datensatz hat 119 Felder; der Skill las die befüllten. Das Feld `NetzbetreiberMaStRNummer` kommt
+als HTML-Link (`<a href="/MaStR/Akteur/…">`), die Nummer stammt deshalb aus `NetzbetreiberNamen`.
 
 ```
 HD A1 – Offshore-Windenergieanlage, EnBW He Dreiht (SEE920051579655)
@@ -119,7 +116,7 @@ HD A1 – Offshore-Windenergieanlage, EnBW He Dreiht (SEE920051579655)
                  Nabenhöhe 144,6 m, Rotordurchmesser 236 m
   Standort:      Ausschließliche Wirtschaftszone – „Nordsee; Gebiet nach dem
                  Flächenentwicklungsplan des BSH: N-7"; 54.358732 N, 6.197874 E
-  Daten:         Inbetriebnahme 2026-02-24, registriert 2026-02-27, zuletzt aktualisiert 2026-09-11
+  Daten:         Inbetriebnahme 2026-02-24, registriert 2026-02-27, zuletzt aktualisiert 2026-09-18
   Betreiber:     EnBW He Dreiht GmbH ＆ Co. KG (ABR912332201010) – Unternehmen, nicht anonymisiert
   Netz:          TenneT TSO GmbH (SNB970033313272), Höchstspannung, Volleinspeisung
   EEG:           EEG961890773712, Zuschlag BK6-17-001-07
@@ -127,4 +124,4 @@ HD A1 – Offshore-Windenergieanlage, EnBW He Dreiht (SEE920051579655)
 Quelle: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0)
 ```
 
-Als Nächstes angeboten: der übrige Windpark (`--filter "Name des Windparks~eq~'EnBW He Dreiht'"` ergibt 64 Einheiten, davon 51 in Betrieb) oder die verknüpfte EEG-Anlage.
+Als Nächstes angeboten: der übrige Windpark (`--filter "Name des Windparks~eq~'EnBW He Dreiht'"`) oder die verknüpfte EEG-Anlage.
