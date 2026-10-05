@@ -103,7 +103,7 @@ parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 00
 `MastrValidationError` (`Invalid <name>: expected …, got <v>.`). The client
 constructor range-checks the engine options the same way (`intRangeProblem`):
 `timeoutMs` 0..`MAX_TIMEOUT_MS`, `maxRetries` 0..`MAX_RETRIES` (10),
-`maxResponseBytes` and `retryDelayMs` non-negative integers — a negative, `NaN` or
+`retryDelayMs` 0..30 000, `maxResponseBytes` a non-negative integer — a negative, `NaN` or
 fractional value would otherwise silently disable the timeout or the size cap. The
 CLI's `--max-retries` parser reads the same exported `MAX_RETRIES`. `userAgent` and
 every `defaultHeaders` value must pass `headerValueProblem` (not blank, Latin-1, no
@@ -145,9 +145,13 @@ outcome.
 
 - **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 20/22/24.
 - **Exit codes** (`run.ts`): help/version → 0; usage → 2; 404 → 4; network → 6; other → 1.
-- Retry transient `429`/`503` (and reset connections, `isTransientNetworkError`) up to `maxRetries`, waiting the `Retry-After` (seconds or an
-  IMF-fixdate, `parseRetryAfter`; above `MAX_RETRY_AFTER_MS` = 30 s no retry, the error
-  surfaces at once), else `retryDelayMs * attempt`; only `http:`/`https:` base URLs.
+- Retry transient `429`/`503` (and reset connections, `isTransientNetworkError`) up to
+  `maxRetries`, waiting `retryDelayMs * attempt` (200 ms, 400 ms, …) or the `Retry-After`
+  (seconds or an IMF-fixdate, `parseRetryAfter`) when that is longer — the backoff is the
+  floor, so `Retry-After: 0` or a past date never makes a burst. Above
+  `MAX_RETRY_AFTER_MS` = 30 s there is no retry: the `MastrApiError` names the requested wait
+  and says retrying sooner won't help. `retryDelayMs` is at most 30 000. Only
+  `http:`/`https:` base URLs.
 - **Scaffold origin:** scaffolded from `entgeltatlas-cli` (GET + query transport); the
   X-API-Key auth machinery was stripped because MaStR's public search needs no auth.
 

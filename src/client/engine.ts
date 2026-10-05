@@ -64,14 +64,15 @@ export interface EngineOptions {
   /**
    * Number of automatic retries for transient (429/503) responses and reset
    * connections (`isTransientNetworkError`), an integer
-   * 0..`MAX_RETRIES` (10); defaults to 2. Each waits the response's `Retry-After`
-   * (up to `MAX_RETRY_AFTER_MS`; a longer one is not retried), or else
-   * `retryDelayMs * attempt`.
+   * 0..`MAX_RETRIES` (10); defaults to 2. Each waits `retryDelayMs * attempt`, or the
+   * response's `Retry-After` when that is longer. A `Retry-After` above
+   * `MAX_RETRY_AFTER_MS` is not retried: the MastrApiError names the requested wait.
    */
   maxRetries?: number;
   /**
-   * Base backoff between retries in milliseconds (grows linearly), a non-negative
-   * integer; used without a Retry-After. Defaults to 200.
+   * Base backoff between retries in milliseconds (grows linearly: `retryDelayMs * attempt`),
+   * an integer 0..`MAX_RETRY_AFTER_MS` (30 000). Defaults to 200. It is also the floor: a
+   * `Retry-After` can make a wait longer, never shorter.
    */
   retryDelayMs?: number;
   /**
@@ -345,7 +346,9 @@ export class RequestEngine {
     // maxRetries would keep retrying against the production register.
     this.timeoutMs = intOption("timeoutMs", options.timeoutMs, MAX_TIMEOUT_MS, 30_000);
     this.maxRetries = intOption("maxRetries", options.maxRetries, MAX_RETRIES, 2);
-    this.retryDelayMs = intOption("retryDelayMs", options.retryDelayMs, Number.MAX_SAFE_INTEGER, 200);
+    // Bounded like a Retry-After wait: a larger value would stall the CLI, and one above
+    // 2^31 - 1 ms would overflow Node's timer and retry after 1 ms.
+    this.retryDelayMs = intOption("retryDelayMs", options.retryDelayMs, MAX_RETRY_AFTER_MS, 200);
     this.maxResponseBytes = intOption(
       "maxResponseBytes",
       options.maxResponseBytes,
@@ -495,15 +498,28 @@ export class RequestEngine {
       }
 
       const retryable = status === 429 || status === 503;
+      // A Retry-After beyond MAX_RETRY_AFTER_MS is not retried: retrying early would land
+      // inside the window the server asked us to wait out, and a hostile value must not stall
+      // the CLI. The error then names the requested wait, so a script knows when to try again.
+      const retryAfter = retryable ? parseRetryAfter(responseHeaders["retry-after"]) : undefined;
       if (retryable && attempt < this.maxRetries) {
-        // Honour Retry-After; without a usable one, back off linearly. A Retry-After
-        // beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at once.
-        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
         if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
           attempt += 1;
-          await this.sleep(retryAfter ?? this.retryDelayMs * attempt);
+          // The linear backoff is the floor: a Retry-After can make a wait longer, never
+          // shorter. `Retry-After: 0` or a date in the past turned the retries into a
+          // zero-delay burst against a register that had just answered 429/503.
+          const backoff = this.retryDelayMs * attempt;
+          await this.sleep(retryAfter === undefined ? backoff : Math.max(retryAfter, backoff));
           continue;
         }
+        throw this.toApiError(
+          url,
+          status,
+          body,
+          `the server asked to wait ${Math.ceil(retryAfter / 1000)} s (Retry-After) before trying again, ` +
+            `longer than the ${MAX_RETRY_AFTER_MS / 1000} s the client waits, so it was not retried; ` +
+            "retrying sooner won't help",
+        );
       }
 
       const contentType = String(responseHeaders["content-type"] ?? "");
@@ -533,7 +549,8 @@ export class RequestEngine {
     }
   }
 
-  private toApiError(url: string, status: number, body: Buffer): MastrApiError {
+  /** The MastrApiError for a non-2xx answer; `note` is appended to the detail. */
+  private toApiError(url: string, status: number, body: Buffer, note?: string): MastrApiError {
     const text = this.scrub(body.toString("utf8"));
     let detail: string | undefined;
     try {
@@ -553,6 +570,7 @@ export class RequestEngine {
     // collapse above does not remove ESC, so strip control characters before it can
     // reach stderr and inject terminal escape sequences.
     if (detail !== undefined) detail = sanitizeServerText(detail);
+    if (note !== undefined) detail = detail === undefined || detail === "" ? note : `${detail}; ${note}`;
     return new MastrApiError({ status, url, method: "GET", body: text, detail });
   }
 }
