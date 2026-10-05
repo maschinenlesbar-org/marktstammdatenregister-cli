@@ -150,7 +150,7 @@ outcome.
 
 ## Conventions to keep
 
-- **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 20/22/24.
+- **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 22/24 (`engines`: Node.js 22.12 or later, the floor commander 15 declares).
 - **Exit codes** (`run.ts`): help/version → 0; usage → 2; 404 → 4; network → 6; other → 1.
 - **Closed pipes** (`io.ts` `handleOutputErrors`, installed by the bin shim before `run()`):
   an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly, any other stdout

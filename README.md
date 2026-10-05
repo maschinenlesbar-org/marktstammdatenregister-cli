@@ -27,6 +27,8 @@ npm install -g @maschinenlesbar.org/marktstammdatenregister-cli   # the `mastr` 
 npm install @maschinenlesbar.org/marktstammdatenregister-cli
 ```
 
+Requires **Node.js 22.12+**.
+
 ## CLI
 
 Four datasets, each paged and filterable. Prints `{ total, data }` (or just the
