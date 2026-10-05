@@ -150,6 +150,15 @@ outcome.
   the `Errors` envelope throws; `parseMsDate`/`isoifyDates`.
 - `cli.test.ts` — the 4 commands, paging bounds, `--total`, `--iso-dates`, the `filters`
   command, and the hardening guards (control-char UA, empty base URL, bounded retries).
+- `conformance-p*.test.ts` — the checks shared across the `*-cli` repos (fix plan
+  2026-10-06; only the adapter block at the top is repo-specific): P1/P2 credential
+  redaction, P4 base-URL rules (the P19 env-var case is skipped: mastr reads no environment
+  variable), P5 the transport contract, P6 the retry floor (this repo fails at once, naming
+  the wait, on a `Retry-After` above 30 s), P7 pipes (spawns the built bin), P8/P9/P13
+  charset, envelopes and error classes, and **P10 strict filters**, written here first: an
+  unknown, misspelled or `__proto__` key or FilterName, arrays and NaN, unnormalised names,
+  a repeated `--filter` and a repeated single-value option. Test helpers answer the client's
+  filter-columns request from `fixtures.filterColumns` (`registerResponder`, `withColumns`).
 
 ## Conventions to keep
 
