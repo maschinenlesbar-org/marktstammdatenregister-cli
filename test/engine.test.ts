@@ -235,3 +235,15 @@ test("sanitizeServerText drops bidi controls and folds line breaks into one line
   assert.equal(sanitizeServerText("line1\nError: forged\r\n\tx  "), "line1 Error: forged x");
   assert.equal(sanitizeServerText("a\u2028b"), "a b");
 });
+
+test("getJson decodes the body by its declared charset (finding 03#4) and drops a BOM", async () => {
+  const body = (data: Buffer, contentType: string) => async () => ({ status: 200, headers: { "content-type": contentType }, body: data });
+  const latin1 = Buffer.from(JSON.stringify({ Ort: "Münster" }), "latin1");
+  const e1 = new RequestEngine({ transport: body(latin1, "application/json; charset=iso-8859-1") });
+  assert.deepEqual(await e1.getJson("/x"), { Ort: "Münster" });
+  const bom = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"a":1}')]);
+  const e2 = new RequestEngine({ transport: body(bom, "application/json; charset=utf-8") });
+  assert.deepEqual(await e2.getJson("/x"), { a: 1 });
+  const e3 = new RequestEngine({ transport: body(Buffer.from("{}"), "application/json; charset=x-bogus") });
+  await assert.rejects(e3.getJson("/x"), (e: unknown) => e instanceof MastrParseError && /Unsupported response charset "x-bogus"/.test((e as Error).message));
+});

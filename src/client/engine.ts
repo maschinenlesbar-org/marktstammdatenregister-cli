@@ -3,6 +3,7 @@
 // JSON responses. MaStR's public search backend is an unauthenticated GET API whose
 // parameters travel in the query string.
 
+import { TextDecoder } from "node:util";
 import {
   MAX_TIMEOUT_MS,
   nodeHttpTransport,
@@ -538,7 +539,7 @@ export class RequestEngine {
    */
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
     const res = await this.request(path, query);
-    const text = res.data.toString("utf8");
+    const text = decodeBody(res.data, res.contentType, path);
     if (res.status === 204 || text.trim().length === 0) {
       throw new MastrParseError(`Empty response body from ${path}`);
     }
@@ -573,4 +574,21 @@ export class RequestEngine {
     if (note !== undefined) detail = detail === undefined || detail === "" ? note : `${detail}; ${note}`;
     return new MastrApiError({ status, url, method: "GET", body: text, detail });
   }
+}
+
+/**
+ * Decode a response body by the charset its Content-Type names (UTF-8 when it names none):
+ * a Latin-1 body from a re-encoding proxy or mirror became U+FFFD with `toString("utf8")`.
+ * TextDecoder also drops a leading byte order mark, which JSON.parse would reject. An
+ * unknown charset label is a MastrParseError.
+ */
+function decodeBody(body: Buffer, contentType: string, path: string): string {
+  const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
+  let decoder: TextDecoder;
+  try {
+    decoder = new TextDecoder(charset);
+  } catch {
+    throw new MastrParseError(`Unsupported response charset "${sanitizeServerText(charset)}" from ${path}.`);
+  }
+  return decoder.decode(body);
 }
