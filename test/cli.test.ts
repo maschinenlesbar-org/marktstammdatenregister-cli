@@ -6,10 +6,10 @@ import { renderJson } from "../src/cli/shared.js";
 import { MastrParseError } from "../src/client/errors.js";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
-import { makeMockTransport, jsonResponse, queryOf, registerResponder } from "./helpers.js";
+import { makeMockTransport, jsonResponse, queryOf, registerResponder, unitRequests, withColumns } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
-function makeCli(responder: (req: HttpRequest) => HttpResponse) {
+function makeCli(responder: (req: HttpRequest) => HttpResponse | Promise<HttpResponse>) {
   const out: string[] = [];
   const err: string[] = [];
   const mt = makeMockTransport(responder);
@@ -44,14 +44,14 @@ test("--total prints only the count and fetches just 1 row (pageSize=1)", async 
 test("--page/--page-size/--sort/--filter are forwarded", async () => {
   const cli = makeCli(registerResponder(fx.unitPage));
   await run(
-    ["stromerzeugung", "--page", "2", "--page-size", "5", "--sort", "Bruttoleistung-desc", "--filter", "X~eq~'1'"],
+    ["stromerzeugung", "--page", "2", "--page-size", "5", "--sort", "Bruttoleistung-desc", "--filter", "Ort~eq~'1'"],
     cli.deps,
   );
   const q = queryOf(cli.mt.last());
   assert.equal(q.get("page"), "2");
   assert.equal(q.get("pageSize"), "5");
   assert.equal(q.get("sort"), "Bruttoleistung-desc");
-  assert.equal(q.get("filter"), "X~eq~'1'");
+  assert.equal(q.get("filter"), "Ort~eq~'1'");
 });
 
 test("--page-size above 5000 is rejected (exit 2)", async () => {
@@ -87,12 +87,12 @@ test("0 results with --sort set prints a note about the likely bad sort field", 
 });
 
 test("0 results with --filter set prints a note about the values", async () => {
-  const cli = makeCli(() => jsonResponse({ Data: [], Total: 0, Errors: null }));
-  const code = await run(["stromerzeugung", "--filter", "Bruttoleistung der Einheit~gt~'4999,999'", "--total"], cli.deps);
+  const cli = makeCli(withColumns(() => jsonResponse({ Data: [], Total: 0, Errors: null })));
+  const code = await run(["stromerzeugung", "--filter", "Ort~eq~'Nirgendwo'", "--total"], cli.deps);
   assert.equal(code, 0);
   const err = cli.err.join("\n");
   assert.match(err, /0 results with --filter/);
-  assert.match(err, /not its label, decimals take a point/);
+  assert.match(err, /eq on a text column matches the whole text/);
   assert.doesNotMatch(err, /--sort/);
 });
 
@@ -104,7 +104,7 @@ test("0 results WITHOUT --sort or --filter prints no such note", async () => {
 
 test("matches with --sort and --filter set print no note", async () => {
   const cli = makeCli(registerResponder(fx.unitPage));
-  await run(["stromerzeugung", "--sort", "Bruttoleistung-desc", "--filter", "X~gt~'1'", "--total"], cli.deps);
+  await run(["stromerzeugung", "--sort", "Bruttoleistung-desc", "--filter", "Ort~gt~'1'", "--total"], cli.deps);
   assert.equal(cli.err.join("\n"), "");
 });
 
@@ -383,4 +383,29 @@ test("--filter FilterNames go out as NFC without padding (finding 01#1)", async 
   const spec = "Energietra\u0308ger~eq~'2495'~and~ Bundesland~eq~'1403'";
   assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 0);
   assert.equal(queryOf(cli.mt.last()).get("filter"), "Energieträger~eq~'2495'~and~Bundesland~eq~'1403'");
+});
+
+test("a second --filter is joined with ~and~, not dropped (finding 03#1)", async () => {
+  const cli = makeCli(registerResponder(fx.unitPage));
+  const argv = ["stromerzeugung", "--filter", "Energieträger~eq~'2495'", "--filter", "Bundesland~eq~'1403'", "--total"];
+  assert.equal(await run(argv, cli.deps), 0);
+  const sent = unitRequests(cli.mt.calls);
+  assert.equal(sent.length, 1);
+  assert.equal(queryOf(sent[0]!).get("filter"), "Energieträger~eq~'2495'~and~Bundesland~eq~'1403'");
+});
+
+test("a repeated single-value option is a usage error, not the last one winning", async () => {
+  for (const argv of [
+    ["stromerzeugung", "--sort", "Bruttoleistung-desc", "--sort", "Bruttoleistung-asc"],
+    ["stromerzeugung", "--page", "2", "--page", "3"],
+    ["stromerzeugung", "--page-size", "2", "--page-size", "3"],
+    ["--timeout", "1000", "--timeout", "2000", "stromerzeugung"],
+    ["--max-retries", "1", "stromerzeugung", "--max-retries", "2"],
+    ["--base-url", "http://127.0.0.1:20440", "--base-url", "http://127.0.0.1:20441", "stromerzeugung"],
+  ]) {
+    const cli = makeCli(registerResponder(fx.unitPage));
+    assert.equal(await run(argv, cli.deps), 2, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0, argv.join(" "));
+    assert.match(cli.err.join("\n"), /was given more than once/, argv.join(" "));
+  }
 });

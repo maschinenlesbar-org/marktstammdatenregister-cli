@@ -36,7 +36,7 @@ mastr [global options] <command> [command options]
 | `--page <n>` | 1-based page (default 1) |
 | `--page-size <n>` | rows per page (1..5000, default 25) |
 | `--sort <spec>` | `FieldKey-asc` or `FieldKey-desc`, e.g. `Bruttoleistung-desc`. `FieldKey` is a record field name of **that category**, not a `FilterName` (`Bruttoleistung` exists only in `stromerzeugung`; see [Capacity fields](#capacity-fields-per-category)) |
-| `--filter <spec>` | filter expression (see below) |
+| `--filter <spec>` | filter expression (see below); repeatable — several are joined with `~and~` |
 | `--total` | print only the total match count, not the rows (a one-row request, the library's `count()`; `--page` and `--page-size` are ignored) |
 
 Each data command prints `{ total, data }`: `total` is the full match count (respects
@@ -64,10 +64,14 @@ FilterName~op~'value'~and~FilterName~op~'value'~…
 - **checked before sending:** every condition needs a FilterName, a known operator and
   a value, a value that opens a single quote must close it, conditions are joined by
   `~and~` only, and nothing may dangle at the end (`…~and~`). Anything else is a usage
-  error (exit 2). The FilterName itself can't be checked (see below), but it is sent
-  normalised: Unicode NFC (a decomposed `ä` from macOS input becomes `ä`), without
-  surrounding whitespace, inner runs of spaces as one — the register matches names exactly
-  and ignores one that differs only so
+  error (exit 2)
+- **checked against the category's columns** (one extra request for the column list): a
+  FilterName the category doesn't have, and for `eq`/`neq` a dropdown code its list
+  doesn't have (a label such as `'Wind'` is named with its code), are a usage error
+  (exit 2) — the register would ignore the name and return the unfiltered set, and answer
+  an unknown code with 0 rows. A name is matched in Unicode NFC (a decomposed `ä` from
+  macOS input counts as `ä`), without surrounding whitespace and in any case, and sent the
+  register's way
 - **conjunction:** only `and`. **There is no working `or`:** the register keeps only the
   part before the first `~or~` and silently drops the rest (a wrong count, no error), so
   the CLI rejects `~or~` (exit 2). For an OR between codes of **one dropdown column**,
@@ -87,14 +91,15 @@ mastr stromerzeugung --filter "Energieträger~eq~'2497,2495'" --total
 mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Bruttoleistung der Einheit~gt~'5000'" --total
 ```
 
-> **A wrong/misspelled FilterName is silently ignored** and you get the unfiltered
-> result — always confirm the exact name via `mastr filters` and sanity-check with
-> `--total` (the count should change).
+> **The register ignores a FilterName it doesn't know** and returns the unfiltered
+> result; the CLI refuses such a name before sending (with "did you mean"). `--filter` may
+> be given several times; the conditions are joined with `~and~`. Every other option given
+> twice is a usage error (exit 2).
 
 ## Examples
 
 ```bash
-mastr stromerzeugung --total                        # 9063887
+mastr stromerzeugung --total                        # 9562366 (2026-10-05)
 mastr stromerzeugung --page-size 5 --iso-dates      # first 5 units, ISO dates
 mastr filters stromerzeugung --compact | jq '.[] | {FilterName, Type}'
 mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --compact | jq '.data'
@@ -106,7 +111,7 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
 |---|---|
 | `0` | success (help/version included); an empty result also exits 0 |
 | `1` | API/logical error (e.g. the server's `Errors` field), or a catch-all |
-| `2` | usage error (bad flags, unknown command, a malformed `--filter` — shape, operator, `~or~` — or a bad `--page-size`, redirecting base URL) |
+| `2` | usage error (bad flags, unknown command, an option other than `--filter` given twice, a malformed `--filter` — shape, operator, `~or~`, a FilterName the category doesn't have, a dropdown code it doesn't list — or a bad `--page-size`, redirecting base URL) |
 | `4` | HTTP 404 |
 | `6` | network / transport failure (DNS, connection, timeout, response size-cap) |
 
@@ -119,9 +124,8 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
   (`Bruttoleistung`, `InbetriebnahmeDatum`), not the FilterNames from `mastr filters`
   (`Bruttoleistung der Einheit-desc` returns 0 rows); list them with
   `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. (Contrast
-  `--filter`, where a wrong field is silently *ignored* and you get the unfiltered set,
-  and a wrong operator is rejected before sending; a filter that still gives 0 rows
-  gets a stderr note about its values.)
+  `--filter`, where a wrong field or operator is rejected before sending; a filter that
+  still gives 0 rows gets a stderr note about its values.)
 - **Dates** are Microsoft `/Date(ms)/` strings; `--iso-dates` converts them, or use the
   library's `parseMsDate()`.
 - **You cannot sum capacity server-side** — there is no aggregate endpoint. Use `--total`

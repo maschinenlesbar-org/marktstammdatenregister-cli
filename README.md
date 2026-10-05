@@ -35,8 +35,8 @@ Four datasets, each paged and filterable. Prints `{ total, data }` (or just the
 count with `--total`).
 
 ```bash
-mastr stromerzeugung --total                       # how many electricity-generation units? → 9063887
-mastr stromerzeugung --filter "Energieträger~eq~'2495'" --total   # …how many are solar? → 6267133
+mastr stromerzeugung --total                       # how many electricity-generation units? → 9562366 (2026-10-05; it grows)
+mastr stromerzeugung --filter "Energieträger~eq~'2495'" --total   # …how many are solar? → 6545851
 mastr stromerzeugung --sort "Bruttoleistung-desc" --page-size 20 --iso-dates
 mastr gaserzeugung --page 1 --page-size 50
 mastr filters stromerzeugung                        # the filterable columns + dropdown codes
@@ -48,12 +48,15 @@ Categories: `stromerzeugung`, `stromverbrauch`, `gaserzeugung`, `gasverbrauch`.
 (ops `eq|neq|sw|ct|nct|ew|null|nn`, plus the strict `gt`/`lt` for numbers and dates);
 there is **no working `~or~`** (the register drops everything after it, so the CLI
 rejects it) — for several codes of one dropdown, list them in one value:
-`Energieträger~eq~'2497,2498'`. Discover the German field names and dropdown codes with `mastr filters <category>`. A
-**wrong `FilterName` is silently ignored** (you get the unfiltered set), and a **wrong
-`--sort` key returns 0 rows**; a malformed spec or an unknown operator (e.g. `gte`) is
-rejected before any request (exit 2), because the register would answer it with a wrong
-count. Verify filter names
-with `mastr filters` and sanity-check with `--total`; sort keys are record field names
+`Energieträger~eq~'2497,2498'`. Discover the German field names and dropdown codes with `mastr filters <category>`.
+The register silently ignores a FilterName it doesn't know (you'd get the unfiltered set)
+and answers an unknown dropdown code with 0 rows, so the CLI checks every FilterName and
+every `eq`/`neq` dropdown code against the category's columns (one extra request) and
+rejects an unknown one (exit 2, with "did you mean"); a name typed with a decomposed umlaut,
+padding or in another case is sent the register's way. A malformed spec or an unknown
+operator (e.g. `gte`) is rejected too. Several `--filter` flags are joined with `~and~`;
+any other option given twice is a usage error. A **wrong `--sort` key returns 0 rows**:
+sanity-check with `--total`; sort keys are record field names
 (`Bruttoleistung`), not FilterNames — list them with
 `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. **Dates** come as Microsoft
 `/Date(ms)/` strings — add `--iso-dates` to convert them to ISO-8601.
@@ -72,6 +75,11 @@ solar.total; // total matching units
 await mastr.count("stromerzeugung", { filter: "Energieträger~eq~'2495'" }); // just the count, one-row request
 parseMsDate(String(solar.data[0]?.EinheitRegistrierungsdatum)); // Date | null
 ```
+
+The client checks a filter's FilterNames and dropdown codes against the category's columns
+(`filterColumns()`, fetched once per client and category) and throws `MastrValidationError`
+for one the register would ignore; `new MastrClient({ allowUnknownFilters: true })` skips that
+check and its request. A query key it doesn't know (`filtr`) is refused the same way.
 
 Build filters from user input with `buildFilter`, not string interpolation: a filter
 value cannot contain `~` (the register splits on it and has no escape), so

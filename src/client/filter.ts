@@ -5,6 +5,7 @@
 // misread are refused before any request.
 
 import { MastrValidationError } from "./errors.js";
+import type { FilterColumn } from "./types.js";
 
 /**
  * The operators the register's search understands (from its web form, all checked
@@ -227,4 +228,110 @@ function plainNumber(n: number): string {
 export function validateFilter(spec: string): void {
   const problem = filterProblem(spec);
   if (problem !== undefined) throw new MastrValidationError(`Invalid filter: ${problem}`);
+}
+
+/** Edit distance between two strings (Levenshtein), for "did you mean". */
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(
+        previous[j]! + 1,
+        current[j - 1]! + 1,
+        previous[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    previous = current;
+  }
+  return previous[b.length]!;
+}
+
+/** Up to three column names close to `name`, closest first. */
+function closeNames(name: string, names: readonly string[]): string[] {
+  const lower = name.toLowerCase();
+  const limit = Math.max(2, Math.floor(name.length / 4));
+  return names
+    .map((candidate) => {
+      const other = candidate.toLowerCase();
+      const distance = other.includes(lower) || lower.includes(other) ? 0 : editDistance(lower, other);
+      return { candidate, distance };
+    })
+    .filter(({ distance }) => distance <= limit)
+    .sort((x, y) => x.distance - y.distance)
+    .slice(0, 3)
+    .map(({ candidate }) => candidate);
+}
+
+/** A value without its surrounding single quotes, when it has them. */
+function unquote(value: string): string {
+  return value.length >= 2 && value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1) : value;
+}
+
+/**
+ * Check a filter spec against the category's filter columns (`filterColumns()`) and return
+ * it with every FilterName in the register's spelling, or throw a {@link MastrValidationError}.
+ * The register silently ignores what it doesn't know, so these would otherwise give a wrong
+ * count with exit 0:
+ *
+ * - a FilterName that is not a column of the category: the unfiltered set (live 2026-10-05:
+ *   `energieträger~eq~'2495'` gave all 9 562 366 units, `Energieträger` on `gasverbrauch`
+ *   all 937). A name that differs from a column only in case is written the register's way
+ *   (the register's names don't collide in case); any other unknown name — `__proto__`
+ *   included — is rejected with up to three close names;
+ * - for `eq`/`neq` on a dropdown column, a value that is not one of its codes: an unknown
+ *   code gives 0 rows, a label (`'Wind'`) or junk in a comma list `{"Error":true}`. A label
+ *   is named with its code.
+ *
+ * `spec` must already pass {@link filterProblem} (the client normalises and checks it first).
+ */
+export function resolveFilter(spec: string, columns: readonly FilterColumn[], category: string): string {
+  const byName = new Map<string, FilterColumn>();
+  const byLowerName = new Map<string, FilterColumn[]>();
+  for (const column of columns) {
+    if (typeof column.FilterName !== "string") continue;
+    byName.set(column.FilterName, column);
+    const lower = column.FilterName.toLowerCase();
+    byLowerName.set(lower, [...(byLowerName.get(lower) ?? []), column]);
+  }
+  const parts = spec.split("~");
+  for (let i = 0, n = 1; i < parts.length; i += 4, n++) {
+    const name = parts[i]!;
+    let column = byName.get(name);
+    if (column === undefined) {
+      const sameCase = byLowerName.get(name.toLowerCase()) ?? [];
+      if (sameCase.length === 1) column = sameCase[0]!;
+    }
+    if (column === undefined) {
+      const near = closeNames(name, [...byName.keys()]);
+      throw new MastrValidationError(
+        `Invalid filter: unknown FilterName ${JSON.stringify(name)} in condition ${n}: ${category} has no such ` +
+          "column, and the register would ignore it and return the unfiltered set." +
+          (near.length > 0 ? ` Did you mean ${near.map((x) => JSON.stringify(x)).join(", ")}?` : "") +
+          ` List the names with \`mastr filters ${category}\` (filterColumns() in the library).`,
+      );
+    }
+    parts[i] = column.FilterName!;
+    const op = parts[i + 1]!;
+    const value = unquote(parts[i + 2]!.trim());
+    const codes = (column.ListObject ?? []).filter(
+      (o): o is { Name?: string; Value: string } => typeof o?.Value === "string",
+    );
+    if (column.Type === "multidropdown" && codes.length > 0 && (op === "eq" || op === "neq")) {
+      for (const item of value.split(",").map((x) => x.trim())) {
+        if (codes.some((o) => o.Value === item)) continue;
+        const label = codes.find((o) => typeof o.Name === "string" && o.Name.toLowerCase() === item.toLowerCase());
+        const shown = codes.slice(0, 8).map((o) => `${o.Value} (${o.Name ?? ""})`).join(", ");
+        throw new MastrValidationError(
+          `Invalid filter: ${JSON.stringify(item)} is not a code of the dropdown column ` +
+            `${JSON.stringify(column.FilterName)} (condition ${n}). ` +
+            (label !== undefined
+              ? `It is the label of code ${label.Value}: a dropdown takes its code (${column.FilterName}~${op}~'${label.Value}').`
+              : `The register would answer 0 rows or an error. Codes: ${shown}${codes.length > 8 ? ", …" : ""}; ` +
+                `all of them with \`mastr filters ${category}\`.`),
+        );
+      }
+    }
+  }
+  return parts.join("~");
 }

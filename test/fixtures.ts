@@ -52,4 +52,28 @@ export const filterColumns = [
     ],
   },
   { FilterName: "Bruttoleistung der Einheit", Type: "number", ListObject: [] },
+  // The columns the filter tests use, shaped like the live list (2026-10-05).
+  {
+    FilterName: "Energieträger",
+    Type: "multidropdown",
+    ListObject: [
+      { Name: "Solare Strahlungsenergie", Value: "2495" },
+      { Name: "Wind", Value: "2497" },
+      { Name: "Wasser", Value: "2498" },
+    ],
+  },
+  {
+    FilterName: "Bundesland",
+    Type: "multidropdown",
+    ListObject: [
+      { Name: "Bayern", Value: "1403" },
+      { Name: "Nordrhein-Westfalen", Value: "1409" },
+    ],
+  },
+  { FilterName: "Betriebs-Status", Type: "multidropdown", ListObject: [{ Name: "In Betrieb", Value: "35" }] },
+  { FilterName: "Ort", Type: "text", ListObject: [] },
+  { FilterName: "Anzeige-Name der Einheit", Type: "text", ListObject: [] },
+  { FilterName: "Bürgerenergie", Type: "boolean", ListObject: [] },
+  { FilterName: "Inbetriebnahmedatum der Einheit", Type: "date", ListObject: [] },
+  { FilterName: "MaStR-Nr. der Einheit", Type: "mastrnummer", ListObject: [] },
 ];

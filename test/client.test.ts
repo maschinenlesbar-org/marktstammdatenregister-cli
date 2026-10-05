@@ -36,13 +36,14 @@ test("returns { total, data } from the envelope", async () => {
 });
 
 test("query options are forwarded", async () => {
-  const { client, mt } = clientFor(fx.unitPage);
-  await client.stromerzeugung({ page: 3, pageSize: 50, sort: "Bruttoleistung-desc", filter: "X~eq~'1'" });
+  const mt = makeMockTransport(registerResponder(fx.unitPage));
+  const client = new MastrClient({ transport: mt.transport });
+  await client.stromerzeugung({ page: 3, pageSize: 50, sort: "Bruttoleistung-desc", filter: "Ort~eq~'1'" });
   const q = queryOf(mt.last());
   assert.equal(q.get("page"), "3");
   assert.equal(q.get("pageSize"), "50");
   assert.equal(q.get("sort"), "Bruttoleistung-desc");
-  assert.equal(q.get("filter"), "X~eq~'1'");
+  assert.equal(q.get("filter"), "Ort~eq~'1'");
 });
 
 test("each category hits its own endpoint", async () => {
@@ -299,4 +300,59 @@ test("units() rejects a page whose rows contradict its Total or the pageSize (fi
     const client = new MastrClient({ transport: makeMockTransport(() => jsonResponse(body)).transport });
     await assert.rejects(client.stromerzeugung({ pageSize }), (err: unknown) => err instanceof MastrParseError && pattern.test(err.message));
   }
+});
+
+test("the filter check names a dropdown label's code and refuses codes the column doesn't list", async () => {
+  const client = new MastrClient({ transport: makeMockTransport(registerResponder(fx.unitPage)).transport });
+  for (const [filter, pattern] of [
+    ["Energieträger~eq~'Wind'", /"Wind" is not a code of the dropdown column "Energieträger".*It is the label of code 2497.*Energieträger~eq~'2497'/],
+    ["Energieträger~eq~'2495,abc'", /"abc" is not a code of the dropdown column "Energieträger".*Codes: 2495 \(Solare Strahlungsenergie\)/],
+    ["Energieträger~neq~'9999'", /"9999" is not a code/],
+    ["energieträger~eq~'2495'~and~Bundesland~eq~'Bayern'", /It is the label of code 1403/],
+  ] as const) {
+    await assert.rejects(client.stromerzeugung({ filter }), (err: unknown) => err instanceof MastrValidationError && pattern.test(err.message), filter);
+  }
+  // A comma list of listed codes (with a space after the comma) passes, as do gt/lt on a dropdown.
+  await client.stromerzeugung({ filter: "Energieträger~eq~'2495, 2497'~and~Energieträger~gt~'2000'" });
+});
+
+test("the filter check suggests close names and writes a name in another case the register's way", async () => {
+  const mt = makeMockTransport(registerResponder(fx.unitPage));
+  const client = new MastrClient({ transport: mt.transport });
+  await assert.rejects(
+    client.stromerzeugung({ filter: "Energietäger~eq~'2495'" }),
+    (err: unknown) =>
+      err instanceof MastrValidationError &&
+      /unknown FilterName "Energietäger" in condition 1: stromerzeugung has no such column/.test(err.message) &&
+      /Did you mean "Energieträger"\?/.test(err.message) &&
+      /`mastr filters stromerzeugung`/.test(err.message),
+  );
+  await client.stromerzeugung({ filter: "ORT~eq~'Münster'" });
+  assert.equal(queryOf(mt.last()).get("filter"), "Ort~eq~'Münster'");
+});
+
+test("the filter columns are fetched once per client and category; a failed fetch is retried next time", async () => {
+  let failColumns = true;
+  const mt = makeMockTransport((req) => {
+    if (new URL(req.url).pathname.includes("/GetFilterColumns") && failColumns) {
+      failColumns = false;
+      return jsonResponse({ Errors: "kaputt" });
+    }
+    return registerResponder(fx.unitPage)(req);
+  });
+  const client = new MastrClient({ transport: mt.transport });
+  await assert.rejects(client.count("stromerzeugung", { filter: "Ort~eq~'a'" }), MastrApiError);
+  await client.count("stromerzeugung", { filter: "Ort~eq~'a'" });
+  await client.count("stromerzeugung", { filter: "Ort~eq~'b'" });
+  const columnRequests = mt.calls.filter((r) => new URL(r.url).pathname.includes("/GetFilterColumns"));
+  assert.equal(columnRequests.length, 2);
+});
+
+test("allowUnknownFilters sends the normalised filter without the column check (no extra request)", async () => {
+  const mt = makeMockTransport(registerResponder(fx.unitPage));
+  const client = new MastrClient({ transport: mt.transport, allowUnknownFilters: true });
+  await client.count("stromerzeugung", { filter: " Neue Spalte~eq~'1'" });
+  assert.equal(mt.calls.length, 1);
+  assert.equal(queryOf(mt.last()).get("filter"), "Neue Spalte~eq~'1'");
+  assert.throws(() => new MastrClient({ allowUnknownFilters: "yes" as unknown as boolean }), MastrValidationError);
 });

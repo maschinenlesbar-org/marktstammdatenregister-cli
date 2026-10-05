@@ -7,7 +7,7 @@ import type { CliDeps } from "./io.js";
 import type { MastrClientOptions } from "../client/client.js";
 import { isoifyDates } from "../client/client.js";
 import { MastrParseError } from "../client/errors.js";
-import { filterProblem } from "../client/filter.js";
+import { filterProblem, normalizeFilter } from "../client/filter.js";
 import { isBidiControl } from "../client/engine.js";
 import {
   baseUrlProblem,
@@ -55,13 +55,32 @@ export const parseSort = parseWith(sortProblem);
 
 /**
  * commander value-parser for `--filter`: non-blank, and not a spec the register would
- * misread (see `filterProblem`), so it becomes a usage error before any request.
+ * misread (see `filterProblem`, run on the `normalizeFilter`ed spec as the client sends
+ * it), so it becomes a usage error before any request. The flag can be repeated: a second
+ * `--filter` is joined to the first with `~and~` (it used to replace it silently, and
+ * "solar in Bavaria" became "every unit in Bavaria"). The FilterNames and dropdown codes
+ * are checked by the client against the category's columns.
  */
-export function parseFilter(value: string): string {
+export function parseFilter(value: string, previous?: string): string {
   parseNonEmpty(value);
-  const problem = filterProblem(value);
+  const problem = filterProblem(normalizeFilter(value));
   if (problem !== undefined) throw new InvalidArgumentError(problem);
-  return value;
+  return previous === undefined ? value : `${previous}~and~${value}`;
+}
+
+/**
+ * Wrap a value-parser so its option may be given only once: commander keeps the last of a
+ * repeated option and drops the others without a word (`--sort A --sort B` sorted by B,
+ * `--page 2 --page 3` fetched page 3). A repeat is a usage error naming the flag. A fresh
+ * program is built per `run()`, so the state lives as long as one parse.
+ */
+export function once<T>(flag: string, parse: (value: string) => T): (value: string) => T {
+  let seen = false;
+  return (value: string) => {
+    if (seen) throw new InvalidArgumentError(`${flag} was given more than once; give it once.`);
+    seen = true;
+    return parse(value);
+  };
 }
 
 /**

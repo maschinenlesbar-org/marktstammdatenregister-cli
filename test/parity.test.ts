@@ -8,7 +8,7 @@ import { MastrClient } from "../src/client/client.js";
 import { MastrNetworkError, MastrValidationError } from "../src/client/errors.js";
 import { validateBaseUrl } from "../src/index.js";
 import { run } from "../src/cli/run.js";
-import { jsonResponse, makeMockTransport, parity, requestShapes } from "./helpers.js";
+import { jsonResponse, makeMockTransport, parity, requestShapes, unitRequests, withColumns } from "./helpers.js";
 
 test("parity: a blank or whitespace-only sort is rejected on both sides, before any request", async () => {
   for (const sort of ["", "   ", "\t"]) {
@@ -189,15 +189,15 @@ test("parity: --total and client.count() send the same one-row request and give 
     const { cli, lib } = await parity(
       ["--compact", ...argv],
       (transport) => call(new MastrClient({ transport })),
-      () => jsonResponse(page),
+      withColumns(() => jsonResponse(page)),
     );
     assert.equal(cli.code, 0, argv.join(" "));
     assert.equal(lib.ok, true);
     assert.equal(JSON.parse(cli.out), 9063887);
     assert.ok(lib.ok && lib.value === 9063887);
     assert.deepEqual(requestShapes(cli.requests), requestShapes(lib.requests));
-    assert.equal(new URL(lib.requests[0]?.url ?? "").searchParams.get("pageSize"), "1");
-    assert.equal(new URL(lib.requests[0]?.url ?? "").searchParams.get("page"), "1");
+    assert.equal(new URL(unitRequests(lib.requests)[0]?.url ?? "").searchParams.get("pageSize"), "1");
+    assert.equal(new URL(unitRequests(lib.requests)[0]?.url ?? "").searchParams.get("page"), "1");
   }
 });
 

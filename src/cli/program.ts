@@ -10,7 +10,7 @@ import { defaultIO } from "./io.js";
 import { MastrClient } from "../client/client.js";
 import { MAX_TIMEOUT_MS } from "../client/http.js";
 import { MAX_RETRIES } from "../client/engine.js";
-import { parseIntArg, parseBoundedInt, parseHeaderValue, parseBaseUrl } from "./shared.js";
+import { once, parseIntArg, parseBoundedInt, parseHeaderValue, parseBaseUrl } from "./shared.js";
 import { registerCommands } from "./commands/units.js";
 
 /**
@@ -53,24 +53,24 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     .option(
       "--base-url <url>",
       "API base URL (http/https only)",
-      parseBaseUrl,
+      once("--base-url", parseBaseUrl),
       "https://www.marktstammdatenregister.de/MaStR",
     )
     .option(
       "--timeout <ms>",
       "time limit per request in ms, whole response included (0 = no timeout)",
-      parseBoundedInt(0, MAX_TIMEOUT_MS),
+      once("--timeout", parseBoundedInt(0, MAX_TIMEOUT_MS)),
     )
-    .option("--user-agent <ua>", "User-Agent header value", parseHeaderValue)
+    .option("--user-agent <ua>", "User-Agent header value", once("--user-agent", parseHeaderValue))
     .option(
       "--max-retries <n>",
       `retries for transient 429/503 responses and reset connections (0..${MAX_RETRIES}; each waits the server's Retry-After, up to 30 s)`,
-      parseBoundedInt(0, MAX_RETRIES),
+      once("--max-retries", parseBoundedInt(0, MAX_RETRIES)),
     )
     .option(
       "--max-response-bytes <n>",
       "cap response body size in bytes (0 = unlimited; default 100 MiB)",
-      parseIntArg,
+      once("--max-response-bytes", parseIntArg),
     )
     .option("--compact", "print JSON on a single line instead of pretty-printed")
     .option("--iso-dates", "rewrite MaStR /Date(ms)/ timestamps to ISO-8601")

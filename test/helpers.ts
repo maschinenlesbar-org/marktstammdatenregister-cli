@@ -7,6 +7,7 @@ import type { Transport, HttpRequest, HttpResponse } from "../src/client/http.js
 import { run } from "../src/cli/run.js";
 import { defaultDeps } from "../src/cli/program.js";
 import type { CliDeps } from "../src/cli/io.js";
+import * as fx from "./fixtures.js";
 
 export function jsonResponse(body: unknown, status = 200): HttpResponse {
   return {
@@ -24,12 +25,35 @@ export function rawResponse(data: string | Buffer, contentType: string, status =
   };
 }
 
+/** True for a request to a `GetFilterColumns…` endpoint (the client's filter check). */
+export function isColumnsRequest(req: HttpRequest): boolean {
+  return new URL(req.url).pathname.includes("/GetFilterColumns");
+}
+
+/**
+ * `responder` for the unit requests, with the filter-columns requests the client makes to
+ * check a filter answered by `columns` (the fixture's columns by default).
+ */
+export function withColumns(
+  responder: (req: HttpRequest) => HttpResponse | Promise<HttpResponse>,
+  columns: unknown = fx.filterColumns,
+): (req: HttpRequest) => HttpResponse | Promise<HttpResponse> {
+  return (req) => (isColumnsRequest(req) ? jsonResponse(columns) : responder(req));
+}
+
+/** The unit requests among `requests` (without the filter-columns requests). */
+export function unitRequests(requests: readonly HttpRequest[]): HttpRequest[] {
+  return requests.filter((req) => !isColumnsRequest(req));
+}
+
 /**
  * A responder that answers like the register: the unit envelope `page` with its rows cut to
- * the request's `pageSize` (the client rejects a page with more rows than asked for).
+ * the request's `pageSize` (the client rejects a page with more rows than asked for), and
+ * the fixture's filter columns for the client's filter check.
  */
 export function registerResponder(page: { Data: unknown[] | null; [key: string]: unknown }) {
   return (req: HttpRequest): HttpResponse => {
+    if (isColumnsRequest(req)) return jsonResponse(fx.filterColumns);
     const pageSize = Number(new URL(req.url).searchParams.get("pageSize") ?? "25");
     return jsonResponse({ ...page, Data: page.Data === null ? null : page.Data.slice(0, pageSize) });
   };
@@ -99,8 +123,9 @@ export type LibOutcome =
 export async function parity(
   argv: string[],
   call: (transport: Transport) => unknown,
-  responder: (req: HttpRequest) => HttpResponse | Promise<HttpResponse> = () =>
+  responder: (req: HttpRequest) => HttpResponse | Promise<HttpResponse> = withColumns(() =>
     jsonResponse({ Data: [], Total: 0, Errors: null }),
+  ),
 ): Promise<{ cli: CliOutcome; lib: LibOutcome }> {
   const mt = makeMockTransport(responder);
   const out: string[] = [];

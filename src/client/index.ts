@@ -8,6 +8,7 @@ export {
   filterProblem,
   normalizeFilter,
   normalizeFilterName,
+  resolveFilter,
   validateFilter,
 } from "./filter.js";
 export type { FilterCondition, FilterOperator } from "./filter.js";
