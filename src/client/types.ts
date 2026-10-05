@@ -107,7 +107,8 @@ export interface UnitQuery {
    * no working `~or~` (the register drops everything after it, so the client rejects
    * it); for several codes of one dropdown column list them in one value:
    * `"Energieträger~eq~'2497,2498'"`. Discover the `FilterName`s and dropdown codes
-   * via {@link MastrClient.filterColumns}.
+   * via {@link MastrClient.filterColumns}; the client checks them against that list
+   * (unless `allowUnknownFilters`), because the register ignores an unknown name.
    */
   filter?: string;
 }

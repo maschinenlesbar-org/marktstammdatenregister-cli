@@ -200,10 +200,13 @@ export class MastrClient {
    * Fetch one page of units for a category. Sends the full Kendo param set —
    * `sort`, `page`, `pageSize`, `group`, `filter` — always, because the server
    * rejects a request with `group`/`filter` missing ("Die Anfrage ist Null.").
-   * An unknown category, a `page` outside 1..`MAX_PAGE`, a `pageSize` outside
-   * 1..`MAX_PAGE_SIZE`, a blank `sort` ({@link sortProblem}) or a filter the register
-   * would misread (e.g. `~or~`, see {@link validateFilter}) is rejected with a
-   * `MastrValidationError` before any request.
+   * An unknown category or query key, a `page` outside 1..`MAX_PAGE`, a `pageSize`
+   * outside 1..`MAX_PAGE_SIZE`, a blank `sort` ({@link sortProblem}) or a filter the
+   * register would misread (e.g. `~or~`, see {@link validateFilter}) is rejected with a
+   * `MastrValidationError` before any request. A filter's FilterNames and `eq`/`neq`
+   * dropdown codes are then checked against the category's columns (one cached
+   * `filterColumns()` request, skipped with `allowUnknownFilters`) before the unit request;
+   * the filter is sent normalised (see `normalizeFilter`, `resolveFilter`).
    */
   async units(category: UnitCategory, query: UnitQuery = {}): Promise<UnitPage> {
     const suffix = categorySuffix(category);
