@@ -145,6 +145,12 @@ outcome.
 
 - **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 20/22/24.
 - **Exit codes** (`run.ts`): help/version → 0; usage → 2; 404 → 4; network → 6; other → 1.
+- **Closed pipes** (`io.ts` `handleOutputErrors`, installed by the bin shim before `run()`):
+  an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly, any other stdout
+  error prints `Output error: …` and exits 1; an EPIPE on stderr is ignored, so a failed run
+  keeps its own exit code (`2>&1 | true` after a usage error still exits 2). A stdout closed
+  with `>&-` can't be told apart from `> /dev/null` (Node reopens the closed descriptor on
+  `/dev/null`), so that run exits 0.
 - Retry transient `429`/`503` (and reset connections, `isTransientNetworkError`) up to
   `maxRetries`, waiting `retryDelayMs * attempt` (200 ms, 400 ms, …) or the `Retry-After`
   (seconds or an IMF-fixdate, `parseRetryAfter`) when that is longer — the backoff is the
