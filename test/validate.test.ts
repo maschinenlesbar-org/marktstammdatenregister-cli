@@ -6,7 +6,7 @@ import { MastrClient } from "../src/client/client.js";
 import * as lib from "../src/index.js";
 import { run } from "../src/cli/run.js";
 import type { CliDeps } from "../src/cli/io.js";
-import { jsonResponse, parity, requestShapes } from "./helpers.js";
+import { parity, requestShapes, registerResponder } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
 const evenProblem: Problem<number> = (n) => (n % 2 === 0 ? undefined : "expected an even number.");
@@ -71,7 +71,7 @@ test("parity() drives the CLI and the library on one transport and records both 
   const { cli, lib: l } = await parity(
     ["--compact", "stromerzeugung", "--page-size", "3"],
     (transport) => new MastrClient({ transport }).stromerzeugung({ pageSize: 3 }),
-    () => jsonResponse(fx.unitPage),
+    registerResponder(fx.unitPage),
   );
   assert.equal(cli.code, 0);
   assert.equal(l.ok, true);

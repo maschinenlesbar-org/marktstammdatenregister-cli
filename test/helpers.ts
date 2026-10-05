@@ -24,6 +24,17 @@ export function rawResponse(data: string | Buffer, contentType: string, status =
   };
 }
 
+/**
+ * A responder that answers like the register: the unit envelope `page` with its rows cut to
+ * the request's `pageSize` (the client rejects a page with more rows than asked for).
+ */
+export function registerResponder(page: { Data: unknown[] | null; [key: string]: unknown }) {
+  return (req: HttpRequest): HttpResponse => {
+    const pageSize = Number(new URL(req.url).searchParams.get("pageSize") ?? "25");
+    return jsonResponse({ ...page, Data: page.Data === null ? null : page.Data.slice(0, pageSize) });
+  };
+}
+
 export interface MockTransport {
   transport: Transport;
   /** All requests the transport has received, in order. */

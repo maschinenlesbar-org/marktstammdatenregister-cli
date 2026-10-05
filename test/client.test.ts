@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient, parseMsDate, isoifyDates } from "../src/client/client.js";
 import { MastrApiError, MastrParseError, MastrValidationError } from "../src/client/errors.js";
-import { makeMockTransport, jsonResponse, queryOf } from "./helpers.js";
+import { makeMockTransport, jsonResponse, queryOf, registerResponder } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
 function clientFor(body: unknown) {
@@ -143,7 +143,7 @@ test("isoifyDates does not reparent or pollute on an attacker '__proto__' key", 
 
 test("MastrClient rejects a non-http(s) base URL even with a custom transport", () => {
   for (const baseUrl of ["file:///etc/passwd", "ftp://example.org"]) {
-    const mt = makeMockTransport(() => jsonResponse(fx.unitPage));
+    const mt = makeMockTransport(registerResponder(fx.unitPage));
     assert.throws(
       () => new MastrClient({ baseUrl, transport: mt.transport }),
       (err) => err instanceof MastrValidationError && /Only http and https URLs are supported/.test(err.message),
@@ -269,4 +269,34 @@ test("parseMsDate accepts the offset form and returns null for an out-of-range v
   assert.equal(parseMsDate("/Date(99999999999999999)/"), null);
   assert.equal(parseMsDate("/Date(1548979200000+01)/"), null);
   assert.deepEqual(JSON.parse(JSON.stringify(isoifyDates({ d: "/Date(0+0200)/" }))), { d: "1970-01-01T00:00:00.000Z" });
+});
+
+test('units() and filterColumns() turn the register\'s {"Error":true} reply into a MastrApiError that says what to fix (findings 01#3, 06#1)', async () => {
+  for (const body of [
+    { Error: true, Message: null, Type: "danger", Icon: "fas fa-times-circle" },
+    { Error: true, Message: "Ungültiger Filterwert", Type: "danger" },
+  ]) {
+    const client = new MastrClient({ transport: makeMockTransport(() => jsonResponse(body)).transport });
+    for (const call of [() => client.stromerzeugung(), () => client.filterColumns("stromerzeugung")]) {
+      await assert.rejects(call(), (err: unknown) => {
+        assert.ok(err instanceof MastrApiError, String(err));
+        assert.equal(err.status, undefined);
+        assert.match(err.message, /the register rejected the request/);
+        assert.match(err.message, /dropdown label instead of its code/);
+        if (body.Message !== null) assert.match(err.message, /Ungültiger Filterwert/);
+        return true;
+      });
+    }
+  }
+});
+
+test("units() rejects a page whose rows contradict its Total or the pageSize (finding 03#3)", async () => {
+  const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ Id: i }));
+  for (const [body, pageSize, pattern] of [
+    [{ Data: rows(2), Total: 0, Errors: null }, 25, /a Total of at least the 2 rows on the page, got 0/],
+    [{ Data: rows(7), Total: 7, Errors: null }, 1, /at most 1 rows \(the pageSize\), got 7/],
+  ] as const) {
+    const client = new MastrClient({ transport: makeMockTransport(() => jsonResponse(body)).transport });
+    await assert.rejects(client.stromerzeugung({ pageSize }), (err: unknown) => err instanceof MastrParseError && pattern.test(err.message));
+  }
 });

@@ -150,6 +150,7 @@ export class MastrClient {
         detail: describeMastrErrors(res["Errors"], (text) => this.engine.scrub(text)),
       });
     }
+    if (res["Error"] === true) throw this.registerRejected(path, params, res);
     const total = res["Total"];
     if (typeof total !== "number" || !Number.isSafeInteger(total) || total < 0) {
       throw shapeError(path, "a numeric Total");
@@ -158,7 +159,38 @@ export class MastrClient {
     // A reply with no matches may carry `Data: null`; with a positive Total it must be an array.
     if (data === null && total === 0) return { total, data: [] };
     if (!Array.isArray(data)) throw shapeError(path, "a Data array");
+    // A page can't hold more rows than match, nor more than were asked for: such a reply
+    // would print rows next to `"total": 0` (and the CLI's "0 results" note), or a page
+    // larger than --page-size.
+    if (data.length > total) {
+      throw shapeError(path, `a Total of at least the ${data.length} rows on the page, got ${total}`);
+    }
+    const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
+    if (data.length > pageSize) {
+      throw shapeError(path, `at most ${pageSize} rows (the pageSize), got ${data.length}`);
+    }
     return { total, data: data as MastrUnit[] };
+  }
+
+  /**
+   * The register's second error envelope, `{"Error":true,"Message":…,"Type":"danger"}`
+   * (HTTP 200), as a MastrApiError: its answer to a filter value it can't read. It used to
+   * surface as "Unexpected response shape … expected a numeric Total", which reads like a
+   * broken server or client and doesn't say what to fix.
+   */
+  private registerRejected(path: string, query: QueryParams | undefined, res: Record<string, unknown>): MastrApiError {
+    const message = typeof res["Message"] === "string" ? describeMastrErrors(res["Message"], (t) => this.engine.scrub(t)) : undefined;
+    return new MastrApiError({
+      url: this.engine.buildUrl(path, query),
+      method: "GET",
+      body: this.engine.scrub(JSON.stringify(res)),
+      detail:
+        `the register rejected the request${message === undefined ? "" : ` (${message})`}. It answers so ` +
+        "to a filter value it can't read: a dropdown label instead of its code (the Value from " +
+        "`mastr filters` / filterColumns()), a decimal comma ('4999,999'; use a point), an exponent " +
+        "or text in a number column, an invalid date, a boolean other than '1'/'0', or null/nn on a " +
+        "column that isn't text",
+    });
   }
 
   /**
@@ -202,6 +234,7 @@ export class MastrClient {
   async filterColumns(category: UnitCategory): Promise<FilterColumn[]> {
     const path = `${SERVICE}/GetFilterColumnsErweiterteOeffentlicheEinheit${categorySuffix(category)}`;
     const res = await this.engine.getJson<unknown>(path);
+    if (isObject(res) && res["Error"] === true) throw this.registerRejected(path, undefined, res);
     if (isObject(res) && res["Errors"] !== undefined && res["Errors"] !== null) {
       throw new MastrApiError({
         url: this.engine.buildUrl(path),

@@ -6,7 +6,7 @@ import { renderJson } from "../src/cli/shared.js";
 import { MastrParseError } from "../src/client/errors.js";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
-import { makeMockTransport, jsonResponse, queryOf } from "./helpers.js";
+import { makeMockTransport, jsonResponse, queryOf, registerResponder } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
 function makeCli(responder: (req: HttpRequest) => HttpResponse) {
@@ -21,7 +21,7 @@ function makeCli(responder: (req: HttpRequest) => HttpResponse) {
 }
 
 test("stromerzeugung renders { total, data } and hits the endpoint", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   const code = await run(["stromerzeugung"], cli.deps);
   assert.equal(code, 0);
   assert.equal(
@@ -34,7 +34,7 @@ test("stromerzeugung renders { total, data } and hits the endpoint", async () =>
 });
 
 test("--total prints only the count and fetches just 1 row (pageSize=1)", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   await run(["stromerzeugung", "--total", "--page-size", "500"], cli.deps);
   assert.equal(JSON.parse(cli.out.join("\n")), 9063887);
   // --total overrides page size to 1 so the count query never pulls a full page.
@@ -42,7 +42,7 @@ test("--total prints only the count and fetches just 1 row (pageSize=1)", async 
 });
 
 test("--page/--page-size/--sort/--filter are forwarded", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   await run(
     ["stromerzeugung", "--page", "2", "--page-size", "5", "--sort", "Bruttoleistung-desc", "--filter", "X~eq~'1'"],
     cli.deps,
@@ -55,14 +55,14 @@ test("--page/--page-size/--sort/--filter are forwarded", async () => {
 });
 
 test("--page-size above 5000 is rejected (exit 2)", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   const code = await run(["stromerzeugung", "--page-size", "6000"], cli.deps);
   assert.equal(code, 2);
   assert.equal(cli.mt.calls.length, 0);
 });
 
 test("--page below 1 is rejected (exit 2)", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   assert.equal(await run(["stromerzeugung", "--page", "0"], cli.deps), 2);
 });
 
@@ -103,7 +103,7 @@ test("0 results WITHOUT --sort or --filter prints no such note", async () => {
 });
 
 test("matches with --sort and --filter set print no note", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   await run(["stromerzeugung", "--sort", "Bruttoleistung-desc", "--filter", "X~gt~'1'", "--total"], cli.deps);
   assert.equal(cli.err.join("\n"), "");
 });
@@ -131,7 +131,7 @@ test("filters with no category is rejected (exit 2)", async () => {
 });
 
 test("--iso-dates rewrites /Date(ms)/ timestamps", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   await run(["stromerzeugung", "--iso-dates", "--compact"], cli.deps);
   const text = cli.out.join("\n");
   assert.doesNotMatch(text, /\/Date\(/);
@@ -139,20 +139,20 @@ test("--iso-dates rewrites /Date(ms)/ timestamps", async () => {
 });
 
 test("without --iso-dates the raw /Date(ms)/ is preserved", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   await run(["stromerzeugung", "--compact"], cli.deps);
   assert.match(cli.out.join("\n"), /\/Date\(1548979200000\)\//);
 });
 
 test("--max-retries above the sane maximum is rejected (exit 2)", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   const code = await run(["--max-retries", "1000000", "stromerzeugung"], cli.deps);
   assert.equal(code, 2);
   assert.equal(cli.mt.calls.length, 0);
 });
 
 test("an empty --base-url is rejected (exit 2)", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   const code = await run(["--base-url", "", "stromerzeugung"], cli.deps);
   assert.equal(code, 2);
   assert.equal(cli.mt.calls.length, 0);
@@ -160,7 +160,7 @@ test("an empty --base-url is rejected (exit 2)", async () => {
 
 test("a non-http(s) --base-url is rejected at parse time (exit 2, no request) (MASTR-03)", async () => {
   for (const bad of ["file:///etc/passwd", "data:text/plain,x", "ftp://example.test"]) {
-    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    const cli = makeCli(registerResponder(fx.unitPage));
     const code = await run(["--base-url", bad, "stromerzeugung"], cli.deps);
     assert.equal(code, 2, `expected usage exit for ${bad}`);
     assert.equal(cli.mt.calls.length, 0, `no request should be made for ${bad}`);
@@ -168,18 +168,18 @@ test("a non-http(s) --base-url is rejected at parse time (exit 2, no request) (M
 });
 
 test("a control character in --user-agent is rejected (exit 2)", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   const code = await run(["stromerzeugung", "--user-agent", "bad\r\nX-Injected: 1"], cli.deps);
   assert.equal(code, 2);
   assert.equal(cli.mt.calls.length, 0);
 });
 
 test("--timeout accepts up to the largest timer Node supports", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   assert.equal(await run(["--timeout", "2147483647", "stromerzeugung"], cli.deps), 0);
   assert.equal(cli.mt.last().timeoutMs, 2_147_483_647);
 
-  const over = makeCli(() => jsonResponse(fx.unitPage));
+  const over = makeCli(registerResponder(fx.unitPage));
   assert.equal(await run(["--timeout", "2147483648", "stromerzeugung"], over.deps), 2);
   assert.equal(over.mt.calls.length, 0);
   assert.match(over.err.join("\n"), /Must be <= 2147483647/);
@@ -213,7 +213,7 @@ test("DEL and C1 control characters in server data are escaped in the JSON outpu
 });
 
 test("--compact prints single-line JSON", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   await run(["stromerzeugung", "--compact"], cli.deps);
   assert.equal(cli.out.length, 1);
 });
@@ -243,7 +243,7 @@ test("--filter with ~or~ is rejected (exit 2, no request) and points at the comm
     "Energieträger~eq~'2497'~or~Energieträger~eq~'2498'",
     "Ort~eq~'x'~OR~Ort~eq~'Münster'",
   ]) {
-    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    const cli = makeCli(registerResponder(fx.unitPage));
     assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 2, spec);
     assert.equal(cli.mt.calls.length, 0);
     assert.match(cli.err.join("\n"), /"~or~" is not supported/);
@@ -252,7 +252,7 @@ test("--filter with ~or~ is rejected (exit 2, no request) and points at the comm
 });
 
 test("--filter with a comma list inside one value is sent as is", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   assert.equal(await run(["stromerzeugung", "--filter", "Energieträger~eq~'2497,2498'", "--total"], cli.deps), 0);
   assert.equal(queryOf(cli.mt.last()).get("filter"), "Energieträger~eq~'2497,2498'");
 });
@@ -307,7 +307,7 @@ test("a malformed --filter is a usage error (exit 2, no request)", async () => {
     ["Ort~eq~'Münster", /value of condition 1 \('Münster\) has no closing single quote/],
   ];
   for (const [spec, message] of cases) {
-    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    const cli = makeCli(registerResponder(fx.unitPage));
     assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 2, spec);
     assert.equal(cli.mt.calls.length, 0, spec);
     assert.match(cli.err.join("\n"), message, spec);
@@ -322,14 +322,14 @@ test("well-formed --filter specs pass (unary ops with '', unquoted codes, an apo
     "Bruttoleistung der Einheit~gt~'5000'~and~Bruttoleistung der Einheit~lt~'6000'",
     "MaStR-Nr. der Einheit~eq~'SEE984033548619'",
   ]) {
-    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    const cli = makeCli(registerResponder(fx.unitPage));
     assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 0, spec);
     assert.equal(queryOf(cli.mt.last()).get("filter"), spec);
   }
 });
 
 test("a ~ inside a quoted --filter value is a usage error naming the cause", async () => {
-  const cli = makeCli(() => jsonResponse(fx.unitPage));
+  const cli = makeCli(registerResponder(fx.unitPage));
   assert.equal(await run(["stromerzeugung", "--filter", "Anzeige-Name der Einheit~ct~'a~b'", "--total"], cli.deps), 2);
   assert.equal(cli.mt.calls.length, 0);
   assert.match(cli.err.join("\n"), /A filter value cannot contain "~"/);
@@ -341,12 +341,12 @@ test("a --base-url with a query, fragment or surrounding whitespace is rejected 
     ["http://127.0.0.1:1/ok?x=1", /cannot have a query \(\?\) or fragment \(#\)/],
     [" http://127.0.0.1:1/ok", /surrounding whitespace/],
   ] as const) {
-    const cli = makeCli(() => jsonResponse(fx.unitPage));
+    const cli = makeCli(registerResponder(fx.unitPage));
     assert.equal(await run(["--base-url", bad, "stromerzeugung"], cli.deps), 2, bad);
     assert.equal(cli.mt.calls.length, 0, bad);
     assert.match(cli.err.join("\n"), message, bad);
   }
-  const prefix = makeCli(() => jsonResponse(fx.unitPage));
+  const prefix = makeCli(registerResponder(fx.unitPage));
   assert.equal(await run(["--base-url", "http://127.0.0.1:1/mirror/MaStR/", "stromerzeugung"], prefix.deps), 0);
   assert.match(prefix.mt.last().url, /^http:\/\/127\.0\.0\.1:1\/mirror\/MaStR\/Einheit\//);
 });
