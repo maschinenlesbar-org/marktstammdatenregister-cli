@@ -127,16 +127,35 @@ export function normalizeFilterName(name: string): string {
 }
 
 /**
- * The spec with every FilterName normalised ({@link normalizeFilterName}); the operators,
- * values and `and`s are left as they are. The spec is split the way the register splits it,
- * on every `~`: names are parts 0, 4, 8, … A malformed spec comes back with its names
- * normalised too; {@link filterProblem} then reports it. A non-string is returned as is.
+ * A value with the whitespace outside its quotes dropped: `'Münster' ` (a space before
+ * `~and~`) → `'Münster'`. The register would read the space as part of the value, and the
+ * shape check took the unclosed-looking value for one that holds a `~`. Inside the quotes
+ * nothing changes; a value that isn't quoted is trimmed.
+ */
+function normalizeFilterValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("'")) return trimmed;
+  return trimmed.length >= 2 && trimmed.endsWith("'") ? trimmed : value;
+}
+
+/**
+ * The spec with whitespace next to a `~` dropped where it means nothing: every FilterName
+ * normalised ({@link normalizeFilterName}), the operators and `and`s trimmed, and the
+ * whitespace outside a quoted value dropped (`'Münster' ~and~…`); the inside of a quoted
+ * value is left as it is. The spec is split the way the register splits it, on every `~`:
+ * names are parts 0, 4, 8, …, operators 1, 5, …, values 2, 6, …, `and`s 3, 7, … A malformed
+ * spec comes back normalised too; {@link filterProblem} then reports it. A non-string is
+ * returned as is.
  */
 export function normalizeFilter(spec: string): string {
   if (typeof spec !== "string") return spec;
   return spec
     .split("~")
-    .map((part, i) => (i % 4 === 0 ? normalizeFilterName(part) : part))
+    .map((part, i) => {
+      if (i % 4 === 0) return normalizeFilterName(part);
+      if (i % 4 === 2) return normalizeFilterValue(part);
+      return part.trim();
+    })
     .join("~");
 }
 

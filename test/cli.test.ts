@@ -421,3 +421,20 @@ test("a quoted empty --filter value is a usage error before any request (finding
   const cli = makeCli(registerResponder(fx.unitPage));
   assert.equal(await run(["stromerzeugung", "--filter", "Ort~null~''", "--total"], cli.deps), 0);
 });
+
+test("whitespace around ~and~ and outside a quoted value is dropped, not reported as a ~ in the value (finding 01#4)", async () => {
+  for (const [spec, sent] of [
+    ["Ort~eq~'Münster' ~and~Energieträger~eq~'2495'", "Ort~eq~'Münster'~and~Energieträger~eq~'2495'"],
+    ["Ort~eq~'Münster' ", "Ort~eq~'Münster'"],
+    ["Ort ~ eq ~ 'Münster' ~ and ~ Energieträger~eq~ '2495'", "Ort~eq~'Münster'~and~Energieträger~eq~'2495'"],
+    ["Ort~eq~' Münster '", "Ort~eq~' Münster '"],
+  ] as const) {
+    const cli = makeCli(registerResponder(fx.unitPage));
+    assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 0, `${spec}: ${cli.err.join("\n")}`);
+    assert.equal(queryOf(cli.mt.last()).get("filter"), sent, spec);
+  }
+  // A ~ inside a value is still named as such.
+  const cli = makeCli(registerResponder(fx.unitPage));
+  assert.equal(await run(["stromerzeugung", "--filter", "Anzeige-Name der Einheit~ct~'a ~b'", "--total"], cli.deps), 2);
+  assert.match(cli.err.join("\n"), /A filter value cannot contain "~"/);
+});

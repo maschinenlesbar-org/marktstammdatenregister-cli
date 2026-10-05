@@ -63,6 +63,9 @@ FilterName~op~'value'~and~FilterName~op~'value'~…
   for it (`ct 'a~b'` would silently become `ct 'a'`), so the CLI rejects it; search for a
   part of the text without the `~` instead. A single `'` inside a value is fine
   (`ct 'd'Arc'`). Library users build specs from input with `buildFilter()`
+- **whitespace:** next to a `~` it means nothing and is dropped — around a FilterName, an
+  operator or `and`, and outside a quoted value (`'Münster' ~and~…`); inside the quotes it
+  is kept
 - **checked before sending:** every condition needs a FilterName, a known operator and
   a value, a value that opens a single quote must close it, conditions are joined by
   `~and~` only, and nothing may dangle at the end (`…~and~`). Anything else is a usage
