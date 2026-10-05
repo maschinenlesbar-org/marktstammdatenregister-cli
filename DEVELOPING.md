@@ -119,7 +119,12 @@ fail to decode it for the Authorization header at request time) and throws `Mast
 error, not a `MastrNetworkError`, which stays for transport failures (the default
 transport still gates the scheme per request). It runs on the raw value, before the
 trailing-slash strip: `new URL()` would trim whitespace silently while the engine joins
-the raw string to each path (`/MaStR%20/...`). `--base-url` uses the same rule. `count(category, { filter, sort })` refuses `page` and
+the raw string to each path (`/MaStR%20/...`). `--base-url` uses the same rule. Wrong types are `MastrValidationError` too, never a raw `TypeError`: options that
+aren't an object, an unknown option key (`timeout` for `timeoutMs`, with a "did you mean"),
+a `transport` or `sleep` that isn't a function, `defaultHeaders` that isn't an object, a
+query that isn't an object, a filter that isn't a string (`null` counts as "none" for
+options and queries). Server text in an error message is cut at 500 characters
+(`MAX_DETAIL_LENGTH`); `MastrApiError.body` keeps all of it. `count(category, { filter, sort })` refuses `page` and
 `pageSize` (`countQueryProblem`): the count is the same on every page.
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`

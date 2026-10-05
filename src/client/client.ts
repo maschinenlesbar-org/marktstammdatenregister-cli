@@ -54,6 +54,17 @@ function checkPaging(name: string, value: unknown, max: number): void {
   }
 }
 
+/** A query as given (null counts as none), or a MastrValidationError for a non-object. */
+function queryObject<T extends object>(query: T | null | undefined): T {
+  if (query === undefined || query === null) return {} as T;
+  if (typeof query !== "object" || Array.isArray(query)) {
+    throw new MastrValidationError(
+      `Invalid query: expected an object, got ${Array.isArray(query) ? "an array" : `a ${typeof query}`}.`,
+    );
+  }
+  return query;
+}
+
 /** Options for the MaStR client (engine options only — the API needs no auth). */
 export type MastrClientOptions = EngineOptions;
 
@@ -124,6 +135,7 @@ export class MastrClient {
    */
   async units(category: UnitCategory, query: UnitQuery = {}): Promise<UnitPage> {
     const suffix = categorySuffix(category);
+    query = queryObject(query);
     checkPaging("page", query.page, MAX_PAGE);
     checkPaging("pageSize", query.pageSize, MAX_PAGE_SIZE);
     if (query.sort !== undefined) assertValid("sort", query.sort, sortProblem);
@@ -202,6 +214,7 @@ export class MastrClient {
    * `MastrValidationError` before any request.
    */
   async count(category: UnitCategory, query: CountQuery = {}): Promise<number> {
+    query = queryObject(query);
     assertValid("count query", query as UnitQuery, countQueryProblem);
     const q: UnitQuery = { page: 1, pageSize: 1 };
     if (query.sort !== undefined) q.sort = query.sort;

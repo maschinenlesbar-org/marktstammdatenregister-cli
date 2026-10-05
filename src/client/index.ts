@@ -13,6 +13,7 @@ export {
   MAX_RETRY_AFTER_MS,
   parseRetryAfter,
   isTransientNetworkError,
+  MAX_DETAIL_LENGTH,
   describeMastrErrors,
   sanitizeServerText,
   isBidiControl,

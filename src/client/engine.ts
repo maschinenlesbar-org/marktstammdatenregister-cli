@@ -18,6 +18,7 @@ import {
   MastrError,
   MastrNetworkError,
   MastrParseError,
+  MastrValidationError,
   credentialsIn,
   redactCredentials,
   redactUrl,
@@ -179,6 +180,18 @@ export function sanitizeServerText(text: string): string {
 }
 
 /**
+ * Longest server text (in characters) an error message keeps: a hostile or buggy body
+ * must not flood stderr or a CI log with one huge line. `MastrApiError.body` keeps the
+ * full text.
+ */
+export const MAX_DETAIL_LENGTH = 500;
+
+/** `text` cut at MAX_DETAIL_LENGTH characters, ending in "…" when cut. */
+function cutDetail(text: string): string {
+  return text.length > MAX_DETAIL_LENGTH ? `${text.slice(0, MAX_DETAIL_LENGTH)}…` : text;
+}
+
+/**
  * Describe a Kendo `Errors` value for an error message: a string as is; otherwise
  * (a ModelState object such as `{"": {"errors": ["Invalid filter"]}}`, or an array)
  * every string found in it, sanitised, blanks and repeats dropped, joined "; ".
@@ -196,7 +209,7 @@ export function describeMastrErrors(errors: unknown, clean: (text: string) => st
     }
   };
   walk(errors, 0);
-  return found.length > 0 ? found.join("; ") : undefined;
+  return found.length > 0 ? cutDetail(found.join("; ")) : undefined;
 }
 
 /**
@@ -223,6 +236,9 @@ export function assertHeaderValue(name: string, value: string): string {
 
 /** Check every `defaultHeaders` name (a token) and value; returns a copy. */
 function checkedHeaders(headers: Record<string, string>): Record<string, string> {
+  if (typeof headers !== "object" || headers === null || Array.isArray(headers)) {
+    throw new MastrValidationError(`Invalid defaultHeaders: expected an object of header names and values, got ${describeType(headers)}.`);
+  }
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
     assertValid("defaultHeaders name", name, headerNameProblem);
@@ -303,6 +319,67 @@ export function isTransientNetworkError(err: unknown): boolean {
   return hasTransientCode(err);
 }
 
+/** A value's type for a validation message: "null", "an array", "a string", … */
+function describeType(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "an array";
+  return `a ${typeof value}`;
+}
+
+/** Every EngineOptions key. */
+const OPTION_NAMES = [
+  "baseUrl",
+  "transport",
+  "userAgent",
+  "defaultHeaders",
+  "timeoutMs",
+  "maxRetries",
+  "retryDelayMs",
+  "maxResponseBytes",
+  "sleep",
+] as const satisfies ReadonlyArray<keyof EngineOptions>;
+
+/**
+ * Throw for a key that is not an option name. A JavaScript caller's typo (`timeout` for
+ * `timeoutMs`) was ignored silently and the default applied; TypeScript catches it at
+ * compile time, JavaScript does not. `extra` names options a wrapper (the client) adds.
+ */
+export function assertKnownOptions(options: object, extra: readonly string[] = []): void {
+  const names: readonly string[] = [...OPTION_NAMES, ...extra];
+  for (const [key, value] of Object.entries(options)) {
+    // An unset key (`proxy: undefined` from a spread config) changes nothing: skip it.
+    if (value === undefined || names.includes(key)) continue;
+    const lower = key.toLowerCase();
+    const hint = names.find((name) => name.toLowerCase().includes(lower) || lower.includes(name.toLowerCase()));
+    throw new MastrValidationError(
+      `Unknown option ${JSON.stringify(key)}` +
+        (hint === undefined ? `; the options are ${names.join(", ")}.` : ` (did you mean ${hint}?).`),
+    );
+  }
+}
+
+/**
+ * Read a function option: `undefined` gives the default; anything else that is not a
+ * function throws. A string `transport` used to fail at the first request, and a bad
+ * `sleep` as a raw TypeError on the first retry.
+ */
+function functionOption<F>(name: string, value: F | undefined, fallback: F): F {
+  if (value === undefined) return fallback;
+  if (typeof value !== "function") {
+    throw new MastrValidationError(`Invalid ${name}: expected a function, got ${describeType(value)}.`);
+  }
+  return value;
+}
+
+/** Engine options as given, or a MastrValidationError for a non-object (null counts as none). */
+export function optionsObject<T extends object>(options: T | null | undefined): T {
+  if (options === undefined || options === null) return {} as T;
+  if (typeof options !== "object" || Array.isArray(options)) {
+    throw new MastrValidationError(`Invalid options: expected an object, got ${describeType(options)}.`);
+  }
+  return options;
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -323,6 +400,10 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
+    // A JavaScript caller may pass null for "no options"; anything else must be an object
+    // with known keys.
+    options = optionsObject(options);
+    assertKnownOptions(options);
     // The raw value is checked before the trailing-slash strip, so "https://h/ "
     // cannot slip past it; only an omitted baseUrl selects the default.
     const baseUrl = options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl;
@@ -334,7 +415,7 @@ export class RequestEngine {
         return [raw];
       }
     });
-    this.transport = options.transport ?? nodeHttpTransport;
+    this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Header values are checked up front: a blank one would be sent as is, and a
     // CR/LF or a character above U+00FF would reach a custom transport raw or make
     // Node's HTTP layer throw an untyped ERR_INVALID_CHAR. Only an omitted
@@ -356,7 +437,7 @@ export class RequestEngine {
       Number.MAX_SAFE_INTEGER,
       DEFAULT_MAX_RESPONSE_BYTES,
     );
-    this.sleep = options.sleep ?? realSleep;
+    this.sleep = functionOption("sleep", options.sleep, realSleep);
   }
 
   /**
@@ -570,7 +651,7 @@ export class RequestEngine {
     // `detail` came from the response body (JSON field or text snippet); the `\s+`
     // collapse above does not remove ESC, so strip control characters before it can
     // reach stderr and inject terminal escape sequences.
-    if (detail !== undefined) detail = sanitizeServerText(detail);
+    if (detail !== undefined) detail = cutDetail(sanitizeServerText(detail));
     if (note !== undefined) detail = detail === undefined || detail === "" ? note : `${detail}; ${note}`;
     return new MastrApiError({ status, url, method: "GET", body: text, detail });
   }

@@ -45,6 +45,9 @@ const SHAPE =
  * the unfiltered set); compare with `filterColumns()`.
  */
 export function filterProblem(spec: string): string | undefined {
+  if (typeof spec !== "string") {
+    return `Expected the filter as a string (FilterName~op~'value'), got ${spec === null ? "null" : Array.isArray(spec) ? "an array" : typeof spec}.`;
+  }
   const parts = spec.split("~");
   let i = 0;
   for (let n = 1; ; n++) {
