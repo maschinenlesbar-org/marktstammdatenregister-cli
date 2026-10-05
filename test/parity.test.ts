@@ -68,7 +68,7 @@ test("parity: out-of-range timeout, retry and size-cap options are rejected on b
 test("parity: in-range timeout, retry and size-cap options are sent identically", async () => {
   for (const [argv, options] of [
     [["--max-retries", "10", "--timeout", "0", "--max-response-bytes", "0"], { maxRetries: 10, timeoutMs: 0, maxResponseBytes: 0 }],
-    [["--timeout", "2147483647", "--max-response-bytes", "1"], { timeoutMs: 2_147_483_647, maxResponseBytes: 1 }],
+    [["--timeout", "2147483647", "--max-response-bytes", "1000"], { timeoutMs: 2_147_483_647, maxResponseBytes: 1000 }],
   ] as const) {
     const { cli, lib } = await parity(["--compact", ...argv, "stromerzeugung"], (transport) =>
       new MastrClient({ transport, ...options }).stromerzeugung(),

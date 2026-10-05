@@ -3,9 +3,16 @@
 // JSON responses. MaStR's public search backend is an unauthenticated GET API whose
 // parameters travel in the query string.
 
-import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
+import {
+  MAX_TIMEOUT_MS,
+  nodeHttpTransport,
+  sizeLimitMessage,
+  type HttpRequest,
+  type HttpResponse,
+  type Transport,
+} from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { MastrApiError, MastrParseError } from "./errors.js";
+import { MastrApiError, MastrError, MastrNetworkError, MastrParseError, redactUrl } from "./errors.js";
 import {
   assertValid,
   baseUrlProblem,
@@ -47,7 +54,8 @@ export interface EngineOptions {
    */
   timeoutMs?: number;
   /**
-   * Number of automatic retries for transient (429/503) responses, an integer
+   * Number of automatic retries for transient (429/503) responses and reset
+   * connections (`isTransientNetworkError`), an integer
    * 0..`MAX_RETRIES` (10); defaults to 2. Each waits the response's `Retry-After`
    * (up to `MAX_RETRY_AFTER_MS`; a longer one is not retried), or else
    * `retryDelayMs * attempt`.
@@ -212,6 +220,78 @@ function checkedHeaders(headers: Record<string, string>): Record<string, string>
   return out;
 }
 
+/** Why `value` is not a usable HttpResponse, or undefined when it is. */
+function responseProblem(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null) return "not an object";
+  const r = value as Partial<Record<"status" | "headers" | "body", unknown>>;
+  if (typeof r.status !== "number" || !Number.isInteger(r.status) || r.status < 100 || r.status > 599) {
+    return "status is not an HTTP status code";
+  }
+  if (typeof r.headers !== "object" || r.headers === null || Array.isArray(r.headers)) return "headers is not an object";
+  if (bodyBytes(r.body) === undefined) return "body is not a Buffer, Uint8Array, other ArrayBuffer view or ArrayBuffer";
+  return undefined;
+}
+
+/**
+ * The response body as a Buffer (a view, no copy): a Buffer, any ArrayBuffer view (a
+ * Uint8Array from fetch, a DataView) or an ArrayBuffer/SharedArrayBuffer — checked by internal
+ * slot, not `instanceof`, so a value from another realm (a vm context, a Jest test) counts.
+ * Undefined for anything else.
+ */
+function bodyBytes(value: unknown): Buffer | undefined {
+  if (Buffer.isBuffer(value)) return value;
+  if (ArrayBuffer.isView(value)) return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  const tag = Object.prototype.toString.call(value);
+  if (tag === "[object ArrayBuffer]" || tag === "[object SharedArrayBuffer]") return Buffer.from(value as ArrayBuffer);
+  return undefined;
+}
+
+/**
+ * The response headers as a plain record with lower-case names. A transport built on
+ * `fetch` returns its `Headers` object, which has no plain properties (the engine then saw
+ * no Retry-After and no Content-Type at all); such an object, or a `Map` (anything with
+ * `get` and `forEach`), is copied into a record. A custom transport may also not
+ * lower-case the names ("Retry-After").
+ */
+function plainHeaders(headers: object): Record<string, string | string[] | undefined> {
+  const h = headers as { get?: unknown; forEach?: unknown };
+  const record: Record<string, string | string[] | undefined> = {};
+  if (typeof h.get === "function" && typeof h.forEach === "function") {
+    (h.forEach as (cb: (value: string, name: string) => void) => void).call(headers, (value, name) => {
+      record[String(name).toLowerCase()] = value;
+    });
+    return record;
+  }
+  for (const [name, value] of Object.entries(headers as Record<string, string | string[] | undefined>)) {
+    record[name.toLowerCase()] = value;
+  }
+  return record;
+}
+
+/**
+ * Error codes of a connection that broke off mid-request: Node's (`socket hang up` is
+ * ECONNRESET) and undici's (`fetch failed` with cause UND_ERR_SOCKET, "other side closed").
+ */
+const TRANSIENT_NETWORK_CODES = new Set(["ECONNRESET", "EPIPE", "ECONNABORTED", "UND_ERR_SOCKET"]);
+
+/** True when `err` or an error in its `cause` chain has a transient connection code. */
+function hasTransientCode(err: unknown, depth = 0): boolean {
+  if (typeof err !== "object" || err === null || depth > 4) return false;
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === "string" && TRANSIENT_NETWORK_CODES.has(code)) return true;
+  return hasTransientCode((err as { cause?: unknown }).cause, depth + 1);
+}
+
+/**
+ * True for a failure caused by a reset or aborted connection, which the engine retries —
+ * whichever transport raised it (a Node error, fetch's TypeError with an undici cause), the
+ * code anywhere in the `cause` chain. A refused connection, a DNS failure or a timeout is
+ * not transient in that sense and is not retried.
+ */
+export function isTransientNetworkError(err: unknown): boolean {
+  return hasTransientCode(err);
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -261,9 +341,41 @@ export class RequestEngine {
   }
 
   /**
+   * Call the transport under the overall deadline (`timeoutMs`): the request gets an
+   * AbortSignal that fires at the deadline, and the call rejects then whether the transport
+   * stops or not — a custom transport (fetch, a node:http wrapper) that ignores `timeoutMs`
+   * can't hang the caller. A synchronous throw becomes a rejection.
+   */
+  private async callTransport(request: HttpRequest): Promise<HttpResponse> {
+    const call = (signal?: AbortSignal): Promise<HttpResponse> =>
+      Promise.resolve().then(() => this.transport(signal === undefined ? request : { ...request, signal }));
+    if (this.timeoutMs === 0) return call();
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const err = new MastrNetworkError(`Request timed out after ${this.timeoutMs}ms`);
+        controller.abort(err);
+        reject(err);
+      }, this.timeoutMs);
+    });
+    try {
+      return await Promise.race([call(controller.signal), deadline]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
    * Perform a GET with Accept negotiation and transient-error retries. Redirects
    * are NOT followed — the canonical host answers directly, so a 3xx (e.g. a bad
    * base URL bouncing to a portal page) surfaces as an error.
+   *
+   * The engine enforces the transport contract itself, so it holds for a custom
+   * transport too: `timeoutMs` (an AbortSignal deadline), `maxResponseBytes` (checked on
+   * the body it gets back), any byte-array body, `Headers`/`Map`/any-case headers. Whatever
+   * a transport throws becomes a `MastrNetworkError`, and so does a malformed response; a
+   * reset connection (`isTransientNetworkError`) is retried like a 503.
    */
   async request(path: string, query?: QueryParams, accept = "application/json"): Promise<RawResponse> {
     const url = this.buildUrl(path, query);
@@ -278,20 +390,53 @@ export class RequestEngine {
 
     let attempt = 0;
     for (;;) {
-      const response = await this.transport({
-        method: "GET",
-        url,
-        headers,
-        timeoutMs: this.timeoutMs,
-        ...(this.maxResponseBytes > 0 ? { maxResponseBytes: this.maxResponseBytes } : {}),
-      });
+      let response: HttpResponse;
+      try {
+        response = await this.callTransport({
+          method: "GET",
+          url,
+          headers,
+          timeoutMs: this.timeoutMs,
+          ...(this.maxResponseBytes > 0 ? { maxResponseBytes: this.maxResponseBytes } : {}),
+        });
+      } catch (cause) {
+        // A connection the server (or a gateway) reset is the network-level twin of a 503:
+        // retry it, whichever transport reported it. Timeouts are not retried.
+        if (hasTransientCode(cause) && attempt < this.maxRetries) {
+          attempt += 1;
+          await this.sleep(this.retryDelayMs * attempt);
+          continue;
+        }
+        // The default transport rejects with MastrNetworkError only; an injected one may
+        // throw anything (fetch's TypeError, a string, null). Keep the library's contract:
+        // every failure is a MastrError.
+        if (cause instanceof MastrError) throw cause;
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        throw new MastrNetworkError(`GET ${redactUrl(url)} failed: ${sanitizeServerText(reason)}`, { cause });
+      }
 
+      // An injected transport may resolve with anything; a malformed HttpResponse would
+      // otherwise surface as a raw TypeError, or a missing status as a success.
+      const invalid = responseProblem(response);
+      if (invalid !== undefined) {
+        throw new MastrNetworkError(
+          `GET ${redactUrl(url)} failed: the transport returned an invalid response (${invalid}).`,
+        );
+      }
       const status = response.status;
+      const responseHeaders = plainHeaders(response.headers);
+      const body = bodyBytes(response.body) as Buffer;
+      // The size cap holds whatever the transport did: the default one aborts early, a
+      // custom one may have read everything.
+      if (this.maxResponseBytes > 0 && body.byteLength > this.maxResponseBytes) {
+        throw new MastrNetworkError(sizeLimitMessage(this.maxResponseBytes));
+      }
+
       const retryable = status === 429 || status === 503;
       if (retryable && attempt < this.maxRetries) {
         // Honour Retry-After; without a usable one, back off linearly. A Retry-After
         // beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at once.
-        const retryAfter = parseRetryAfter(response.headers["retry-after"]);
+        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
         if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
           attempt += 1;
           await this.sleep(retryAfter ?? this.retryDelayMs * attempt);
@@ -299,12 +444,12 @@ export class RequestEngine {
         }
       }
 
-      const contentType = String(response.headers["content-type"] ?? "");
+      const contentType = String(responseHeaders["content-type"] ?? "");
       if (status < 200 || status >= 300) {
-        throw this.toApiError(url, status, response.body);
+        throw this.toApiError(url, status, body);
       }
 
-      return { data: response.body, contentType, status };
+      return { data: body, contentType, status };
     }
   }
 

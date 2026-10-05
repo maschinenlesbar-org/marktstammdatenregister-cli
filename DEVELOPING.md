@@ -71,6 +71,18 @@ The engine sends `X-Requested-With: XMLHttpRequest` (the endpoint is an XHR back
 Redirects are **not** followed — a 3xx (e.g. a wrong base URL bouncing to a portal
 page) surfaces as an error and maps to the usage exit code.
 
+**Custom transports.** The engine enforces the transport contract itself, so the
+documented limits hold for a `fetch` or `node:http` transport too. Every call runs under
+the overall `timeoutMs` deadline: the request carries an `AbortSignal`
+(`HttpRequest.signal`, honoured by the default transport) that fires at the deadline, and
+the call rejects then whether the transport stops or not. `maxResponseBytes` is checked on
+the body any transport returns (the message names `--max-response-bytes` too). A body may be
+a Buffer, any `ArrayBuffer` view (fetch's `Uint8Array`, from any realm) or an `ArrayBuffer`;
+headers a plain record in any case, a `Headers` object or a `Map`. Whatever a transport
+throws, and a response without a valid status, headers or body, becomes a
+`MastrNetworkError`; a reset reported as `ECONNRESET`/`EPIPE`/`ECONNABORTED` or undici's
+`UND_ERR_SOCKET` anywhere in the `cause` chain is retried like a 503.
+
 **Credentials in the base URL.** A `user:password@` in `--base-url` (a mirror behind a
 login) is sent as HTTP Basic auth and never printed. `run()` starts with
 `withRedactedOutput(deps, argv)`: it collects the exact userinfo of every argument and of
@@ -129,7 +141,7 @@ outcome.
 
 - **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 20/22/24.
 - **Exit codes** (`run.ts`): help/version → 0; usage → 2; 404 → 4; network → 6; other → 1.
-- Retry transient `429`/`503` up to `maxRetries`, waiting the `Retry-After` (seconds or an
+- Retry transient `429`/`503` (and reset connections, `isTransientNetworkError`) up to `maxRetries`, waiting the `Retry-After` (seconds or an
   IMF-fixdate, `parseRetryAfter`; above `MAX_RETRY_AFTER_MS` = 30 s no retry, the error
   surfaces at once), else `retryDelayMs * attempt`; only `http:`/`https:` base URLs.
 - **Scaffold origin:** scaffolded from `entgeltatlas-cli` (GET + query transport); the
