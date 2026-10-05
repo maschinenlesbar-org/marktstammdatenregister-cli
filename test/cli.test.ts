@@ -409,3 +409,15 @@ test("a repeated single-value option is a usage error, not the last one winning"
     assert.match(cli.err.join("\n"), /was given more than once/, argv.join(" "));
   }
 });
+
+test("a quoted empty --filter value is a usage error before any request (finding 01#2)", async () => {
+  for (const spec of ["Energieträger~eq~''", "Ort~eq~' '", "Bruttoleistung der Einheit~gt~''", "Ort~eq~'x'~and~Ort~ct~''"]) {
+    const cli = makeCli(registerResponder(fx.unitPage));
+    assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 2, spec);
+    assert.equal(cli.mt.calls.length, 0, spec);
+    assert.match(cli.err.join("\n"), /has no value: '' is only for null\/nn/, spec);
+  }
+  // null/nn keep their ''.
+  const cli = makeCli(registerResponder(fx.unitPage));
+  assert.equal(await run(["stromerzeugung", "--filter", "Ort~null~''", "--total"], cli.deps), 0);
+});

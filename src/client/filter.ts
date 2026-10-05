@@ -33,7 +33,8 @@ const SHAPE =
  *
  * - every condition has a non-blank FilterName, a known lower-case operator and a
  *   value (`''` for `null`/`nn`: `Ort~null` without a value is ignored upstream and
- *   returns the unfiltered register; a blank value for the other operators);
+ *   returns the unfiltered register); for the other operators the value is not blank,
+ *   quoted (`''`, `' '`) or not;
  * - a value that starts with a single quote ends with one;
  * - conditions are joined by `and` only, and nothing dangles at the end.
  *
@@ -72,6 +73,12 @@ export function filterProblem(spec: string): string | undefined {
     }
     if (!UNARY_OPERATORS.has(op) && value.trim() === "") {
       return `Condition ${n} ("${name}~${op}") has no value. ${SHAPE}`;
+    }
+    // A quoted blank value ('' or ' ') is no value either: on a text column it matches
+    // nothing, and on a dropdown the live register did not answer within 30 s
+    // (2026-10-05). Only null/nn take ''.
+    if (!UNARY_OPERATORS.has(op) && /^'\s*'$/.test(value.trim())) {
+      return `Condition ${n} ("${name}~${op}~${value.trim()}") has no value: '' is only for null/nn. ${SHAPE}`;
     }
     if (value.startsWith("'") && (value.length < 2 || !value.endsWith("'"))) {
       // A later part that closes the quote means the value itself held a "~".

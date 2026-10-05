@@ -84,3 +84,10 @@ test("buildFilter normalises names and writes numbers without exponent; NaN and 
     );
   }
 });
+
+test("filterProblem refuses a quoted empty value except for null/nn (finding 01#2)", () => {
+  assert.match(filterProblem("Energieträger~eq~''") ?? "", /Condition 1 \("Energieträger~eq~''"\) has no value: '' is only for null\/nn/);
+  assert.match(filterProblem("Ort~ct~'  '") ?? "", /has no value/);
+  assert.equal(filterProblem("Ort~nn~''"), undefined);
+  assert.equal(filterProblem("Ort~eq~' x '"), undefined);
+});
