@@ -356,3 +356,19 @@ test("allowUnknownFilters sends the normalised filter without the column check (
   assert.equal(queryOf(mt.last()).get("filter"), "Neue Spalte~eq~'1'");
   assert.throws(() => new MastrClient({ allowUnknownFilters: "yes" as unknown as boolean }), MastrValidationError);
 });
+
+test("null/nn on a number, dropdown or boolean column is a validation error; on text, date and MaStR-number columns it goes out (finding 06#1)", async () => {
+  const mt = makeMockTransport(registerResponder(fx.unitPage));
+  const client = new MastrClient({ transport: mt.transport });
+  for (const filter of ["Bruttoleistung der Einheit~null~''", "Energieträger~null~''", "Bürgerenergie~nn~''", "Bürgerenergie~null~''"]) {
+    await assert.rejects(
+      client.count("stromerzeugung", { filter }),
+      (err: unknown) => err instanceof MastrValidationError && /the register answers null\/nn on number, dropdown and boolean columns with an error/.test(err.message),
+      filter,
+    );
+  }
+  for (const filter of ["Ort~null~''", "Inbetriebnahmedatum der Einheit~nn~''", "MaStR-Nr. der Einheit~nn~''"]) {
+    await client.count("stromerzeugung", { filter });
+    assert.equal(queryOf(mt.last()).get("filter"), filter);
+  }
+});

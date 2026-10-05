@@ -22,6 +22,13 @@ const UNARY_OPERATORS: ReadonlySet<string> = new Set(["null", "nn"]);
 
 const OPERATORS: ReadonlySet<string> = new Set(FILTER_OPERATORS);
 
+/**
+ * Column types on which the register refuses `null`/`nn` with `{"Error":true}` (live
+ * 2026-10-05: `Bruttoleistung der Einheit`, `Energieträger`, `Bürgerenergie`). They work on
+ * text columns; date and MaStR-number columns are untested and left to the register.
+ */
+const NO_NULL_TEST_TYPES: ReadonlySet<string> = new Set(["number", "multidropdown", "boolean"]);
+
 const SHAPE =
   "Expected FilterName~op~'value' (e.g. Energieträger~eq~'2495'), several joined by ~and~.";
 
@@ -307,7 +314,9 @@ function unquote(value: string): string {
  *   included — is rejected with up to three close names;
  * - for `eq`/`neq` on a dropdown column, a value that is not one of its codes: an unknown
  *   code gives 0 rows, a label (`'Wind'`) or junk in a comma list `{"Error":true}`. A label
- *   is named with its code.
+ *   is named with its code;
+ * - `null`/`nn` on a number, dropdown or boolean column, which the register answers with
+ *   `{"Error":true}` (they work on text columns).
  *
  * `spec` must already pass {@link filterProblem} (the client normalises and checks it first).
  */
@@ -339,6 +348,14 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
     }
     parts[i] = column.FilterName!;
     const op = parts[i + 1]!;
+    if (UNARY_OPERATORS.has(op) && NO_NULL_TEST_TYPES.has(String(column.Type))) {
+      throw new MastrValidationError(
+        `Invalid filter: ${op} (condition ${n}) doesn't work on the ${String(column.Type)} column ` +
+          `${JSON.stringify(column.FilterName)}: the register answers null/nn on number, dropdown and ` +
+          "boolean columns with an error (they work on text columns). There is no way to ask for " +
+          "the units without a value in such a column.",
+      );
+    }
     const value = unquote(parts[i + 2]!.trim());
     const codes = (column.ListObject ?? []).filter(
       (o): o is { Name?: string; Value: string } => typeof o?.Value === "string",

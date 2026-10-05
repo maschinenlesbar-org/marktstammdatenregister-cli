@@ -49,7 +49,9 @@ FilterName~op~'value'~and~FilterName~op~'value'~…
 ```
 
 - **operators:** `eq` (=), `neq` (≠), `sw` (starts-with), `ct` (contains),
-  `nct` (not-contains), `ew` (ends-with), `null` (empty), `nn` (not empty), and for
+  `nct` (not-contains), `ew` (ends-with), `null` (empty) and `nn` (not empty) — these two
+  on text columns only: the register refuses them on number, dropdown and boolean columns,
+  so the CLI rejects that (exit 2) — and for
   `number`/`date` columns `gt` (>) and `lt` (<). `gt`/`lt` are strict; there is no
   `gte`/`lte`. An unknown or upper-case operator is rejected (exit 2) — the register
   would return 0 rows for it
