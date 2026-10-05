@@ -64,7 +64,10 @@ FilterName~op~'value'~and~FilterName~op~'value'~…
 - **checked before sending:** every condition needs a FilterName, a known operator and
   a value, a value that opens a single quote must close it, conditions are joined by
   `~and~` only, and nothing may dangle at the end (`…~and~`). Anything else is a usage
-  error (exit 2). The FilterName itself can't be checked (see below)
+  error (exit 2). The FilterName itself can't be checked (see below), but it is sent
+  normalised: Unicode NFC (a decomposed `ä` from macOS input becomes `ä`), without
+  surrounding whitespace, inner runs of spaces as one — the register matches names exactly
+  and ignores one that differs only so
 - **conjunction:** only `and`. **There is no working `or`:** the register keeps only the
   part before the first `~or~` and silently drops the rest (a wrong count, no error), so
   the CLI rejects `~or~` (exit 2). For an OR between codes of **one dropdown column**,

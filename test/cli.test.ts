@@ -377,3 +377,10 @@ test("bidi controls from the server are stripped on stderr and escaped on stdout
   assert.match(text, /PV\\u202e1/);
   assert.equal((JSON.parse(text) as { data: { EinheitName: string }[] }).data[0]?.EinheitName, `PV${RLO}1`);
 });
+
+test("--filter FilterNames go out as NFC without padding (finding 01#1)", async () => {
+  const cli = makeCli(registerResponder(fx.unitPage));
+  const spec = "Energietra\u0308ger~eq~'2495'~and~ Bundesland~eq~'1403'";
+  assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 0);
+  assert.equal(queryOf(cli.mt.last()).get("filter"), "Energieträger~eq~'2495'~and~Bundesland~eq~'1403'");
+});

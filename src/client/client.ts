@@ -12,7 +12,7 @@
 
 import { RequestEngine, describeMastrErrors, type EngineOptions } from "./engine.js";
 import { MastrApiError, MastrParseError, MastrValidationError } from "./errors.js";
-import { validateFilter } from "./filter.js";
+import { normalizeFilter, validateFilter } from "./filter.js";
 import { assertValid, countQueryProblem, sortProblem } from "./validate.js";
 import type { QueryParams } from "./query.js";
 import type { CountQuery, FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery } from "./types.js";
@@ -139,13 +139,16 @@ export class MastrClient {
     checkPaging("page", query.page, MAX_PAGE);
     checkPaging("pageSize", query.pageSize, MAX_PAGE_SIZE);
     if (query.sort !== undefined) assertValid("sort", query.sort, sortProblem);
-    if (query.filter !== undefined) validateFilter(query.filter);
+    // The FilterNames are normalised (NFC, trimmed) first: the register ignores a name it
+    // doesn't match exactly and answers with the unfiltered set.
+    const filter = query.filter === undefined ? undefined : normalizeFilter(query.filter);
+    if (filter !== undefined) validateFilter(filter);
     const params: QueryParams = {
       sort: query.sort ?? "",
       page: query.page ?? DEFAULT_PAGE,
       pageSize: query.pageSize ?? DEFAULT_PAGE_SIZE,
       group: "",
-      filter: query.filter ?? "",
+      filter: filter ?? "",
     };
     const path = `${SERVICE}/GetErweiterteOeffentlicheEinheit${suffix}`;
     const res = await this.engine.getJson<unknown>(path, params);

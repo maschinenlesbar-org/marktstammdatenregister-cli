@@ -105,6 +105,33 @@ export function filterProblem(spec: string): string | undefined {
   }
 }
 
+/**
+ * A FilterName as the register spells it, as far as that can be told without its column
+ * list: Unicode NFC, no surrounding whitespace, inner whitespace runs as one space. The
+ * register matches FilterNames exactly and silently ignores one it doesn't know, so
+ * `Energieträger` typed with a decomposed "ä" (macOS input: `a` + U+0308) or with a space
+ * after `~and~` returned the unfiltered set (live 2026-10-05: 9 562 366 instead of 6 545 851).
+ * The register's own names are NFC, never padded and never hold two spaces in a row, so this
+ * can't turn a valid name into another one.
+ */
+export function normalizeFilterName(name: string): string {
+  return name.normalize("NFC").trim().replace(/\s+/g, " ");
+}
+
+/**
+ * The spec with every FilterName normalised ({@link normalizeFilterName}); the operators,
+ * values and `and`s are left as they are. The spec is split the way the register splits it,
+ * on every `~`: names are parts 0, 4, 8, … A malformed spec comes back with its names
+ * normalised too; {@link filterProblem} then reports it. A non-string is returned as is.
+ */
+export function normalizeFilter(spec: string): string {
+  if (typeof spec !== "string") return spec;
+  return spec
+    .split("~")
+    .map((part, i) => (i % 4 === 0 ? normalizeFilterName(part) : part))
+    .join("~");
+}
+
 /** One condition for {@link buildFilter}. */
 export interface FilterCondition {
   /** The FilterName, e.g. `"Ort"` or `"Energieträger"` (see `filterColumns()`). */
@@ -157,7 +184,12 @@ export function buildFilter(conditions: readonly FilterCondition[]): string {
           `Invalid filter: condition ${n} ("${c.name}") needs a non-blank value, got ${JSON.stringify(item)}.`,
         );
       }
-      const text = String(item);
+      if (typeof item === "number" && !Number.isFinite(item)) {
+        throw new MastrValidationError(
+          `Invalid filter: condition ${n} ("${c.name}") needs a finite number, got ${String(item)}.`,
+        );
+      }
+      const text = typeof item === "number" ? plainNumber(item) : item;
       if (text.includes("~")) {
         throw new MastrValidationError(
           `Invalid filter: the value ${JSON.stringify(text)} in condition ${n} contains "~", which the ` +
@@ -174,12 +206,24 @@ export function buildFilter(conditions: readonly FilterCondition[]): string {
     });
     return `${c.name}~${c.op}~'${texts.join(",")}'`;
   });
-  const spec = parts.join("~and~");
+  const spec = normalizeFilter(parts.join("~and~"));
   validateFilter(spec);
   return spec;
 }
 
-/** Throw a {@link MastrValidationError} if {@link filterProblem} finds a problem. */
+/**
+ * A number as the register reads it: decimal point, no exponent, no grouping. `String()`
+ * writes `1e-7` and `1e+21`, which the register answers with `{"Error":true}`.
+ */
+function plainNumber(n: number): string {
+  const text = String(n);
+  return /e/i.test(text) ? n.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 20 }) : text;
+}
+
+/**
+ * Throw a {@link MastrValidationError} if {@link filterProblem} finds a problem. It checks
+ * the spec as given; the client checks (and sends) the {@link normalizeFilter}ed spec.
+ */
 export function validateFilter(spec: string): void {
   const problem = filterProblem(spec);
   if (problem !== undefined) throw new MastrValidationError(`Invalid filter: ${problem}`);
