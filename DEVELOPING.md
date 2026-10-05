@@ -71,6 +71,15 @@ The engine sends `X-Requested-With: XMLHttpRequest` (the endpoint is an XHR back
 Redirects are **not** followed — a 3xx (e.g. a wrong base URL bouncing to a portal
 page) surfaces as an error and maps to the usage exit code.
 
+**Credentials in the base URL.** A `user:password@` in `--base-url` (a mirror behind a
+login) is sent as HTTP Basic auth and never printed. `run()` starts with
+`withRedactedOutput(deps, argv)`: it collects the exact userinfo of every argument and of
+the value part of every `--opt=value` token (`credentialsIn`, which also handles values that
+don't parse as a URL and the scheme-less `user:pw@host`) and redacts those strings, raw and
+JSON-quoted, from every line the CLI prints — commander's usage errors echo rejected values,
+and a pattern can't delimit a password holding a space, quote, `#`, `?` or `/`.
+`redactUrl` falls back to the same exact-string redaction for a value that doesn't parse.
+
 The client validates its own inputs before any request, for library callers the CLI's
 parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),
 `pageSize` outside 1..`MAX_PAGE_SIZE` (5000), a blank or whitespace-only `sort`

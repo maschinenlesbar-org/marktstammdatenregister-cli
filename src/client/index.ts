@@ -41,6 +41,8 @@ export {
   MastrValidationError,
   MastrParseError,
   redactUrl,
+  credentialsIn,
+  redactCredentials,
 } from "./errors.js";
 
 export * from "./types.js";
