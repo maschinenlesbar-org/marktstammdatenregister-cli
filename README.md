@@ -45,7 +45,8 @@ mastr filters stromerzeugung                        # the filterable columns + d
 Categories: `stromerzeugung`, `stromverbrauch`, `gaserzeugung`, `gasverbrauch`.
 
 **Filtering** uses the register's own syntax — `FilterName~op~'value'~and~…`
-(ops `eq|neq|sw|ct|nct|ew|null|nn`, plus the strict `gt`/`lt` for numbers and dates);
+(ops `eq|neq|sw|ct|nct|ew|null|nn`, plus the strict `gt`/`lt` — meant for numbers and dates,
+but the register applies them to text and dropdown columns too, comparing the text or the code);
 there is **no working `~or~`** (the register drops everything after it, so the CLI
 rejects it) — for several codes of one dropdown, list them in one value:
 `Energieträger~eq~'2497,2498'`. Discover the German field names and dropdown codes with `mastr filters <category>`.

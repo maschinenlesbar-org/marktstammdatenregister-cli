@@ -53,7 +53,10 @@ FilterName~op~'value'~and~FilterName~op~'value'~…
   on text columns only: the register refuses them on number, dropdown and boolean columns,
   so the CLI rejects that (exit 2) — and for
   `number`/`date` columns `gt` (>) and `lt` (<). `gt`/`lt` are strict; there is no
-  `gte`/`lte`. An unknown or upper-case operator is rejected (exit 2) — the register
+  `gte`/`lte`. The register applies them to text and dropdown columns as well (checked live
+  2026-10-05: `Ort~gt~'A'` keeps a Münster unit, `Ort~gt~'Z'` drops it; on a dropdown they
+  compare the code, `Energieträger~gt~'2000'`) — the text comparison is the register's own
+  (its order for umlauts and case isn't documented), so prefer `eq`/`sw`/`ct` there. An unknown or upper-case operator is rejected (exit 2) — the register
   would return 0 rows for it
 - **value:** single-quoted; for a dropdown use its **code** (`Value`), not its label;
   decimals take a point (`'4999.999'`) and no thousands separator (`'5.000'` means 5),
