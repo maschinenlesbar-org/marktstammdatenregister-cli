@@ -62,7 +62,10 @@ sanity-check with `--total`; sort keys are record field names
 `/Date(ms)/` strings — add `--iso-dates` to convert them to ISO-8601.
 
 Global flags: `--base-url`, `--timeout`, `--user-agent`, `--max-retries`,
-`--max-response-bytes`, `--compact`, `--iso-dates`. See [Usage.md](Usage.md).
+`--max-response-bytes`, `--compact`, `--iso-dates`. See [Usage.md](Usage.md). A `--base-url`
+on plain `http:` to a host other than loopback prints one `warning: … sent unencrypted …`
+line on stderr before the first request (stdout and the exit code are unchanged); the
+library's check is `cleartextProblem(baseUrl)`.
 
 ## Library
 

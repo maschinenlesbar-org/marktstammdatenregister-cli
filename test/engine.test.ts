@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RequestEngine, parseRetryAfter, sanitizeServerText } from "../src/client/engine.js";
+import { RequestEngine, cleartextProblem, parseRetryAfter, sanitizeServerText } from "../src/client/engine.js";
 import { MastrApiError, MastrParseError, MastrValidationError, redactUrl } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -246,4 +246,22 @@ test("getJson decodes the body by its declared charset (finding 03#4) and drops 
   assert.deepEqual(await e2.getJson("/x"), { a: 1 });
   const e3 = new RequestEngine({ transport: body(Buffer.from("{}"), "application/json; charset=x-bogus") });
   await assert.rejects(e3.getJson("/x"), (e: unknown) => e instanceof MastrParseError && /Unsupported response charset "x-bogus"/.test((e as Error).message));
+});
+
+test("cleartextProblem: wording, loopback and https exemptions", () => {
+  for (const quiet of ["https://a.example", "not a url", "http://localhost:8080", "http://127.1.2.3", "http://[::1]:9", "http://LOCALHOST."]) {
+    assert.equal(cleartextProblem(quiet), undefined, quiet);
+  }
+  assert.equal(cleartextProblem("http://a.example:8080/MaStR"), "requests to a.example:8080 are sent unencrypted (http:, not https:)");
+  assert.equal(
+    cleartextProblem("http://u:pw@a.example"),
+    "the base URL's credentials are sent unencrypted to a.example (http:, not https:)",
+  );
+  assert.equal(cleartextProblem("http://a.example", ["the API key"]), "the API key is sent unencrypted to a.example (http:, not https:)");
+  assert.equal(
+    cleartextProblem("http://u:pw@a.example", ["the API key"]),
+    "the API key and the base URL's credentials are sent unencrypted to a.example (http:, not https:)",
+  );
+  // A host that only starts like a loopback name still warns.
+  assert.match(cleartextProblem("http://127.0.0.1.example") ?? "", /127\.0\.0\.1\.example/);
 });

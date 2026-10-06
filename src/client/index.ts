@@ -16,6 +16,7 @@ export {
   RequestEngine,
   assertHeaderValue,
   validateBaseUrl,
+  cleartextProblem,
   DEFAULT_BASE_URL,
   MAX_RETRIES,
   MAX_RETRY_AFTER_MS,

@@ -226,6 +226,44 @@ export function validateBaseUrl(raw: string): string {
 }
 
 /**
+ * Say what a base URL on plain `http:` sends unencrypted, or `undefined` when nothing is.
+ *
+ * Returns `undefined` for `https:`, for a value that doesn't parse as a URL, and for a
+ * loopback host (`localhost`, `127.0.0.0/8`, `::1`), where nothing crosses the network.
+ * Otherwise one sentence without a `warning: ` prefix, naming the host (`url.host`: host
+ * and port, never the userinfo) and what travels with the requests:
+ * - nothing secret: `requests to <host> are sent unencrypted (http:, not https:)`;
+ * - userinfo in the URL: `the base URL's credentials are sent unencrypted to <host> (…)`;
+ * - other secrets, given as noun phrases in `secrets` (e.g. `"the API key"`), are joined
+ *   with the userinfo phrase by "and".
+ * Never the password or key itself. The CLI prints it once per run as `warning: …` on
+ * stderr; the register needs no secret, so it passes none.
+ */
+export function cleartextProblem(baseUrl: string, secrets: readonly string[] = []): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "http:" || isLoopbackHost(url.hostname)) return undefined;
+  const userinfo = url.username !== "" || url.password !== "";
+  const sent = userinfo ? [...secrets, "the base URL's credentials"] : [...secrets];
+  const scheme = "(http:, not https:)";
+  if (sent.length === 0) return `requests to ${url.host} are sent unencrypted ${scheme}`;
+  // "credentials" is plural; a single other phrase ("the API key") takes "is".
+  const verb = sent.length === 1 && !userinfo ? "is" : "are";
+  return `${sent.join(" and ")} ${verb} sent unencrypted to ${url.host} ${scheme}`;
+}
+
+/** True for `localhost`, an IPv4 address in 127.0.0.0/8, and `::1` (as `URL.hostname` spells them). */
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (host === "localhost" || host === "[::1]") return true;
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+}
+
+/**
  * Check a value bound for an HTTP header (`headerValueProblem`) and return it, or
  * throw a MastrValidationError (`Invalid <name>: <reason>`). The engine runs it on
  * `userAgent` and every `defaultHeaders` value before any request.

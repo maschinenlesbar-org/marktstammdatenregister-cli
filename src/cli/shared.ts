@@ -8,7 +8,7 @@ import type { MastrClientOptions } from "../client/client.js";
 import { isoifyDates } from "../client/client.js";
 import { MastrParseError } from "../client/errors.js";
 import { filterProblem, normalizeFilter } from "../client/filter.js";
-import { isBidiControl } from "../client/engine.js";
+import { DEFAULT_BASE_URL, cleartextProblem, isBidiControl } from "../client/engine.js";
 import {
   baseUrlProblem,
   headerValueProblem,
@@ -196,6 +196,10 @@ export function action(
     const command = args[args.length - 1] as Command;
     const positionals = args.slice(0, Math.max(0, args.length - 2)) as string[];
     const global = command.optsWithGlobals() as GlobalOptions;
+    // Once per run, before the first request: a remote plain-http base URL sends every
+    // request (and any userinfo in it) unencrypted. stderr only; the run goes ahead.
+    const cleartext = cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL);
+    if (cleartext !== undefined) deps.io.err(`warning: ${cleartext}`);
     const client = deps.createClient(toEngineOptions(global));
     await fn({ client, global, opts: command.opts() }, positionals);
   };

@@ -159,10 +159,18 @@ outcome.
   unknown, misspelled or `__proto__` key or FilterName, arrays and NaN, unnormalised names,
   a repeated `--filter` and a repeated single-value option. Test helpers answer the client's
   filter-columns request from `fixtures.filterColumns` (`registerResponder`, `withColumns`).
+  **P20** the plain-`http:` warning (follow-up round 2026-10-06): one `warning: …` line on
+  stderr for a remote `http:` base URL, naming the host and, without printing them, the
+  URL's credentials; none for `https:`, loopback or `--help`; stdout unchanged; the library
+  exports `cleartextProblem` (the env-var and other-secret cases are skipped: mastr reads no
+  environment variable and sends no key).
 
 ## Conventions to keep
 
 - **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 22/24 (`engines`: Node.js 22.12 or later, the floor commander 15 declares).
+- **Plain `http:`** (`engine.ts` `cleartextProblem`, called once per run by `shared.ts`
+  `action()` before the client is built): a remote `http:` base URL gets one
+  `warning: <sentence>` line on stderr; stdout and the exit code don't change.
 - **Exit codes** (`run.ts`): help/version → 0; usage → 2; 404 → 4; network → 6; other → 1.
 - **Closed pipes** (`io.ts` `handleOutputErrors`, installed by the bin shim before `run()`):
   an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly — so does ENOTCONN,

@@ -10,7 +10,7 @@ mastr [global options] <command> [command options]
 
 | Option | Description |
 |---|---|
-| `--base-url <url>` | API base URL (default `https://www.marktstammdatenregister.de/MaStR`; http/https, a path prefix is fine, no `?query`, `#fragment`, whitespace or control characters; a `user:password@` is sent as Basic auth, never printed, and a literal `%` in it is written `%25`) |
+| `--base-url <url>` | API base URL (default `https://www.marktstammdatenregister.de/MaStR`; http/https, a path prefix is fine, no `?query`, `#fragment`, whitespace or control characters; a `user:password@` is sent as Basic auth, never printed, and a literal `%` in it is written `%25`). A remote plain-`http:` URL prints one `warning: requests to <host> are sent unencrypted (http:, not https:)` line on stderr before the first request — `the base URL's credentials are sent unencrypted to <host> …` when it carries a `user:password@`; loopback hosts (`localhost`, `127.0.0.0/8`, `::1`) and `https:` don't warn, and stdout and the exit code are unchanged |
 | `--timeout <ms>` | time limit per request in ms, whole response included (0 = no timeout; at most 2147483647) |
 | `--user-agent <ua>` | User-Agent header value (not blank; Latin-1 without control characters, tab is fine) |
 | `--max-retries <n>` | retries for transient 429/503 responses and reset connections (0..10; each waits 200 ms, 400 ms, … or the server's `Retry-After` when that is longer, up to 30 s — a longer one is not retried, and the error names the requested wait) |
