@@ -182,12 +182,12 @@ test("a malformed Retry-After falls back to the linear backoff", async () => {
   }
 });
 
-test("a Retry-After above 30 s is not retried: the error surfaces at once", async () => {
+test("a Retry-After above 30 s waits the 30 s cap, then retries", async () => {
   for (const long of ["31", "99999999999", new Date(Date.now() + 3_600_000).toUTCString()]) {
     const r = retryRun(long);
     await assert.rejects(() => r.e.getJson("/x"), (err) => err instanceof MastrApiError && err.status === 429);
-    assert.deepEqual(r.delays, [], long);
-    assert.equal(r.calls(), 1, long);
+    assert.deepEqual(r.delays, [30_000, 30_000], long);
+    assert.equal(r.calls(), 3, long);
   }
 });
 

@@ -68,7 +68,7 @@ export interface EngineOptions {
    * connections (`isTransientNetworkError`), an integer
    * 0..`MAX_RETRIES` (10); defaults to 2. Each waits `retryDelayMs * attempt`, or the
    * response's `Retry-After` when that is longer. A `Retry-After` above
-   * `MAX_RETRY_AFTER_MS` is not retried: the MastrApiError names the requested wait.
+   * `MAX_RETRY_AFTER_MS` waits that cap (30 s) and then retries.
    */
   maxRetries?: number;
   /**
@@ -101,10 +101,9 @@ function intOption(name: string, value: number | undefined, max: number, fallbac
 }
 
 /**
- * Longest `Retry-After` the engine waits out before retrying a 429/503. When the
- * server asks for longer, the engine does not retry at all and surfaces the error at
- * once: retrying early would only land inside the window the server asked us to wait
- * out, and a hostile value must not stall the CLI.
+ * Longest `Retry-After` the engine waits before retrying a 429/503. When the server asks
+ * for longer, the engine waits this cap and retries (as most of the *-cli clients do): a
+ * hostile or careless value must not stall the CLI, and `maxRetries` still bounds the run.
  */
 export const MAX_RETRY_AFTER_MS = 30_000;
 
@@ -618,28 +617,19 @@ export class RequestEngine {
       }
 
       const retryable = status === 429 || status === 503;
-      // A Retry-After beyond MAX_RETRY_AFTER_MS is not retried: retrying early would land
-      // inside the window the server asked us to wait out, and a hostile value must not stall
-      // the CLI. The error then names the requested wait, so a script knows when to try again.
-      const retryAfter = retryable ? parseRetryAfter(responseHeaders["retry-after"]) : undefined;
       if (retryable && attempt < this.maxRetries) {
-        if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
-          attempt += 1;
-          // The linear backoff is the floor: a Retry-After can make a wait longer, never
-          // shorter. `Retry-After: 0` or a date in the past turned the retries into a
-          // zero-delay burst against a register that had just answered 429/503.
-          const backoff = this.retryDelayMs * attempt;
-          await this.sleep(retryAfter === undefined ? backoff : Math.max(retryAfter, backoff));
-          continue;
-        }
-        throw this.toApiError(
-          url,
-          status,
-          body,
-          `the server asked to wait ${Math.ceil(retryAfter / 1000)} s (Retry-After) before trying again, ` +
-            `longer than the ${MAX_RETRY_AFTER_MS / 1000} s the client waits, so it was not retried; ` +
-            "retrying sooner won't help",
+        // A Retry-After beyond MAX_RETRY_AFTER_MS waits the cap: a hostile value must not
+        // stall the CLI, and maxRetries still bounds the run.
+        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
+        attempt += 1;
+        // The linear backoff is the floor: a Retry-After can make a wait longer, never
+        // shorter. `Retry-After: 0` or a date in the past turned the retries into a
+        // zero-delay burst against a register that had just answered 429/503.
+        const backoff = this.retryDelayMs * attempt;
+        await this.sleep(
+          retryAfter === undefined ? backoff : Math.max(Math.min(retryAfter, MAX_RETRY_AFTER_MS), backoff),
         );
+        continue;
       }
 
       const contentType = String(responseHeaders["content-type"] ?? "");

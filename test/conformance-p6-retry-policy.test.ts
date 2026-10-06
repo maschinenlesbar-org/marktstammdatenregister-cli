@@ -20,7 +20,7 @@ const RETRY_AFTER_CAP_MS = 30_000;
  * What a Retry-After above the ceiling does (the guide lets each repo pick one): "wait-cap"
  * waits the ceiling and retries; "fail" doesn't retry and the error names the requested wait.
  */
-const ABOVE_CAP = "fail" as "wait-cap" | "fail";
+const ABOVE_CAP = "wait-cap" as "wait-cap" | "fail";
 /** The error class that "fail" raises. */
 const AboveCapError = ApiError;
 // --------------------------------------------------------------------------------------
