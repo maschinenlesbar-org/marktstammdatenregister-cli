@@ -73,7 +73,11 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
       once("--max-response-bytes", parseIntArg),
     )
     .option("--compact", "print JSON on a single line instead of pretty-printed")
-    .option("--iso-dates", "rewrite MaStR /Date(ms)/ timestamps to ISO-8601")
+    .option(
+      "--iso-dates",
+      "rewrite MaStR /Date(ms)/ timestamps to ISO-8601: dates as YYYY-MM-DD, times in German " +
+        "time with their offset (2026-10-06T10:40:00+02:00)",
+    )
     .showHelpAfterError();
 
   registerCommands(program, deps);

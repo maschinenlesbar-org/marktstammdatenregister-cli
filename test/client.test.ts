@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MastrClient, parseMsDate, isoifyDates } from "../src/client/client.js";
+import { MastrClient, formatMastrDate, parseMsDate, isoifyDates } from "../src/client/client.js";
 import { MastrApiError, MastrParseError, MastrValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, queryOf, registerResponder } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -107,8 +107,8 @@ test("isoifyDates recursively rewrites /Date(ms)/ strings", () => {
   // Rebuilt objects have a null prototype (prototype-pollution hardening), so
   // compare the JSON projection — the own enumerable data is what downstream sees.
   assert.deepEqual(JSON.parse(JSON.stringify(out)), {
-    a: "1970-01-01T00:00:00.000Z",
-    b: [{ c: "1970-01-01T00:00:01.000Z" }],
+    a: "1970-01-01",
+    b: [{ c: "1970-01-01T01:00:01+01:00" }],
     d: "plain",
     e: 5,
   });
@@ -130,7 +130,7 @@ test("isoifyDates does not reparent or pollute on an attacker '__proto__' key", 
   const out = isoifyDates(hostile) as Record<string, unknown>;
 
   // The date field is still transformed as usual.
-  assert.equal(out["ok"], "1970-01-01T00:00:00.000Z");
+  assert.equal(out["ok"], "1970-01-01");
   // "__proto__" survived as a real own property, not as a reparented prototype.
   assert.equal(Object.prototype.hasOwnProperty.call(out, "__proto__"), true);
   assert.equal(Object.getPrototypeOf(out), null);
@@ -139,7 +139,7 @@ test("isoifyDates does not reparent or pollute on an attacker '__proto__' key", 
   assert.equal((Object.prototype as Record<string, unknown>)["polluted"], undefined);
   // The rebuilt object still round-trips through JSON.stringify unchanged.
   const round = JSON.parse(JSON.stringify(out)) as Record<string, unknown>;
-  assert.equal(round["ok"], "1970-01-01T00:00:00.000Z");
+  assert.equal(round["ok"], "1970-01-01");
 });
 
 test("MastrClient rejects a non-http(s) base URL even with a custom transport", () => {
@@ -269,7 +269,26 @@ test("parseMsDate accepts the offset form and returns null for an out-of-range v
   assert.equal(parseMsDate("/Date(1548979200000-0500)/")?.getTime(), 1548979200000);
   assert.equal(parseMsDate("/Date(99999999999999999)/"), null);
   assert.equal(parseMsDate("/Date(1548979200000+01)/"), null);
-  assert.deepEqual(JSON.parse(JSON.stringify(isoifyDates({ d: "/Date(0+0200)/" }))), { d: "1970-01-01T00:00:00.000Z" });
+  assert.deepEqual(JSON.parse(JSON.stringify(isoifyDates({ d: "/Date(0+0200)/" }))), { d: "1970-01-01" });
+});
+
+test("formatMastrDate: date-only values as YYYY-MM-DD, instants in Europe/Berlin with the offset", () => {
+  const f = (ms: number) => formatMastrDate(new Date(ms));
+  assert.equal(f(1548979200000), "2019-02-01"); // UTC midnight = a date-only register value
+  assert.equal(f(-86_400_000), "1969-12-31");
+  assert.equal(f(1582216115250), "2020-02-20T17:28:35.250+01:00"); // winter, milliseconds kept
+  assert.equal(f(1626335677863), "2021-07-15T09:54:37.863+02:00"); // summer
+  assert.equal(f(1782120000000), "2026-06-22T11:20:00+02:00"); // no .000
+  // The spring-forward and fall-back edges of 2024.
+  assert.equal(f(1711846799999), "2024-03-31T01:59:59.999+01:00");
+  assert.equal(f(1711846800000), "2024-03-31T03:00:00+02:00");
+  assert.equal(f(1729990799000), "2024-10-27T02:59:59+02:00");
+  assert.equal(f(1729990800000), "2024-10-27T02:00:00+01:00");
+  // The same instant: parsing the output gives back the milliseconds.
+  assert.equal(Date.parse(f(1582216115250)), 1582216115250);
+  // Outside what a +hh:mm offset or a 4-digit year can say: the UTC form.
+  assert.equal(f(-2524521600001), "1889-12-31T23:59:59.999Z"); // Berlin local mean time
+  assert.equal(f(-62198755200000), "-000001-01-01T00:00:00.000Z");
 });
 
 test('units() and filterColumns() turn the register\'s {"Error":true} reply into a MastrApiError that says what to fix (findings 01#3, 06#1)', async () => {

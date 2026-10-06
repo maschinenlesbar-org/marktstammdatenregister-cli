@@ -136,7 +136,11 @@ test("--iso-dates rewrites /Date(ms)/ timestamps", async () => {
   await run(["stromerzeugung", "--iso-dates", "--compact"], cli.deps);
   const text = cli.out.join("\n");
   assert.doesNotMatch(text, /\/Date\(/);
-  assert.match(text, /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/); // an ISO timestamp appears
+  // Date-only values (UTC midnight) print as the calendar date; instants in German time.
+  assert.match(text, /"EinheitRegistrierungsdatum":"2019-02-01"/);
+  assert.match(text, /"InbetriebnahmeDatum":"2007-07-20"/);
+  assert.match(text, /"EinheitRegistrierungsdatum":"2020-09-13T14:26:40\+02:00"/);
+  assert.doesNotMatch(text, /\d{2}Z"/);
 });
 
 test("without --iso-dates the raw /Date(ms)/ is preserved", async () => {

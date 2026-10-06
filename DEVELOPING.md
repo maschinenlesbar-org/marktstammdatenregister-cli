@@ -67,7 +67,7 @@ live — the OpenAPI spec is thin, so trust the live behaviour:
 | **Repeated options** | commander keeps the last of a repeated option: `--filter A --filter B` sent only `B` ("solar in Bavaria" became every unit in Bavaria, 2 042 883 instead of 1 456 625). | `shared.ts`: `parseFilter` joins repeated `--filter`s with `~and~`; every other value option is wrapped in `once()`, a repeat is a usage error |
 | **Charset** | The register sends `application/json; charset=utf-8`; a mirror or re-encoding proxy may not. | `engine.ts` `getJson()` decodes by the declared charset (`TextDecoder`, BOM dropped); an unknown label is `MastrParseError` |
 | **FilterNames match exactly** | A FilterName with a decomposed umlaut (macOS input), a leading/trailing space (`~and~ Bundesland`) or two spaces in a row is ignored like an unknown one: the unfiltered set (live 2026-10-05: 9 562 366 instead of 6 545 851). Values are normalised by the register itself (`'Mu\u0308nster'` = `'Münster'`, `' 2495 '` = `'2495'`). | `filter.ts` `normalizeFilter()`/`normalizeFilterName()` (NFC, trim, one space; operators and `and`s trimmed; whitespace outside a quoted value dropped, so `'Münster' ~and~…` isn't misread as a value holding `~`); `units()` and `buildFilter()` send the normalised spec, the CLI's `--filter` parser checks it |
-| **Microsoft dates** | Dates are `"/Date(ms)/"` strings, not ISO (the offset form `/Date(ms+hhmm)/` is accepted too; not seen live). | `parseMsDate()` (null for an out-of-range value) / `isoifyDates()`; CLI `--iso-dates` |
+| **Microsoft dates** | Dates are `"/Date(ms)/"` strings, not ISO (the offset form `/Date(ms+hhmm)/` is accepted too; not seen live). | `parseMsDate()` (null for an out-of-range value) / `isoifyDates()` via `formatMastrDate()`: date-only values (UTC midnight, live 2026-10-06) → `YYYY-MM-DD`, timestamps → `Europe/Berlin` with offset (Intl, so DST follows the tz database; UTC `Z` fallback for years outside 1–9999 and pre-1893 local mean time); CLI `--iso-dates` |
 | **No aggregate endpoint** | `AggregateResults` is null; there is no server-side capacity sum — only the `Total` count. | documented; `MastrClient.count()` (the CLI's `--total`) returns the count with a one-row request, but there is no sum |
 | **Wide, category-varying rows** | ~90 fields; a solar unit carries columns a gas consumer lacks. | `MastrUnit` types the common fields + an index signature |
 | **Withheld data** | Natural-person and confidential data are not published (operator names anonymised; some location data withheld for units < 30 kW). | documented; fields are optional/nullable |
@@ -147,7 +147,8 @@ outcome.
 - `query.test.ts` — the builder **sends empty-string values** (`sort=&group=&filter=`),
   the linchpin of the null-request fix.
 - `client.test.ts` — `units()` ALWAYS sends the full Kendo param set; category routing;
-  the `Errors` envelope throws; `parseMsDate`/`isoifyDates`.
+  the `Errors` envelope throws; `parseMsDate`/`isoifyDates`/`formatMastrDate` (incl. the
+  2024 DST edges).
 - `cli.test.ts` — the 4 commands, paging bounds, `--total`, `--iso-dates`, the `filters`
   command, and the hardening guards (control-char UA, empty base URL, bounded retries).
 - `conformance-p*.test.ts` — the checks shared across the `*-cli` repos (fix plan

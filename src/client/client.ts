@@ -121,16 +121,68 @@ export function parseMsDate(value: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+const DAY_MS = 86_400_000;
+
+/** Wall-clock fields of an instant in Europe/Berlin (h23, so midnight is 00, never 24). */
+const BERLIN = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Europe/Berlin",
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+const pad = (n: number, width = 2): string => String(n).padStart(width, "0");
+
 /**
- * Recursively rewrite every `"/Date(ms)/"` string in a value to an ISO-8601 string,
+ * Render a register date as ISO-8601, the way `--iso-dates` prints it. The register is a
+ * German one, so:
+ * - a **date-only** value — the register sends those as UTC midnight (`InbetriebnahmeDatum`,
+ *   `EinheitRegistrierungsdatum`, …) — becomes the calendar date, `YYYY-MM-DD`;
+ * - an **instant** (`DatumLetzteAktualisierung`) becomes German local time with an explicit
+ *   offset, `2020-02-20T17:28:35.250+01:00` (`+02:00` in summer time); the milliseconds are
+ *   shown only when they aren't zero. It is the same instant as the UTC form, written for a
+ *   German reader.
+ * A year outside 1–9999, or an offset that isn't whole minutes (Berlin's local mean time
+ * before 1893), falls back to `Date.toISOString()` (UTC, `Z`).
+ */
+export function formatMastrDate(date: Date): string {
+  const ms = date.getTime();
+  const year = date.getUTCFullYear();
+  if (Number.isNaN(ms) || year < 1 || year > 9999) return date.toISOString();
+  if (ms % DAY_MS === 0) return date.toISOString().slice(0, 10);
+  const part: Record<string, number> = {};
+  for (const p of BERLIN.formatToParts(date)) if (p.type !== "literal") part[p.type] = Number(p.value);
+  const { year: y = 0, month = 1, day = 1, hour = 0, minute = 0, second = 0 } = part;
+  const millis = ((ms % 1000) + 1000) % 1000;
+  const wall = new Date(0);
+  wall.setUTCFullYear(y, month - 1, day);
+  wall.setUTCHours(hour, minute, second, millis);
+  const offsetMin = (wall.getTime() - ms) / 60_000;
+  if (!Number.isInteger(offsetMin) || y < 1 || y > 9999) return date.toISOString();
+  const sign = offsetMin < 0 ? "-" : "+";
+  const abs = Math.abs(offsetMin);
+  return (
+    `${pad(y, 4)}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}` +
+    (millis === 0 ? "" : `.${pad(millis, 3)}`) +
+    `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
+  );
+}
+
+/**
+ * Recursively rewrite every `"/Date(ms)/"` string in a value with {@link formatMastrDate}
+ * (date-only values as `YYYY-MM-DD`, instants in Europe/Berlin with their offset),
  * returning a new value. Used by the CLI's `--iso-dates`.
  */
 export function isoifyDates<T>(value: T): T {
   if (typeof value === "string") {
-    // parseMsDate returns null for an out-of-range value, so `.toISOString()` never
-    // throws; such a string is left as-is.
+    // parseMsDate returns null for an out-of-range value, so formatting never throws;
+    // such a string is left as-is.
     const d = parseMsDate(value);
-    return (d ? d.toISOString() : value) as unknown as T;
+    return (d ? formatMastrDate(d) : value) as unknown as T;
   }
   if (Array.isArray(value)) {
     return value.map((v) => isoifyDates(v)) as unknown as T;

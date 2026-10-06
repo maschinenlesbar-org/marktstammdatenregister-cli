@@ -16,7 +16,7 @@ mastr [global options] <command> [command options]
 | `--max-retries <n>` | retries for transient 429/503 responses and reset connections (0..10; each waits 200 ms, 400 ms, … or the server's `Retry-After` when that is longer, up to 30 s — a longer one is not retried, and the error names the requested wait) |
 | `--max-response-bytes <n>` | cap the response body size in bytes (0 = unlimited; default 100 MiB) |
 | `--compact` | print JSON on a single line (for piping to `jq`) |
-| `--iso-dates` | rewrite MaStR `/Date(ms)/` timestamps to ISO-8601 |
+| `--iso-dates` | rewrite MaStR `/Date(ms)/` timestamps to ISO-8601: a date-only value (sent as UTC midnight) as `YYYY-MM-DD`, a timestamp in German time (`Europe/Berlin`) with an explicit offset, e.g. `2020-02-20T17:28:35.250+01:00` (milliseconds only when not zero) |
 | `-V, --version` / `-h, --help` | version / help |
 
 ## Commands
@@ -138,7 +138,12 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
   `--filter`, where a wrong field or operator is rejected before sending; a filter that
   still gives 0 rows gets a stderr note about its values.)
 - **Dates** are Microsoft `/Date(ms)/` strings; `--iso-dates` converts them, or use the
-  library's `parseMsDate()`.
+  library's `parseMsDate()` (a `Date`) and `formatMastrDate()` (the `--iso-dates` text).
+  Date-only fields (`InbetriebnahmeDatum`, `EinheitRegistrierungsdatum`, …) arrive as UTC
+  midnight and print as `YYYY-MM-DD`; timestamps (`DatumLetzteAktualisierung`) print in German
+  time with their offset (`+01:00` winter, `+02:00` summer) — the same instant as the UTC
+  value, so the calendar day is the German one. A timestamp that happens to fall on UTC
+  midnight exactly prints as a date.
 - **You cannot sum capacity server-side** — there is no aggregate endpoint. Use `--total`
   for counts; sum the capacity field client-side only for small result sets.
 

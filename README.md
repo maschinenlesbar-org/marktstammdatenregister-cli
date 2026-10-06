@@ -59,7 +59,9 @@ any other option given twice is a usage error. A **wrong `--sort` key returns 0 
 sanity-check with `--total`; sort keys are record field names
 (`Bruttoleistung`), not FilterNames — list them with
 `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. **Dates** come as Microsoft
-`/Date(ms)/` strings — add `--iso-dates` to convert them to ISO-8601.
+`/Date(ms)/` strings — add `--iso-dates` to convert them to ISO-8601: date-only fields
+(`InbetriebnahmeDatum`, …) as `YYYY-MM-DD`, timestamps (`DatumLetzteAktualisierung`) in German
+time with an explicit offset, `2020-02-20T17:28:35.250+01:00`.
 
 Global flags: `--base-url`, `--timeout`, `--user-agent`, `--max-retries`,
 `--max-response-bytes`, `--compact`, `--iso-dates`. See [Usage.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/Usage.md). A `--base-url`
