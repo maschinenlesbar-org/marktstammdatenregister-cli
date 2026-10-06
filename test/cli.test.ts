@@ -4,7 +4,8 @@ import { run } from "../src/cli/run.js";
 import { MastrClient } from "../src/client/client.js";
 import { renderJson } from "../src/cli/shared.js";
 import { MastrParseError } from "../src/client/errors.js";
-import type { CliDeps } from "../src/cli/io.js";
+import { handleOutputErrors, type CliDeps } from "../src/cli/io.js";
+import { EventEmitter } from "node:events";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
 import { makeMockTransport, jsonResponse, queryOf, registerResponder, unitRequests, withColumns } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -437,4 +438,17 @@ test("whitespace around ~and~ and outside a quoted value is dropped, not reporte
   const cli = makeCli(registerResponder(fx.unitPage));
   assert.equal(await run(["stromerzeugung", "--filter", "Anzeige-Name der Einheit~ct~'a ~b'", "--total"], cli.deps), 2);
   assert.match(cli.err.join("\n"), /A filter value cannot contain "~"/);
+});
+
+test("handleOutputErrors: EPIPE and ENOTCONN mean the reader has gone", () => {
+  for (const code of ["EPIPE", "ENOTCONN"]) {
+    const stdout = new EventEmitter();
+    const stderr = new EventEmitter();
+    const exits: number[] = [];
+    handleOutputErrors({ stdout, stderr } as never, (c) => { exits.push(c); });
+    stderr.emit("error", Object.assign(new Error(`write ${code}`), { code }));
+    assert.deepEqual(exits, [], `${code} on stderr is ignored`);
+    stdout.emit("error", Object.assign(new Error(`write ${code}`), { code }));
+    assert.deepEqual(exits, [0], `${code} on stdout exits 0`);
+  }
 });
