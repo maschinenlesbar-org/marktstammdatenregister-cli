@@ -163,7 +163,10 @@ outcome.
   stderr for a remote `http:` base URL, naming the host and, without printing them, the
   URL's credentials; none for `https:`, loopback or `--help`; stdout unchanged; the library
   exports `cleartextProblem` (the env-var and other-secret cases are skipped: mastr reads no
-  environment variable and sends no key).
+  environment variable and sends no key). **P21** README links: every relative link in
+  `README.md` (shown on npmjs.com) must target a file `package.json` `files` ships
+  (`DATA_LICENSE.md`, `LICENSING.md`, `CONTRIBUTING.md`, plus README/LICENSE); the other
+  documents are linked as `https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/<path>`.
 
 ## Conventions to keep
 

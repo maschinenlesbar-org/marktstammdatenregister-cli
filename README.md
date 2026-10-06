@@ -62,7 +62,7 @@ sanity-check with `--total`; sort keys are record field names
 `/Date(ms)/` strings — add `--iso-dates` to convert them to ISO-8601.
 
 Global flags: `--base-url`, `--timeout`, `--user-agent`, `--max-retries`,
-`--max-response-bytes`, `--compact`, `--iso-dates`. See [Usage.md](Usage.md). A `--base-url`
+`--max-response-bytes`, `--compact`, `--iso-dates`. See [Usage.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/Usage.md). A `--base-url`
 on plain `http:` to a host other than loopback prints one `warning: … sent unencrypted …`
 line on stderr before the first request (stdout and the exit code are unchanged); the
 library's check is `cleartextProblem(baseUrl)`.
@@ -101,11 +101,11 @@ await mastr.stromerzeugung({ filter, pageSize: 1 });
 
 ## Documentation
 
-- [Usage.md](Usage.md) — commands, filter syntax, exit codes
-- [DEVELOPING.md](DEVELOPING.md) — architecture, testing, the live-API quirks
-- [GLOSSARY.md](GLOSSARY.md) — MaStR domain terms
+- [Usage.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/Usage.md) — commands, filter syntax, exit codes
+- [DEVELOPING.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/DEVELOPING.md) — architecture, testing, the live-API quirks
+- [GLOSSARY.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/GLOSSARY.md) — MaStR domain terms
 - [DATA_LICENSE.md](DATA_LICENSE.md) — the DL-DE-BY-2.0 data terms
-- [SKILLS.md](SKILLS.md) — the Claude Code skills this repo ships
+- [SKILLS.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/SKILLS.md) — the Claude Code skills this repo ships
 
 ## Licence
 
