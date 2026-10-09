@@ -98,11 +98,16 @@ bidi characters is matched in its raw form. `redactionFor(argv)` collects the ex
 the value part of every `--opt=value` token (`credentialsIn`, which also handles values that
 don't parse as a URL and the scheme-less `user:pw@host`) and redacts those strings, raw and
 JSON-quoted, from every line the CLI prints — commander's usage errors echo rejected values,
-and a pattern can't delimit a password holding a space, quote, `#`, `?` or `/`.
+and a pattern can't delimit a password holding a space, quote, `#`, `?` or `/`. The forms
+a server echoes a userinfo back in are replaced too: the `Basic` value and the decoded
+`user:password` on stdout and stderr, the password alone (4 characters or more) on stderr
+only, since it may well occur in the data.
 `redactUrl` falls back to the same exact-string redaction for a value that doesn't parse.
 In the library the engine keeps the base URL and the default headers in real `#private`
 fields, so `console.log(client)`, `util.inspect` and `JSON.stringify` never show them, and
-it scrubs the base URL's userinfo (raw and percent-decoded) from error bodies and details,
+it scrubs the base URL's userinfo (raw and percent-decoded) and the forms a server echoes
+it back in (the `Basic` value, the decoded `user:password`, the password alone from 4
+characters: `echoedCredentialForms`) from error bodies and details,
 `Errors` envelopes, transport error text and the `cause` chain it attaches.
 
 The client validates its own inputs before any request, for library callers the CLI's

@@ -293,3 +293,17 @@ test("a charset label and a text snippet are quoted at most 200 characters long 
   const text = new RequestEngine({ transport: async () => rawResponse("y".repeat(5000), "text/plain", 500) });
   await assert.rejects(text.getJson("/x"), (err: Error) => /: y{200}…$/.test(err.message));
 });
+
+test("credentials a server echoes are scrubbed from the error: Basic, user:password, password (L13)", async () => {
+  const basic = Buffer.from("alice:pa ss-pw", "utf8").toString("base64");
+  const body = JSON.stringify({ message: `no: Basic ${basic} / alice:pa ss-pw / pa ss-pw` });
+  const engine = new RequestEngine({
+    baseUrl: "https://alice:pa%20ss-pw@mirror.example",
+    transport: async () => rawResponse(body, "application/json", 401),
+  });
+  await assert.rejects(engine.getJson("/x"), (err: MastrApiError) => {
+    for (const form of [basic, "alice:pa ss-pw", "pa ss-pw"]) assert.ok(!err.message.includes(form), err.message);
+    assert.match(err.message, /no: Basic \*\*\* \/ \*\*\* \/ \*\*\*/);
+    return true;
+  });
+});
