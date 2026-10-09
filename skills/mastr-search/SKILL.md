@@ -70,15 +70,17 @@ mastr stromerzeugung --page 2 --page-size 100 --compact
   CLI rejects a FilterName or dropdown code the category doesn't have (exit 2, with "did
   you mean"). Several `--filter` flags are joined with `~and~`; any other option given
   twice exits 2.
-- **A wrong `--sort` field returns 0 rows, not an error.** If a query drops to
-  `total: 0` only after you add `--sort`, the sort column key is probably wrong (the
-  CLI prints a stderr note). Sort keys are record field names (`Bruttoleistung`), not
-  the FilterNames from `mastr filters` (`Bruttoleistung der Einheit` gives 0 rows); list
-  them with `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`.
+- **A wrong `--sort` field is refused by the register** (seen 2026-10-09): exit 1 with
+  "the register rejected the request. It answers so to a sort key it doesn't know". It
+  used to give 0 rows instead, so if a query drops to `total: 0` only after you add
+  `--sort`, the sort column key is still the first suspect (the CLI prints a stderr note).
+  Sort keys are record field names (`Bruttoleistung`), not the FilterNames from
+  `mastr filters` (`Bruttoleistung der Einheit` is refused); list them with
+  `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`.
 - **A malformed `--filter` exits 2 without a unit query** (unknown operator such as `gte`,
   `~or~`, missing value, dangling `~and~`, unknown FilterName or code). Exit 1 with "the
   register rejected the request" means a value it can't read (a decimal comma, a bad
-  date). Range filters use `gt`/`lt` (strict; there is
+  date) or, with `--sort`, a sort key it doesn't know; the message names the likely cause. Range filters use `gt`/`lt` (strict; there is
   no `gte`/`lte`) — see **mastr-filters**.
 - **Reading a record** (fields, dates, anonymisation) → the **mastr-unit** skill.
 - Cite the source: © Bundesnetzagentur – Marktstammdatenregister (DL-DE-BY-2.0).

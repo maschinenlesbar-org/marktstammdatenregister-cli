@@ -80,15 +80,16 @@ export function registerCommands(program: Command, deps: CliDeps): void {
               ? await client.count(cat.name, buildCountQuery(opts))
               : undefined;
           const page = total === undefined ? await RUN[cat.name](client, buildQuery(opts)) : { total };
-          // An unknown --sort key or --filter operator makes the server return 0 rows
-          // (not an error), which reads like "no matches". Nudge the user toward the
-          // likely cause. Sort keys are the record's field names (`Bruttoleistung`);
-          // the FilterNames from `mastr filters` ("Bruttoleistung der Einheit") don't sort.
+          // 0 rows read like "no matches". An unknown --sort key used to give 0 rows; the
+          // register refused one with {"Error":true} on 2026-10-09 (an ERROR naming the sort
+          // key, from the library), but a 0 after adding --sort is still worth a look.
+          // Sort keys are the record's field names (`Bruttoleistung`); the FilterNames
+          // from `mastr filters` ("Bruttoleistung der Einheit") don't sort.
           if (page.total === 0 && typeof opts["sort"] === "string") {
             logOf(deps).info(
               "api",
-              "0 results with --sort set. If you expected matches, an unknown sort " +
-                `key returns 0 rows. Sort keys are record field names (e.g. ${cat.sortKey}), ` +
+              "0 results with --sort set. If you expected matches, check the sort key: " +
+                `sort keys are record field names (e.g. ${cat.sortKey}), ` +
                 "not the FilterNames from `mastr filters`; list them with " +
                 `\`mastr ${cat.name} --page-size 1 --compact | jq '.data[0] | keys'\`.`,
             );

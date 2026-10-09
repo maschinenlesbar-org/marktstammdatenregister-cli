@@ -125,19 +125,21 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
 | Code | Meaning |
 |---|---|
 | `0` | success (help/version included); an empty result also exits 0 |
-| `1` | API/logical error (e.g. the server's `Errors` field), or a catch-all |
+| `1` | API/logical error (e.g. the server's `Errors` field, or `{"Error":true}` for a filter value it can't read or an unknown `--sort` key), or a catch-all |
 | `2` | usage error (bad flags, unknown command, an option other than `--filter` given twice, a malformed `--filter` — shape, operator, `~or~`, a FilterName the category doesn't have, a dropdown code it doesn't list — or a bad `--page-size`, redirecting base URL) |
 | `4` | HTTP 404 |
 | `6` | network / transport failure (DNS, connection, timeout, response size-cap) |
 
 ## Notes
 
-- **A wrong `--sort` field returns 0 results, not an error.** An unknown sort column
-  key makes the server answer with zero rows (`total: 0`), which reads like "no
-  matches". If a query returns 0 only after you add `--sort`, check the column key —
-  the CLI logs a note (an `INFO` record of `mastr.api`) to stderr in this case. Sort keys are the record's field names
-  (`Bruttoleistung`, `InbetriebnahmeDatum`), not the FilterNames from `mastr filters`
-  (`Bruttoleistung der Einheit-desc` returns 0 rows); list them with
+- **A wrong `--sort` field is refused by the register.** On 2026-10-09 the register
+  answered an unknown sort key (`Bogus-desc`, or the FilterName `Bruttoleistung der
+  Einheit-desc`) with `{"Error":true}`: exit 1, and an `ERROR` record of `mastr.api`
+  ("… the register rejected the request. It answers so to a sort key it doesn't know …").
+  It used to answer with zero rows (`total: 0`), which reads like "no matches"; if a
+  query returns 0 only after you add `--sort`, check the column key — the CLI logs a note
+  (an `INFO` record of `mastr.api`) to stderr in this case. Sort keys are the record's field names
+  (`Bruttoleistung`, `InbetriebnahmeDatum`), not the FilterNames from `mastr filters`; list them with
   `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. (Contrast
   `--filter`, where a wrong field or operator is rejected before sending; a filter that
   still gives 0 rows gets a stderr note, an `INFO` record, about its values.)

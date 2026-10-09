@@ -81,8 +81,9 @@ test("0 results with --sort set prints a note about the likely bad sort field", 
   assert.equal(code, 0);
   const err = cli.err.join("\n");
   assert.match(untimed(err), /^INFO  \[mastr\.api\] 0 results with --sort/);
-  // `mastr filters` lists FilterNames, which are not sort keys (live: "Bruttoleistung der
-  // Einheit-desc" gives 0 rows, "Bruttoleistung-desc" works), so point at the record keys.
+  // `mastr filters` lists FilterNames, which are not sort keys (live 2026-09-26: "Bruttoleistung
+  // der Einheit-desc" gave 0 rows, 2026-10-09 {"Error":true}; "Bruttoleistung-desc" works), so
+  // point at the record keys.
   assert.match(err, /not the FilterNames from `mastr filters`/);
   assert.match(err, /mastr stromerzeugung --page-size 1 --compact \| jq '\.data\[0\] \| keys'/);
   assert.doesNotMatch(err, /--filter/);
@@ -575,4 +576,12 @@ test("stderr waits for stdout: a record is held while stdout has a backlog, and 
   err("fifth");
   stdout.emit("error", new Error("EPIPE"));
   assert.deepEqual(written, ["first", "second", "third", "fourth", "fifth"]);
+});
+
+test("an unknown --sort key the register refuses ({\"Error\":true}) is an ERROR of mastr.api naming the sort key, exit 1 (bug 03-1)", async () => {
+  const cli = makeCli(registerResponder({ Error: true, Message: null, Type: "danger", Data: null }));
+  assert.equal(await run(["stromerzeugung", "--sort", "Bogus-desc", "--total"], cli.deps), 1);
+  assert.equal(cli.err.length, 1, cli.err.join("\n"));
+  assert.match(untimed(cli.err[0]!), /^ERROR \[mastr\.api\] MaStR error for GET .*sort=Bogus-desc.*: the register rejected the request\. It answers so to a sort key it doesn't know \(sort, the CLI's --sort/);
+  assert.deepEqual(cli.out, []);
 });

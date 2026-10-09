@@ -316,22 +316,31 @@ export class MastrClient {
 
   /**
    * The register's second error envelope, `{"Error":true,"Message":…,"Type":"danger"}`
-   * (HTTP 200), as a MastrApiError: its answer to a filter value it can't read. It used to
-   * surface as "Unexpected response shape … expected a numeric Total", which reads like a
-   * broken server or client and doesn't say what to fix.
+   * (HTTP 200), as a MastrApiError: its answer to a filter value it can't read, and (live
+   * 2026-10-09) to a sort key it doesn't know. It used to surface as "Unexpected response
+   * shape … expected a numeric Total", which reads like a broken server or client and
+   * doesn't say what to fix. A request with a sort key names that cause first; one with a
+   * filter (or neither) names the filter values.
    */
   private registerRejected(path: string, query: QueryParams | undefined, res: Record<string, unknown>): MastrApiError {
     const message = typeof res["Message"] === "string" ? describeMastrErrors(res["Message"], (t) => this.engine.scrub(t)) : undefined;
+    const sorted = typeof query?.["sort"] === "string" && query["sort"] !== "";
+    const filtered = typeof query?.["filter"] === "string" && query["filter"] !== "";
+    const sortCause =
+      "a sort key it doesn't know (sort, the CLI's --sort: a record field name such as " +
+      "Bruttoleistung or InbetriebnahmeDatum with -asc/-desc, not a FilterName from `mastr filters`)";
+    const filterCause =
+      "a filter value it can't read: a dropdown label instead of its code (the Value from " +
+      "`mastr filters` / filterColumns()), a decimal comma ('4999,999'; use a point), an exponent " +
+      "or text in a number column, an invalid date, a boolean other than '1'/'0', or null/nn on a " +
+      "column that isn't text";
     return new MastrApiError({
       url: this.engine.buildUrl(path, query),
       method: "GET",
       body: this.engine.scrub(JSON.stringify(res)),
       detail:
         `the register rejected the request${message === undefined ? "" : ` (${message})`}. It answers so ` +
-        "to a filter value it can't read: a dropdown label instead of its code (the Value from " +
-        "`mastr filters` / filterColumns()), a decimal comma ('4999,999'; use a point), an exponent " +
-        "or text in a number column, an invalid date, a boolean other than '1'/'0', or null/nn on a " +
-        "column that isn't text",
+        `to ${sorted ? (filtered ? `${sortCause}, or to ${filterCause}` : sortCause) : filterCause}`,
     });
   }
 
@@ -339,7 +348,8 @@ export class MastrClient {
    * The number of units in a category that match `filter` (all units without one).
    * Fetches a single row (`page=1`, `pageSize=1`) and returns the envelope's
    * `Total`, which counts every match regardless of the page. `sort` is forwarded:
-   * an unknown sort key makes the register answer 0. Paging options are refused
+   * the register refuses a sort key it doesn't know (`{"Error":true}`, a MastrApiError;
+   * live 2026-10-09). Paging options are refused
    * (`countQueryProblem`), as are the inputs `units()` refuses, all with a
    * `MastrValidationError` before any request.
    */

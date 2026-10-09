@@ -56,9 +56,10 @@ every `eq`/`neq` dropdown code against the category's columns (one extra request
 rejects an unknown one (exit 2, with "did you mean"); a name typed with a decomposed umlaut,
 padding or in another case is sent the register's way. A malformed spec or an unknown
 operator (e.g. `gte`) is rejected too. Several `--filter` flags are joined with `~and~`;
-any other option given twice is a usage error. A **wrong `--sort` key returns 0 rows**:
-sanity-check with `--total`; sort keys are record field names
-(`Bruttoleistung`), not FilterNames — list them with
+any other option given twice is a usage error. A **wrong `--sort` key is refused by the
+register** (live 2026-10-09: `{"Error":true}`, exit 1 with an `ERROR` record of `mastr.api`
+that names the sort key; it used to answer 0 rows, so sanity-check a sorted query with
+`--total`); sort keys are record field names (`Bruttoleistung`), not FilterNames — list them with
 `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. **Dates** come as Microsoft
 `/Date(ms)/` strings — add `--iso-dates` to convert them to ISO-8601: date-only fields
 (`InbetriebnahmeDatum`, …) as `YYYY-MM-DD`, timestamps (`DatumLetzteAktualisierung`) in German

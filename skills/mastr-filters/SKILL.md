@@ -108,9 +108,11 @@ Pick the key that matches the column (`Bruttoleistung`, `Nettonennleistung`,
 storage sort by `Erzeugungsleistung`, `MaxEinspeicherleistung`, `MaxAusspeicherleistung`
 or `MaxArbeitsvolumen`, gas consumption by `MaximaleGasbezugsLeistung`, and
 `stromverbrauch` has no capacity key. List the keys of the category you query.
-**A wrong sort key is worse than a wrong filter: it returns 0 rows** (not an error, not
-the unfiltered set), so a query that goes to `total: 0` right after you add `--sort`
-almost always has a bad sort key. The CLI prints a stderr note in that case.
+**A wrong sort key is refused by the register** (seen 2026-10-09: exit 1, "the register
+rejected the request. It answers so to a sort key it doesn't know"). It used to return 0
+rows instead (not an error, not the unfiltered set), so a query that goes to `total: 0`
+right after you add `--sort` still most likely has a bad sort key; the CLI prints a stderr
+note in that case.
 
 ## Traps
 

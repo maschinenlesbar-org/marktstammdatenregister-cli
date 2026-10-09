@@ -402,3 +402,32 @@ test("own messages quote a caller's value at most 200 characters long (L3)", asy
   assert.throws(() => new MastrClient({ [long]: 1 } as never), bounded(/Unknown option "x+…"/));
   assert.throws(() => new MastrClient({ timeoutMs: long as never }), bounded(/got "x+…"/));
 });
+
+test('{"Error":true} to a request with a sort key names the sort key first, not only filter values (bug 03-1)', async () => {
+  // Live 2026-10-09: an unknown sort key (`Bogus-desc`, or a FilterName such as
+  // `Bruttoleistung der Einheit-desc`) was answered {"Error":true}, no filter given.
+  const rejected = { Error: true, Message: null, Type: "danger" };
+  const sortOnly = new MastrClient({ transport: makeMockTransport(() => jsonResponse(rejected)).transport });
+  await assert.rejects(sortOnly.count("stromerzeugung", { sort: "Bogus-desc" }), (err: unknown) => {
+    assert.ok(err instanceof MastrApiError, String(err));
+    assert.match(err.message, /the register rejected the request\. It answers so to a sort key it doesn't know/);
+    assert.match(err.message, /record field name/);
+    assert.doesNotMatch(err.message, /dropdown label instead of its code/, "no filter was given");
+    return true;
+  });
+  // With a filter too, both causes are named, the sort key first.
+  const both = new MastrClient({ transport: makeMockTransport(registerResponder({ ...rejected, Data: null })).transport });
+  await assert.rejects(both.stromerzeugung({ sort: "Bogus-desc", filter: "Ort~eq~'x'" }), (err: unknown) => {
+    assert.ok(err instanceof MastrApiError, String(err));
+    assert.match(err.message, /a sort key it doesn't know .*, or to a filter value it can't read: a dropdown label instead of its code/);
+    return true;
+  });
+  // Without a sort key the message is the filter one, as before.
+  const filterOnly = new MastrClient({ transport: makeMockTransport(registerResponder({ ...rejected, Data: null })).transport });
+  await assert.rejects(filterOnly.stromerzeugung({ filter: "Ort~eq~'x'" }), (err: unknown) => {
+    assert.ok(err instanceof MastrApiError, String(err));
+    assert.match(err.message, /It answers so to a filter value it can't read/);
+    assert.doesNotMatch(err.message, /sort key/);
+    return true;
+  });
+});

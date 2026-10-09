@@ -127,7 +127,8 @@ export const baseUrlProblem: Problem<string> = (value) => {
  * A `sort` spec (`FieldKey-asc` / `FieldKey-desc`): not blank. A blank one would go
  * out as `sort=` (the same as no sort) or `sort=%20%20`, and an explicitly blank
  * sort is a mistake rather than a request for the default order. The shape itself is
- * left to the register: an unknown sort key there answers 0 rows.
+ * left to the register: it refused an unknown sort key with `{"Error":true}` (live
+ * 2026-10-09; it used to answer 0 rows), which the client turns into a MastrApiError.
  */
 export const sortProblem: Problem<string> = (value) => nonBlankProblem(value);
 
