@@ -128,7 +128,8 @@ aren't an object, an unknown option key (`timeout` for `timeoutMs`, with a "did 
 a `transport` or `sleep` that isn't a function, `defaultHeaders` that isn't an object, a
 query that isn't an object, a filter that isn't a string (`null` counts as "none" for
 options and queries). Server text in an error message is cut at 500 characters
-(`MAX_DETAIL_LENGTH`); `MastrApiError.body` keeps all of it. `count(category, { filter, sort })` refuses `page` and
+(`MAX_DETAIL_LENGTH`), a text body's snippet at 200, never inside a surrogate pair
+(`cutText`), so the message stays well-formed; `MastrApiError.body` keeps all of it. `count(category, { filter, sort })` refuses `page` and
 `pageSize` (`countQueryProblem`): the count is the same on every page.
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`
@@ -228,7 +229,9 @@ and `msg`. A record is always one line: `formatLogRecord` runs `escapeForRecord`
 the message (text) or the whole JSON object (jsonl), which writes CR and LF as `\r`/`\n`,
 every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
 controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
-forge another one or steer the terminal. The areas are `cli` (usage errors, commander's messages, unexpected errors),
+forge another one or steer the terminal. Before that a lone surrogate (half a
+character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`).
+The areas are `cli` (usage errors, commander's messages, unexpected errors),
 `api` (the register's answers: HTTP errors, and the notes on an empty answer with `--sort`
 or `--filter`) and `http` (the connection: network errors, the size-cap hint, the
 cleartext warning). Code logs through `logOf(deps)` and never writes diagnostics with

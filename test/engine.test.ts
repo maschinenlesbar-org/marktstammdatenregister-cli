@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RequestEngine, cleartextProblem, parseRetryAfter, sanitizeServerText } from "../src/client/engine.js";
-import { MastrApiError, MastrParseError, MastrValidationError, redactUrl } from "../src/client/errors.js";
+import { MastrApiError, MastrParseError, MastrValidationError, cutText, redactUrl, toWellFormed } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -264,4 +264,24 @@ test("cleartextProblem: wording, loopback and https exemptions", () => {
   );
   // A host that only starts like a loopback name still warns.
   assert.match(cleartextProblem("http://127.0.0.1.example") ?? "", /127\.0\.0\.1\.example/);
+});
+
+test("cutText never cuts inside a surrogate pair; toWellFormed replaces half a character", () => {
+  assert.equal(cutText("ab\u{1f600}cd", 3), "ab");
+  assert.equal(cutText("ab\u{1f600}cd", 4), "ab\u{1f600}");
+  assert.equal(cutText("short", 10), "short");
+  assert.equal(toWellFormed("a\ud83d b\ude00 \u{1f600}"), "a� b� \u{1f600}");
+});
+
+test("a server detail or text snippet cut to its limit keeps the message well-formed", async () => {
+  // The JSON detail is cut at 500 characters, a text body's snippet at 200: "a" + emoji
+  // puts a high surrogate right before either cut.
+  for (const body of [JSON.stringify({ detail: "a" + "\u{1f600}".repeat(400) }), "a" + "\u{1f600}".repeat(400)]) {
+    const engine = new RequestEngine({ transport: async () => rawResponse(body, "application/json", 500) });
+    await assert.rejects(engine.getJson("/x"), (err: Error) => {
+      assert.equal(toWellFormed(err.message), err.message, body.slice(0, 20));
+      assert.match(err.message, /…$/);
+      return true;
+    });
+  }
 });

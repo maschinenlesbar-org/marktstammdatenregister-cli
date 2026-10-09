@@ -20,6 +20,7 @@ import {
   MastrParseError,
   MastrValidationError,
   credentialsIn,
+  cutText,
   redactCredentials,
   redactUrl,
 } from "./errors.js";
@@ -185,9 +186,9 @@ export function sanitizeServerText(text: string): string {
  */
 export const MAX_DETAIL_LENGTH = 500;
 
-/** `text` cut at MAX_DETAIL_LENGTH characters, ending in "…" when cut. */
+/** `text` cut at MAX_DETAIL_LENGTH characters (never inside a surrogate pair), ending in "…" when cut. */
 function cutDetail(text: string): string {
-  return text.length > MAX_DETAIL_LENGTH ? `${text.slice(0, MAX_DETAIL_LENGTH)}…` : text;
+  return text.length > MAX_DETAIL_LENGTH ? `${cutText(text, MAX_DETAIL_LENGTH)}…` : text;
 }
 
 /**
@@ -673,7 +674,7 @@ export class RequestEngine {
       // collapsed snippet of a textual body; skip HTML pages (start with "<").
       const snippet = text.trim().replace(/\s+/g, " ");
       if (snippet.length > 0 && !snippet.startsWith("<")) {
-        detail = snippet.length > 200 ? `${snippet.slice(0, 200)}…` : snippet;
+        detail = snippet.length > 200 ? `${cutText(snippet, 200)}…` : snippet;
       }
     }
     // `detail` came from the response body (JSON field or text snippet); the `\s+`
