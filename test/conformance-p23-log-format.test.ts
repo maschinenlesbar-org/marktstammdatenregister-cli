@@ -42,6 +42,20 @@ function secretArgv(secret: string): string[] {
   // whole (the path of the jsonl leak, 2026-10-09 result 04 note 4).
   return ["--base-url", `http://u:${secret}@mirror.example`];
 }
+/**
+ * Malformed answers to SIMPLE_COMMAND with status 200: not JSON, a proxy's HTML page, the
+ * wrong shape (an array, a string Total), empty, an unknown charset, and the register's
+ * `{"Error":true}` envelope (an error answer with HTTP 200, `api` by the 2026-10-09 decision).
+ */
+const MALFORMED_ANSWERS: HttpResponse[] = [
+  { status: 200, headers: { "content-type": "application/json" }, body: Buffer.from("<html>not json</html>") },
+  { status: 200, headers: { "content-type": "text/html" }, body: Buffer.from("<!doctype html><html>a proxy</html>") },
+  { status: 200, headers: { "content-type": "application/json" }, body: Buffer.from("[]") },
+  { status: 200, headers: { "content-type": "application/json" }, body: Buffer.from('{"Data":[],"Total":"1","Errors":null}') },
+  { status: 200, headers: { "content-type": "application/json" }, body: Buffer.alloc(0) },
+  { status: 200, headers: { "content-type": "application/json; charset=x-unknown" }, body: Buffer.from(JSON.stringify(okBody)) },
+  { status: 200, headers: { "content-type": "application/json" }, body: Buffer.from('{"Error":true,"Message":null,"Type":"danger"}') },
+];
 /** Builds the CliDeps for a run, on a transport that answers `okBody` (or `answer`) and a fixed clock (this repo's CliDeps has no `env`). */
 function makeDeps(out: string[], err: string[], now: () => Date, answer?: HttpResponse): CliDeps {
   const transport = async (): Promise<HttpResponse> => answer ?? {
@@ -266,4 +280,12 @@ test("P23: the log format is the one commander parsed, also where an option's va
   const dashes = await cli(["--user-agent", "--", "--log-format", "jsonl", ...SIMPLE_COMMAND], errorAnswer("boom"));
   assert.notEqual(dashes.code, 0);
   assertOneRecordEach(dashes.err, "jsonl", "--user-agent -- --log-format jsonl");
+});
+
+test("P23: a malformed answer is an ERROR record of <program>.api", async () => {
+  for (const answer of MALFORMED_ANSWERS) {
+    const r = await cli(SIMPLE_COMMAND, answer);
+    assert.notEqual(r.code, 0, answer.body.toString());
+    assert.match(r.err[0] ?? "", new RegExp(`^${TS} ERROR \\[${PROGRAM}\\.api\\] `), r.err.join("\n"));
+  }
 });

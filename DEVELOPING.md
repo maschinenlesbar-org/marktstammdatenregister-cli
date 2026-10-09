@@ -253,8 +253,9 @@ forge another one or steer the terminal. Before that a lone surrogate (half a
 character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors),
-`api` (the register's answers: HTTP errors, and the notes on an empty answer with `--sort`
-or `--filter`), `http` (the connection: network errors, the size-cap hint, the
+`api` (the register's answers: HTTP errors, the `{"Error":true}` and `Errors` envelopes
+with HTTP 200, a malformed answer — a `MastrParseError`: bad JSON, the wrong shape, an empty
+body, an unknown charset — and the notes on an empty answer with `--sort` or `--filter`), `http` (the connection: network errors, the size-cap hint, the
 cleartext warning) and `output` (a failed write to stdout). A failed write to stdout other
 than a closed pipe (`handleOutputErrors`, in the bin shim, outside `run()`) is an ERROR
 record of `mastr.output` (`Could not write to stdout: …`), and the shim's last-resort

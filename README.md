@@ -72,7 +72,7 @@ unchanged); the library's check is `cleartextProblem(baseUrl)`.
 
 Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
 `INFO`) and a topic, the program and the area it comes from (`mastr.cli` for usage errors,
-`mastr.api` for the register's answers and the notes about them, `mastr.http` for the
+`mastr.api` for the register's answers, a malformed one included, and the notes about them, `mastr.http` for the
 connection, `mastr.output` for a failed write to stdout). By default it is written log4j style; `--log-format jsonl` writes one JSON
 object per line instead. A record is always one line: a line break, a control character
 or a bidi control in a message (a server's text, a value you typed) is written as an
