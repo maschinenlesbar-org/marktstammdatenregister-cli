@@ -91,7 +91,10 @@ throws, and a response without a valid status, headers or body, becomes a
 
 **Credentials in the base URL.** A `user:password@` in `--base-url` (a mirror behind a
 login) is sent as HTTP Basic auth and never printed. `run()` starts with
-`withRedactedOutput(deps, argv)`: it collects the exact userinfo of every argument and of
+`withRedactedOutput(deps, argv)`, which builds the log too: the log replaces the secrets in
+each record's *message*, before the record is cut and escaped, and writes it to the raw
+stderr, so the frame (time, level, topic) is never touched and a password with DEL, C1 or
+bidi characters is matched in its raw form. `redactionFor(argv)` collects the exact userinfo of every argument and of
 the value part of every `--opt=value` token (`credentialsIn`, which also handles values that
 don't parse as a URL and the scheme-less `user:pw@host`) and redacts those strings, raw and
 JSON-quoted, from every line the CLI prints — commander's usage errors echo rejected values,
@@ -246,8 +249,9 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 or `--filter`) and `http` (the connection: network errors, the size-cap hint, the
 cleartext warning). Code logs through `logOf(deps)` and never writes diagnostics with
 `io.err` directly. `run()` builds the logger from argv before commander parses it, so
-commander's own usage errors are records too, and on top of the redacted `io.err`, so a
-secret is kept out of the log in either format. `CliDeps.now` makes the timestamps
+commander's own usage errors are records too, and with the run's redaction
+(`withRedactedOutput`), which replaces a secret in the message only, before it is
+escaped: the frame is never touched, and a secret is kept out of the log in either format. `CliDeps.now` makes the timestamps
 testable. stdout carries data only. Conformance test P23 checks all of this, and its body
 is shared across the *-cli repos. Two lines stay plain, outside `run()`: the bin shim's
 `Output error: …` (`handleOutputErrors`, stdout failing) and its last-resort
