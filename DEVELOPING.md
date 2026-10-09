@@ -192,6 +192,13 @@ outcome.
   (`DATA_LICENSE.md`, `LICENSING.md`, `CONTRIBUTING.md`, plus README/LICENSE); the other
   documents are linked as `https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/<path>`.
 
+Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
+`{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
+redacted) `}`) is called once per retry right before the sleep, never when there is none, and
+a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
+`mastr.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
+seconds, ms under 1 s). Tests: `test/retry-log.test.ts`.
+
 ## Conventions to keep
 
 - **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 22/24 (`engines`: Node.js 22.12 or later, the floor commander 15 declares).
