@@ -94,9 +94,11 @@ login) is sent as HTTP Basic auth and never printed. `run()` starts with
 `withRedactedOutput(deps, argv)`, which builds the log too: the log replaces the secrets in
 each record's *message*, before the record is cut and escaped, and writes it to the raw
 stderr, so the frame (time, level, topic) is never touched and a password with DEL, C1 or
-bidi characters is matched in its raw form. `redactionFor(argv)` collects the exact userinfo of every argument and of
+bidi characters is matched in its raw form. `redactionFor(argv)` collects the exact userinfo of every URL argument and of
 the value part of every `--opt=value` token (`credentialsIn`, which also handles values that
-don't parse as a URL and the scheme-less `user:pw@host`) and redacts those strings, raw and
+don't parse as a URL). Only a value that starts with a scheme counts (a bare `a:b@c` is a
+search text, a sort key or a User-Agent as often as a credential), except as the
+`--base-url` value, where a scheme-less `user:pw@host` is still read as one. It redacts those strings, raw and
 JSON-quoted, from every line the CLI prints — commander's usage errors echo rejected values,
 and a pattern can't delimit a password holding a space, quote, `#`, `?` or `/`. The forms
 a server echoes a userinfo back in are replaced too: the `Basic` value and the decoded

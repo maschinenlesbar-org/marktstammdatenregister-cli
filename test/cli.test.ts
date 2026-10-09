@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { run } from "../src/cli/run.js";
 import { MastrClient } from "../src/client/client.js";
 import { renderJson } from "../src/cli/shared.js";
-import { MastrParseError } from "../src/client/errors.js";
+import { MastrParseError, credentialsIn } from "../src/client/errors.js";
 import { handleOutputErrors, type CliDeps } from "../src/cli/io.js";
 import { EventEmitter } from "node:events";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
@@ -479,4 +479,12 @@ test("the filter check's quote of the register's dropdown names and codes is one
     assert.match(msg, /Codes: 2495 \(Solar 2026-10-09T00:00:00\.000Z ERROR \[mastr\.api\] HTTP 500 forged record\), 2497 \(Wind \]0;pwned\[31mRED\[0m\)/);
     assert.ok(msg.length < 1500, `${msg.length} characters`);
   }
+});
+
+test("an a:b@c argument (here a User-Agent) is neither a credential in the log nor rewritten in the JSON on stdout (L14)", async () => {
+  const cli = makeCli(registerResponder({ ...fx.unitPage, Data: [{ Id: 1, Ort: "run:2026-10-09@x" }], Total: 1 }));
+  assert.equal(await run(["--user-agent", "run:2026-10-09@x", "stromerzeugung"], cli.deps), 0);
+  assert.match(cli.out.join("\n"), /"Ort": "run:2026-10-09@x"/);
+  assert.deepEqual(credentialsIn("run:2026-10-09@x"), []);
+  assert.deepEqual(credentialsIn("https://alice:pw@host"), ["alice:pw"]);
 });
