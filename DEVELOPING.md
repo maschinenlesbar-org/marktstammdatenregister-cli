@@ -255,7 +255,10 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 `api` (the register's answers: HTTP errors, and the notes on an empty answer with `--sort`
 or `--filter`) and `http` (the connection: network errors, the size-cap hint, the
 cleartext warning). Code logs through `logOf(deps)` and never writes diagnostics with
-`io.err` directly. `run()` builds the logger from argv before commander parses it, so
+`io.err` directly. `run()` builds the logger from argv before commander parses it
+(`logFormatFromArgv`, used only for the records of a parse error: the first `--log-format`,
+skipping the value of each of the program's own value options; a `preAction` hook then
+sets the format commander parsed, so `--user-agent --log-format=jsonl` logs text), so
 commander's own usage errors are records too: its `error: …` an ERROR of `cli` (a
 `(Did you mean …?)` line joined to it), the help it shows after one an INFO record per
 line, and the program run with options but without a command (`mastr --compact`) an ERROR
