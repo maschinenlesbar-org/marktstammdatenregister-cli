@@ -269,7 +269,11 @@ commander's own usage errors are records too: its `error: …` an ERROR of `cli`
 `(Did you mean …?)` line joined to it), the help it shows after one an INFO record per
 line, and the program run with options but without a command (`mastr --compact`) an ERROR
 "missing command: `mastr <subcommand>`" before that help, so every failed run has an ERROR
-record (`writeCommanderErr`). The log is built with the run's redaction
+record (`writeCommanderErr`). `run.ts` replaces commander's built-in `help [command]` with
+its own `help [command...]` (`addHelpCommand`, in `configureTree`, so the tree the website
+documents is unchanged): it walks every name, and an unknown one is reported like
+`mastr nope` (`error: unknown command 'nope'`, exit 2), where the built-in one showed the
+root help after a "missing command" error that never named it. The log is built with the run's redaction
 (`withRedactedOutput`), which replaces a secret in the message only, before it is
 escaped: the frame is never touched, and a secret is kept out of the log in either format.
 Node's own process warnings (`NODE_TLS_REJECT_UNAUTHORIZED=0`) are WARN records of

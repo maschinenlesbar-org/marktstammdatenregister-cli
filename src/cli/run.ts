@@ -44,6 +44,7 @@ function configureTree(command: Command, deps: CliDeps, state: { errorLogged: bo
     writeOut: (str) => deps.io.out(str.replace(/\n$/, "")),
     writeErr: (str) => writeCommanderErr(command, deps, state, str),
   });
+  if (command.commands.length > 0) addHelpCommand(command);
   for (const child of command.commands) configureTree(child, deps, state);
 }
 
@@ -77,6 +78,38 @@ function writeCommanderErr(command: Command, deps: CliDeps, state: { errorLogged
     log.error("cli", `missing command: \`${commandPath(command)} <subcommand>\``);
   }
   for (const line of text.split("\n")) if (line.trim() !== "") log.info("cli", line.trimEnd());
+}
+
+/**
+ * Replace commander's built-in `help [command]` with one that resolves every name it
+ * is given. The built-in one looked at the first name only: `mastr help nope` printed
+ * the root help after a "missing command" error with no word about "nope", and
+ * `mastr help stromerzeugung nope` ran the stromerzeugung command. Now `help a b …` shows the help of `a b`, and
+ * an unknown name is reported exactly as `mastr a nope` reports it (`error: unknown
+ * command 'nope'`, redacted like all output, the usage exit code): the remaining names
+ * are parsed by the command they were meant for, which raises commander's own error.
+ * Added here rather than in `buildProgram`, so the command tree the website documents
+ * stays as commander builds it.
+ */
+function addHelpCommand(command: Command): void {
+  command.helpCommand(false);
+  command
+    .command("help [command...]")
+    .description("display help for command")
+    .action(async (names: string[]) => {
+      let target = command;
+      for (const [i, name] of names.entries()) {
+        const sub = target.commands.find((c) => c.name() === name || c.aliases().includes(name));
+        if (sub === undefined) {
+          // A command without subcommands would run its action on the rest of the names.
+          if (target.commands.length === 0) target.error(`error: unknown command '${name}'`, { exitCode: 1, code: "commander.unknownCommand" });
+          await target.parseAsync(names.slice(i), { from: "user" });
+          return;
+        }
+        target = sub;
+      }
+      target.help();
+    });
 }
 
 /**

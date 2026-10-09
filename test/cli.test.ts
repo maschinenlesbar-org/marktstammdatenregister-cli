@@ -503,6 +503,40 @@ test("options without a command: an ERROR 'missing command' first, then the help
   }
 });
 
+test("help for an unknown command reports it like the command itself, exit 2 (item 3)", async () => {
+  for (const [helpArgv, plainArgv] of [
+    [["help", "nope"], ["nope"]],
+    [["help", "https://alice:s3cret@x.test"], ["https://alice:s3cret@x.test"]],
+  ] as const) {
+    const viaHelp = makeCli(registerResponder(fx.unitPage));
+    const plain = makeCli(registerResponder(fx.unitPage));
+    assert.equal(await run([...helpArgv], viaHelp.deps), 2, helpArgv.join(" "));
+    assert.equal(await run([...plainArgv], plain.deps), 2);
+    assert.match(viaHelp.err[0] ?? "", /^\S+ ERROR \[mastr\.cli\] unknown command '/, viaHelp.err.join("\n"));
+    assert.equal(untimed(viaHelp.err[0] ?? ""), untimed(plain.err[0] ?? ""));
+    assert.deepEqual(viaHelp.out, []);
+    assert.ok(!viaHelp.err.join("\n").includes("s3cret"));
+    assert.equal(viaHelp.mt.calls.length, 0);
+  }
+  // A command without subcommands is not run on the rest of the names.
+  const leaf = makeCli(registerResponder(fx.unitPage));
+  assert.equal(await run(["help", "stromerzeugung", "nope"], leaf.deps), 2);
+  assert.match(untimed(leaf.err[0] ?? ""), /^ERROR \[mastr\.cli\] unknown command 'nope'$/);
+  assert.equal(leaf.mt.calls.length, 0);
+});
+
+test("help names a command path and shows that command's help on stdout, exit 0", async () => {
+  for (const [argv, usage] of [
+    [["help"], "Usage: mastr [options] [command]"],
+    [["help", "stromerzeugung"], "Usage: mastr stromerzeugung [options]"],
+  ] as const) {
+    const cli = makeCli(registerResponder(fx.unitPage));
+    assert.equal(await run([...argv], cli.deps), 0, argv.join(" "));
+    assert.equal(cli.out.join("\n").split("\n")[0], usage, argv.join(" "));
+    assert.deepEqual(cli.err, []);
+  }
+});
+
 test("a parse error is logged in the format commander would have parsed (L6)", async () => {
   const isJsonl = (line: string): boolean => line.startsWith("{");
   const cases: [string[], boolean][] = [
