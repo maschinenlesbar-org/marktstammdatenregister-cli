@@ -10,11 +10,12 @@ mastr [global options] <command> [command options]
 
 | Option | Description |
 |---|---|
-| `--base-url <url>` | API base URL (default `https://www.marktstammdatenregister.de/MaStR`; http/https, a path prefix is fine, no `?query`, `#fragment`, whitespace or control characters; a `user:password@` is sent as Basic auth, never printed, and a literal `%` in it is written `%25`). A remote plain-`http:` URL prints one `warning: requests to <host> are sent unencrypted (http:, not https:)` line on stderr before the first request — `the base URL's credentials are sent unencrypted to <host> …` when it carries a `user:password@`; loopback hosts (`localhost`, `127.0.0.0/8`, `::1`) and `https:` don't warn, and stdout and the exit code are unchanged |
+| `--base-url <url>` | API base URL (default `https://www.marktstammdatenregister.de/MaStR`; http/https, a path prefix is fine, no `?query`, `#fragment`, whitespace or control characters; a `user:password@` is sent as Basic auth, never printed, and a literal `%` in it is written `%25`). A remote plain-`http:` URL logs one `WARN` record of `mastr.http` on stderr before the first request, `requests to <host> are sent unencrypted (http:, not https:)` — `the base URL's credentials are sent unencrypted to <host> …` when it carries a `user:password@`; loopback hosts (`localhost`, `127.0.0.0/8`, `::1`) and `https:` don't warn, and stdout and the exit code are unchanged |
 | `--timeout <ms>` | time limit per request in ms, whole response included (0 = no timeout; at most 2147483647) |
 | `--user-agent <ua>` | User-Agent header value (not blank; Latin-1 without control characters, tab is fine) |
 | `--max-retries <n>` | retries for transient 429/503 responses and reset connections (0..10; each waits 200 ms, 400 ms, … or the server's `Retry-After` when that is longer, up to 30 s — a longer one waits the 30 s cap, then retries) |
 | `--max-response-bytes <n>` | cap the response body size in bytes (0 = unlimited; default 100 MiB) |
+| `--log-format <format>` | how errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [mastr.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
 | `--compact` | print JSON on a single line (for piping to `jq`) |
 | `--iso-dates` | rewrite MaStR `/Date(ms)/` timestamps to ISO-8601: a date-only value (sent as UTC midnight) as `YYYY-MM-DD`, a timestamp in German time (`Europe/Berlin`) with an explicit offset, e.g. `2020-02-20T17:28:35.250+01:00` (milliseconds only when not zero) |
 | `-V, --version` / `-h, --help` | version / help |
@@ -134,12 +135,12 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
 - **A wrong `--sort` field returns 0 results, not an error.** An unknown sort column
   key makes the server answer with zero rows (`total: 0`), which reads like "no
   matches". If a query returns 0 only after you add `--sort`, check the column key —
-  the CLI prints a note to stderr in this case. Sort keys are the record's field names
+  the CLI logs a note (an `INFO` record of `mastr.api`) to stderr in this case. Sort keys are the record's field names
   (`Bruttoleistung`, `InbetriebnahmeDatum`), not the FilterNames from `mastr filters`
   (`Bruttoleistung der Einheit-desc` returns 0 rows); list them with
   `mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'`. (Contrast
   `--filter`, where a wrong field or operator is rejected before sending; a filter that
-  still gives 0 rows gets a stderr note about its values.)
+  still gives 0 rows gets a stderr note, an `INFO` record, about its values.)
 - **Dates** are Microsoft `/Date(ms)/` strings; `--iso-dates` converts them, or use the
   library's `parseMsDate()` (a `Date`) and `formatMastrDate()` (the `--iso-dates` text).
   Date-only fields (`InbetriebnahmeDatum`, `EinheitRegistrierungsdatum`, …) arrive as UTC

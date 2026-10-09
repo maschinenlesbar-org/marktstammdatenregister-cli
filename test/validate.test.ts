@@ -6,7 +6,7 @@ import { MastrClient } from "../src/client/client.js";
 import * as lib from "../src/index.js";
 import { run } from "../src/cli/run.js";
 import type { CliDeps } from "../src/cli/io.js";
-import { parity, requestShapes, registerResponder } from "./helpers.js";
+import { parity, requestShapes, registerResponder, untimed } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
 const evenProblem: Problem<number> = (n) => (n % 2 === 0 ? undefined : "expected an even number.");
@@ -40,7 +40,7 @@ test("the package root exports assertValid and MastrValidationError", () => {
   assert.equal(lib.MastrValidationError, MastrValidationError);
 });
 
-test("run() maps a MastrValidationError raised in an action to exit 2 and 'Error: <message>'", async () => {
+test("run() maps a MastrValidationError raised in an action to exit 2 and an ERROR record", async () => {
   const out: string[] = [];
   const err: string[] = [];
   const deps: CliDeps = {
@@ -50,7 +50,7 @@ test("run() maps a MastrValidationError raised in an action to exit 2 and 'Error
     },
   };
   assert.equal(await run(["stromerzeugung"], deps), 2);
-  assert.deepEqual(err, ["Error: Invalid thing: expected something else."]);
+  assert.deepEqual(err.map(untimed), ["ERROR [mastr.cli] Invalid thing: expected something else."]);
   assert.deepEqual(out, []);
 });
 
@@ -64,7 +64,7 @@ test("run() maps a library rejection from a client method to exit 2 as well", as
       }) as unknown as MastrClient,
   };
   assert.equal(await run(["stromerzeugung"], deps), 2);
-  assert.deepEqual(err, ["Error: Invalid page: expected an integer from 1 to 1000000, got 0."]);
+  assert.deepEqual(err.map(untimed), ["ERROR [mastr.cli] Invalid page: expected an integer from 1 to 1000000, got 0."]);
 });
 
 test("parity() drives the CLI and the library on one transport and records both sides", async () => {

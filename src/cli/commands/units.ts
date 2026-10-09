@@ -3,7 +3,7 @@
 // `filters` command to discover the filterable columns and their dropdown codes.
 
 import { Argument, type Command } from "commander";
-import type { CliDeps } from "../io.js";
+import { logOf, type CliDeps } from "../io.js";
 import { MAX_PAGE, MAX_PAGE_SIZE, type MastrClient } from "../../client/client.js";
 import type { CountQuery, UnitCategory, UnitQuery } from "../../client/types.js";
 import { action, once, parseBoundedInt, parseFilter, parseSort, renderJson } from "../shared.js";
@@ -85,8 +85,9 @@ export function registerCommands(program: Command, deps: CliDeps): void {
           // likely cause. Sort keys are the record's field names (`Bruttoleistung`);
           // the FilterNames from `mastr filters` ("Bruttoleistung der Einheit") don't sort.
           if (page.total === 0 && typeof opts["sort"] === "string") {
-            deps.io.err(
-              "Note: 0 results with --sort set. If you expected matches, an unknown sort " +
+            logOf(deps).info(
+              "api",
+              "0 results with --sort set. If you expected matches, an unknown sort " +
                 `key returns 0 rows. Sort keys are record field names (e.g. ${cat.sortKey}), ` +
                 "not the FilterNames from `mastr filters`; list them with " +
                 `\`mastr ${cat.name} --page-size 1 --compact | jq '.data[0] | keys'\`.`,
@@ -95,8 +96,9 @@ export function registerCommands(program: Command, deps: CliDeps): void {
           // An unknown operator, FilterName or dropdown code is already a usage error; what
           // is left that silently gives 0 rows is a value the register can't match.
           if (page.total === 0 && typeof opts["filter"] === "string") {
-            deps.io.err(
-              "Note: 0 results with --filter set. If you expected matches, check the values: eq " +
+            logOf(deps).info(
+              "api",
+              "0 results with --filter set. If you expected matches, check the values: eq " +
                 "on a text column matches the whole text (ct matches a part), decimals take a " +
                 "point ('4999.999'), and gt/lt are strict.",
             );

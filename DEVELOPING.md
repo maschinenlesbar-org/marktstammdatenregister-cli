@@ -35,7 +35,8 @@ src/
     client.ts    # MastrClient (+ parseMsDate / isoifyDates)
     index.ts
   cli/
-    io.ts        # injectable I/O (CliDeps / CliIO) — no env seam (no auth)
+    io.ts        # injectable I/O (CliDeps / CliIO), the logger and the clock — no env seam (no auth)
+    log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global->engine mapping, JSON render (+ --iso-dates)
     commands/units.ts  # the 4 category commands + the `filters` command
     program.ts   # assembles the commander program
@@ -136,8 +137,8 @@ the code it guards (`filterProblem` in `filter.ts`). The library enforces it wit
 `assertValid(name, value, problem)`, which throws `MastrValidationError` with
 `Invalid <name>: <reason>` before any request (constructors throw, async methods
 reject). The CLI's commander parsers call the same function and turn the reason into a
-usage error; a `MastrValidationError` raised during an action exits 2 with
-`Error: <message>`. Parity tests (`parity()` in `test/helpers.ts`) send one input
+usage error; a `MastrValidationError` raised during an action exits 2 and is
+logged as an `ERROR` record of `mastr.cli`. Parity tests (`parity()` in `test/helpers.ts`) send one input
 through `run()` and through the library on one mock transport and expect the same
 outcome.
 
@@ -160,8 +161,8 @@ outcome.
   unknown, misspelled or `__proto__` key or FilterName, arrays and NaN, unnormalised names,
   a repeated `--filter` and a repeated single-value option. Test helpers answer the client's
   filter-columns request from `fixtures.filterColumns` (`registerResponder`, `withColumns`).
-  **P20** the plain-`http:` warning (follow-up round 2026-10-06): one `warning: …` line on
-  stderr for a remote `http:` base URL, naming the host and, without printing them, the
+  **P20** the plain-`http:` warning (follow-up round 2026-10-06): one `WARN` record of
+  `mastr.http` on stderr for a remote `http:` base URL, naming the host and, without printing them, the
   URL's credentials; none for `https:`, loopback or `--help`; stdout unchanged; the library
   exports `cleartextProblem` (the env-var and other-secret cases are skipped: mastr reads no
   environment variable and sends no key). **P21** README links: every relative link in
@@ -174,7 +175,7 @@ outcome.
 - **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 22/24 (`engines`: Node.js 22.12 or later, the floor commander 15 declares).
 - **Plain `http:`** (`engine.ts` `cleartextProblem`, called once per run by `shared.ts`
   `action()` before the client is built): a remote `http:` base URL gets one
-  `warning: <sentence>` line on stderr; stdout and the exit code don't change.
+  `WARN` record of `mastr.http` on stderr; stdout and the exit code don't change.
 - **Exit codes** (`run.ts`): help/version → 0; usage → 2; 404 → 4; network → 6; other → 1.
 - **Closed pipes** (`io.ts` `handleOutputErrors`, installed by the bin shim before `run()`):
   an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly — so does ENOTCONN,
@@ -214,3 +215,21 @@ npm run build                        # the CLI, for the command reference
 cd site && npm ci && bundle install  # once (Node >= 22.12, Ruby 3.4, Bundler)
 npm run serve                        # http://127.0.0.1:4000/marktstammdatenregister-cli/
 ```
+
+## The log on stderr
+
+Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+(`ERROR`, `WARN`, `INFO`) and a topic, `mastr.<area>`. `--log-format text` (the default)
+writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
+`--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
+and `msg`. The areas are `cli` (usage errors, commander's messages, unexpected errors),
+`api` (the register's answers: HTTP errors, and the notes on an empty answer with `--sort`
+or `--filter`) and `http` (the connection: network errors, the size-cap hint, the
+cleartext warning). Code logs through `logOf(deps)` and never writes diagnostics with
+`io.err` directly. `run()` builds the logger from argv before commander parses it, so
+commander's own usage errors are records too, and on top of the redacted `io.err`, so a
+secret is kept out of the log in either format. `CliDeps.now` makes the timestamps
+testable. stdout carries data only. Conformance test P23 checks all of this, and its body
+is shared across the *-cli repos. Two lines stay plain, outside `run()`: the bin shim's
+`Output error: …` (`handleOutputErrors`, stdout failing) and its last-resort
+`Unexpected error: …` should `run()` itself ever reject.

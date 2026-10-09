@@ -7,7 +7,7 @@ import { MastrParseError } from "../src/client/errors.js";
 import { handleOutputErrors, type CliDeps } from "../src/cli/io.js";
 import { EventEmitter } from "node:events";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
-import { makeMockTransport, jsonResponse, queryOf, registerResponder, unitRequests, withColumns } from "./helpers.js";
+import { makeMockTransport, jsonResponse, queryOf, registerResponder, unitRequests, untimed, withColumns } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
 function makeCli(responder: (req: HttpRequest) => HttpResponse | Promise<HttpResponse>) {
@@ -79,7 +79,7 @@ test("0 results with --sort set prints a note about the likely bad sort field", 
   const code = await run(["stromerzeugung", "--sort", "BogusField-desc", "--total"], cli.deps);
   assert.equal(code, 0);
   const err = cli.err.join("\n");
-  assert.match(err, /0 results with --sort/);
+  assert.match(untimed(err), /^INFO  \[mastr\.api\] 0 results with --sort/);
   // `mastr filters` lists FilterNames, which are not sort keys (live: "Bruttoleistung der
   // Einheit-desc" gives 0 rows, "Bruttoleistung-desc" works), so point at the record keys.
   assert.match(err, /not the FilterNames from `mastr filters`/);
@@ -92,7 +92,7 @@ test("0 results with --filter set prints a note about the values", async () => {
   const code = await run(["stromerzeugung", "--filter", "Ort~eq~'Nirgendwo'", "--total"], cli.deps);
   assert.equal(code, 0);
   const err = cli.err.join("\n");
-  assert.match(err, /0 results with --filter/);
+  assert.match(untimed(err), /^INFO  \[mastr\.api\] 0 results with --filter/);
   assert.match(err, /eq on a text column matches the whole text/);
   assert.doesNotMatch(err, /--sort/);
 });

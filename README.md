@@ -65,10 +65,25 @@ sanity-check with `--total`; sort keys are record field names
 time with an explicit offset, `2020-02-20T17:28:35.250+01:00`.
 
 Global flags: `--base-url`, `--timeout`, `--user-agent`, `--max-retries`,
-`--max-response-bytes`, `--compact`, `--iso-dates`. See [Usage.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/Usage.md). A `--base-url`
-on plain `http:` to a host other than loopback prints one `warning: … sent unencrypted …`
-line on stderr before the first request (stdout and the exit code are unchanged); the
-library's check is `cleartextProblem(baseUrl)`.
+`--max-response-bytes`, `--log-format`, `--compact`, `--iso-dates`. See [Usage.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/Usage.md). A `--base-url`
+on plain `http:` to a host other than loopback logs one `WARN` record of `mastr.http`
+(`… sent unencrypted …`) on stderr before the first request (stdout and the exit code are
+unchanged); the library's check is `cleartextProblem(baseUrl)`.
+
+Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
+`INFO`) and a topic, the program and the area it comes from (`mastr.cli` for usage errors,
+`mastr.api` for the register's answers and the notes about them, `mastr.http` for the
+connection). By default it is written log4j style; `--log-format jsonl` writes one JSON
+object per line instead:
+
+```text
+2026-10-09T14:03:12.481Z WARN  [mastr.http] requests to mirror.test are sent unencrypted (http:, not https:)
+2026-10-09T14:03:12.902Z INFO  [mastr.api] 0 results with --filter set. If you expected matches, check the values: …
+```
+
+```bash
+mastr --log-format jsonl stromerzeugung --filter "Ort~eq~'Nirgendwo'" --total 2>log.jsonl   # {"ts":"…","level":"INFO","topic":"mastr.api","msg":"0 results with --filter set. …"}
+```
 
 ## Library
 

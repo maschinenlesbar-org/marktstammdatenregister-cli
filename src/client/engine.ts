@@ -235,8 +235,8 @@ export function validateBaseUrl(raw: string): string {
  * - userinfo in the URL: `the base URL's credentials are sent unencrypted to <host> (…)`;
  * - other secrets, given as noun phrases in `secrets` (e.g. `"the API key"`), are joined
  *   with the userinfo phrase by "and".
- * Never the password or key itself. The CLI prints it once per run as `warning: …` on
- * stderr; the register needs no secret, so it passes none.
+ * Never the password or key itself. The CLI logs it once per run as a `WARN` record of
+ * `mastr.http` on stderr; the register needs no secret, so it passes none.
  */
 export function cleartextProblem(baseUrl: string, secrets: readonly string[] = []): string | undefined {
   let url: URL;

@@ -95,6 +95,18 @@ export function queryOf(req: HttpRequest): URLSearchParams {
   return new URL(req.url).searchParams;
 }
 
+// ---- the log on stderr -------------------------------------------------------
+
+/**
+ * stderr with each text record's timestamp taken off: `ERROR [mastr.api] HTTP 404 …`.
+ * The format itself — timestamp, level, topic — is the conformance test's
+ * (conformance-p23-log-format); the other tests check what was said, at which level
+ * and under which topic.
+ */
+export function untimed(text: string): string {
+  return text.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z /gm, "");
+}
+
 // ---- CLI <-> library parity ----
 
 /** What the CLI did with one argv: exit code, captured output, requests sent. */
@@ -136,7 +148,7 @@ export async function parity(
     createClient: (opts) => defaultDeps.createClient({ ...opts, transport: mt.transport }),
   };
   const code = await run(argv, deps);
-  const cli: CliOutcome = { code, out: out.join("\n"), err: err.join("\n"), requests: mt.calls.slice() };
+  const cli: CliOutcome = { code, out: out.join("\n"), err: untimed(err.join("\n")), requests: mt.calls.slice() };
 
   const before = mt.calls.length;
   let lib: LibOutcome;

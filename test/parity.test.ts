@@ -8,7 +8,7 @@ import { MastrClient } from "../src/client/client.js";
 import { MastrNetworkError, MastrValidationError } from "../src/client/errors.js";
 import { validateBaseUrl } from "../src/index.js";
 import { run } from "../src/cli/run.js";
-import { jsonResponse, makeMockTransport, parity, requestShapes, unitRequests, withColumns } from "./helpers.js";
+import { jsonResponse, makeMockTransport, parity, requestShapes, unitRequests, untimed, withColumns } from "./helpers.js";
 
 test("parity: a blank or whitespace-only sort is rejected on both sides, before any request", async () => {
   for (const sort of ["", "   ", "\t"]) {
@@ -249,7 +249,7 @@ test("a bad base URL rejected by the library, not the CLI parser, still exits 2"
     createClient: (opts) => new MastrClient({ ...opts, baseUrl: "ftp://h.example/" }),
   });
   assert.equal(code, 2);
-  assert.deepEqual(err, ["Error: Invalid baseUrl: Only http and https URLs are supported."]);
+  assert.deepEqual(err.map(untimed), ["ERROR [mastr.cli] Invalid baseUrl: Only http and https URLs are supported."]);
 });
 
 test("validateBaseUrl returns the value without trailing slashes, or throws MastrValidationError", () => {

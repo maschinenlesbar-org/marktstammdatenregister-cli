@@ -3,7 +3,7 @@
 
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
-import type { CliDeps } from "./io.js";
+import { logOf, type CliDeps } from "./io.js";
 import type { MastrClientOptions } from "../client/client.js";
 import { isoifyDates } from "../client/client.js";
 import { MastrParseError } from "../client/errors.js";
@@ -199,7 +199,7 @@ export function action(
     // Once per run, before the first request: a remote plain-http base URL sends every
     // request (and any userinfo in it) unencrypted. stderr only; the run goes ahead.
     const cleartext = cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL);
-    if (cleartext !== undefined) deps.io.err(`warning: ${cleartext}`);
+    if (cleartext !== undefined) logOf(deps).warn("http", cleartext);
     const client = deps.createClient(toEngineOptions(global));
     await fn({ client, global, opts: command.opts() }, positionals);
   };
