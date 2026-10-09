@@ -203,7 +203,8 @@ outcome.
   an EPIPE on stdout (`| head`, `| jq` stopping early) exits 0 quietly — so does ENOTCONN,
   which is what a socket stdout reports when its reader has gone (a Node parent with piped
   stdio on macOS) — any other stdout
-  error prints `Output error: …` and exits 1; an EPIPE/ENOTCONN on stderr is ignored, so a failed run
+  error is an ERROR record of `mastr.output` (`Could not write to stdout: …`, in the format
+  argv asks for: `processLogger`) and exits 1; an EPIPE/ENOTCONN on stderr is ignored, so a failed run
   keeps its own exit code (`2>&1 | true` after a usage error still exits 2). A stdout closed
   with `>&-` can't be told apart from `> /dev/null` (Node reopens the closed descriptor on
   `/dev/null`), so that run exits 0.
@@ -253,8 +254,12 @@ character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellF
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors),
 `api` (the register's answers: HTTP errors, and the notes on an empty answer with `--sort`
-or `--filter`) and `http` (the connection: network errors, the size-cap hint, the
-cleartext warning). Code logs through `logOf(deps)` and never writes diagnostics with
+or `--filter`), `http` (the connection: network errors, the size-cap hint, the
+cleartext warning) and `output` (a failed write to stdout). A failed write to stdout other
+than a closed pipe (`handleOutputErrors`, in the bin shim, outside `run()`) is an ERROR
+record of `mastr.output` (`Could not write to stdout: …`), and the shim's last-resort
+`Unexpected error: …`, should `run()` itself ever reject, an ERROR of `mastr.cli`, both in
+the format argv asks for and redacted like the run's log (`processLogger`). Code logs through `logOf(deps)` and never writes diagnostics with
 `io.err` directly. `run()` builds the logger from argv before commander parses it
 (`logFormatFromArgv`, used only for the records of a parse error: the first `--log-format`,
 skipping the value of each of the program's own value options; a `preAction` hook then
@@ -267,6 +272,4 @@ record (`writeCommanderErr`). The log is built with the run's redaction
 (`withRedactedOutput`), which replaces a secret in the message only, before it is
 escaped: the frame is never touched, and a secret is kept out of the log in either format. `CliDeps.now` makes the timestamps
 testable. stdout carries data only. Conformance test P23 checks all of this, and its body
-is shared across the *-cli repos. Two lines stay plain, outside `run()`: the bin shim's
-`Output error: …` (`handleOutputErrors`, stdout failing) and its last-resort
-`Unexpected error: …` should `run()` itself ever reject.
+is shared across the *-cli repos.

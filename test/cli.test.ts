@@ -5,6 +5,7 @@ import { MastrClient } from "../src/client/client.js";
 import { renderJson } from "../src/cli/shared.js";
 import { MastrParseError, credentialsIn } from "../src/client/errors.js";
 import { handleOutputErrors, type CliDeps } from "../src/cli/io.js";
+import { createLogger } from "../src/cli/log.js";
 import { EventEmitter } from "node:events";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
 import { makeMockTransport, jsonResponse, queryOf, registerResponder, unitRequests, untimed, withColumns } from "./helpers.js";
@@ -517,4 +518,33 @@ test("a parse error is logged in the format commander would have parsed (L6)", a
     assert.equal(await run(argv, cli.deps), 2, argv.join(" "));
     assert.ok(cli.err.length > 0 && cli.err.every((line) => isJsonl(line) === jsonl), `${argv.join(" ")}:\n${cli.err.join("\n")}`);
   }
+});
+
+test("handleOutputErrors: another stdout write error (a closed descriptor, a full disk) is an ERROR record of mastr.output, in the run's format, and exits 1", () => {
+  // Only a reader that has gone is a success; EBADF, ENOSPC or EIO means the output is incomplete.
+  const stdout = new EventEmitter();
+  const written: string[] = [];
+  const stderr = Object.assign(new EventEmitter(), { write: (text: string) => written.push(text) > 0 });
+  const exits: number[] = [];
+  const records: string[] = [];
+  const log = createLogger({ format: "jsonl", write: (line) => records.push(line), now: () => new Date("2026-01-02T03:04:05.678Z") });
+  handleOutputErrors({ stdout, stderr } as never, (c) => { exits.push(c); }, log);
+  stdout.emit("error", Object.assign(new Error("EBADF: bad file descriptor, write"), { code: "EBADF" }));
+  assert.deepEqual(exits, [1]);
+  assert.deepEqual(records.map((line) => JSON.parse(line)), [
+    { ts: "2026-01-02T03:04:05.678Z", level: "ERROR", topic: "mastr.output", msg: "Could not write to stdout: EBADF: bad file descriptor, write" },
+  ]);
+  assert.deepEqual(written, []);
+});
+
+test("handleOutputErrors: without a logger, a stdout write error is a text ERROR record on the streams' stderr", () => {
+  const stdout = new EventEmitter();
+  const written: string[] = [];
+  const stderr = Object.assign(new EventEmitter(), { write: (text: string) => written.push(text) > 0 });
+  const exits: number[] = [];
+  handleOutputErrors({ stdout, stderr } as never, (c) => { exits.push(c); });
+  stdout.emit("error", Object.assign(new Error("write EBADF"), { code: "EBADF" }));
+  assert.deepEqual(exits, [1]);
+  assert.equal(written.length, 1);
+  assert.match(written[0] ?? "", /^\S+Z ERROR \[mastr\.output\] Could not write to stdout: write EBADF\n$/);
 });
