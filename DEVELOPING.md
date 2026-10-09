@@ -152,6 +152,8 @@ outcome.
   2024 DST edges).
 - `cli.test.ts` — the 4 commands, paging bounds, `--total`, `--iso-dates`, the `filters`
   command, and the hardening guards (control-char UA, empty base URL, bounded retries).
+- `log.test.ts` — the record helpers of `src/cli/log.ts` on their own
+  (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
 - `conformance-p*.test.ts` — the checks shared across the `*-cli` repos (fix plan
   2026-10-06; only the adapter block at the top is repo-specific): P1/P2 credential
   redaction, P4 base-URL rules (the P19 env-var case is skipped: mastr reads no environment
@@ -222,7 +224,11 @@ Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp,
 (`ERROR`, `WARN`, `INFO`) and a topic, `mastr.<area>`. `--log-format text` (the default)
 writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
 `--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
-and `msg`. The areas are `cli` (usage errors, commander's messages, unexpected errors),
+and `msg`. A record is always one line: `formatLogRecord` runs `escapeForRecord` over
+the message (text) or the whole JSON object (jsonl), which writes CR and LF as `\r`/`\n`,
+every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
+controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
+forge another one or steer the terminal. The areas are `cli` (usage errors, commander's messages, unexpected errors),
 `api` (the register's answers: HTTP errors, and the notes on an empty answer with `--sort`
 or `--filter`) and `http` (the connection: network errors, the size-cap hint, the
 cleartext warning). Code logs through `logOf(deps)` and never writes diagnostics with
