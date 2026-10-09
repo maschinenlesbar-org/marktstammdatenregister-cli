@@ -488,3 +488,15 @@ test("an a:b@c argument (here a User-Agent) is neither a credential in the log n
   assert.deepEqual(credentialsIn("run:2026-10-09@x"), []);
   assert.deepEqual(credentialsIn("https://alice:pw@host"), ["alice:pw"]);
 });
+
+test("options without a command: an ERROR 'missing command' first, then the help one INFO record per line (L5)", async () => {
+  for (const argv of [["--compact"], ["--log-format", "jsonl"]]) {
+    const cli = makeCli(registerResponder(fx.unitPage));
+    const now = () => new Date("2026-01-02T03:04:05.678Z");
+    assert.equal(await run(argv, { ...cli.deps, now }), 2);
+    const msgs = cli.err.map((line) => (line.startsWith("{") ? (({ level, msg }) => ({ level, msg }))(JSON.parse(line) as { level: string; msg: string }) : { level: line.split(" ")[1]!, msg: line.slice(line.indexOf("] ") + 2) }));
+    assert.deepEqual(msgs[0], { level: "ERROR", msg: "missing command: `mastr <subcommand>`" });
+    assert.ok(msgs.length > 3 && msgs.slice(1).every((m) => m.level === "INFO" && m.msg.trim() !== "" && !m.msg.includes("\n")), cli.err.join("\n"));
+    assert.ok(msgs.some((m) => m.msg.startsWith("Usage: mastr")), cli.err.join("\n"));
+  }
+});
