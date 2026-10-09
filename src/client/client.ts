@@ -11,7 +11,7 @@
 //   page.total; // total solar units
 
 import { RequestEngine, describeMastrErrors, optionsObject, type EngineOptions } from "./engine.js";
-import { MastrApiError, MastrParseError, MastrValidationError } from "./errors.js";
+import { MastrApiError, MastrParseError, MastrValidationError, cutForMessage } from "./errors.js";
 import { normalizeFilter, resolveFilter, validateFilter } from "./filter.js";
 import { COUNT_IGNORED_KEYS, assertValid, countQueryProblem, sortProblem } from "./validate.js";
 import type { QueryParams } from "./query.js";
@@ -38,7 +38,7 @@ export const MAX_PAGE_SIZE = 5000;
 function categorySuffix(category: UnitCategory): string {
   if (typeof category !== "string" || !Object.hasOwn(CATEGORY_SUFFIX, category)) {
     throw new MastrValidationError(
-      `Invalid category: expected one of ${Object.keys(CATEGORY_SUFFIX).join(", ")}, got ${JSON.stringify(category)}.`,
+      `Invalid category: expected one of ${Object.keys(CATEGORY_SUFFIX).join(", ")}, got ${typeof category === "string" ? JSON.stringify(cutForMessage(category)) : String(category)}.`,
     );
   }
   return CATEGORY_SUFFIX[category];
@@ -49,7 +49,7 @@ function checkPaging(name: string, value: unknown, max: number): void {
   if (value === undefined) return;
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > max) {
     throw new MastrValidationError(
-      `Invalid ${name}: expected an integer from 1 to ${max}, got ${typeof value === "string" ? JSON.stringify(value) : String(value)}.`,
+      `Invalid ${name}: expected an integer from 1 to ${max}, got ${typeof value === "string" ? JSON.stringify(cutForMessage(value)) : String(value)}.`,
     );
   }
 }
@@ -94,7 +94,7 @@ function assertQueryKeys(query: object, allowed: readonly string[]): void {
     const lower = key.toLowerCase();
     const hint = allowed.find((name) => name.toLowerCase() === lower || editHint(lower, name.toLowerCase()));
     throw new MastrValidationError(
-      `Invalid query: unknown key ${JSON.stringify(key)}` +
+      `Invalid query: unknown key ${JSON.stringify(cutForMessage(key))}` +
         (hint === undefined ? `; the keys are ${allowed.join(", ")}.` : ` (did you mean ${hint}?).`),
     );
   }

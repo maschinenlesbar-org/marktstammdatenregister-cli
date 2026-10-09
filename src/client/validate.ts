@@ -4,7 +4,7 @@
 // commander parsers call the same functions and turn the reason into a usage
 // error, so a rule is written once and the CLI and the library cannot drift apart.
 
-import { MastrValidationError } from "./errors.js";
+import { MastrValidationError, cutForMessage } from "./errors.js";
 import type { UnitQuery } from "./types.js";
 
 /** A rule: the reason `value` is invalid, or `undefined` when it is valid. */
@@ -23,9 +23,9 @@ export function assertValid<T>(name: string, value: T, problem: Problem<T>): T {
   return value;
 }
 
-/** A value as it appears in a validation message: strings quoted, the rest as is. */
+/** A value as it appears in a validation message: strings quoted (and cut, `cutForMessage`), the rest as is. */
 function show(value: unknown): string {
-  return typeof value === "string" ? JSON.stringify(value) : String(value);
+  return typeof value === "string" ? JSON.stringify(cutForMessage(value)) : String(value);
 }
 
 /**

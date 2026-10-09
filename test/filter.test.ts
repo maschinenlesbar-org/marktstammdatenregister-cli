@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildFilter, filterProblem, normalizeFilter, normalizeFilterName, FILTER_OPERATORS } from "../src/client/filter.js";
+import { buildFilter, filterProblem, normalizeFilter, normalizeFilterName, resolveFilter, FILTER_OPERATORS } from "../src/client/filter.js";
 import { MastrValidationError } from "../src/client/errors.js";
 
 test("filterProblem names a ~ inside a quoted value (the register has no escape)", () => {
@@ -90,4 +90,21 @@ test("filterProblem refuses a quoted empty value except for null/nn (finding 01#
   assert.match(filterProblem("Ort~ct~'  '") ?? "", /has no value/);
   assert.equal(filterProblem("Ort~nn~''"), undefined);
   assert.equal(filterProblem("Ort~eq~' x '"), undefined);
+});
+
+test("own messages quote a typed filter part at most 200 characters long (L3)", () => {
+  const long = "x".repeat(5000);
+  for (const spec of [`Ort~${long}~'a'`, `Ort~eq~'${long}`, `Ort~eq~'a'~${long}~Ort~eq~'b'`, `Ort~eq~'a'~and~${long}`]) {
+    const problem = filterProblem(spec) ?? "";
+    assert.match(problem, /x…/, spec.slice(0, 20));
+    assert.ok(problem.length < 600, `${problem.length}`);
+  }
+  assert.throws(
+    () => resolveFilter(`${long}~eq~'a'`, [{ FilterName: "Ort", Type: "text" }], "stromerzeugung"),
+    (err: Error) => /unknown FilterName "x+…"/.test(err.message) && err.message.length < 600,
+  );
+  assert.throws(
+    () => buildFilter([{ name: "Ort", op: "eq", value: `${long}~` }]),
+    (err: Error) => /the value "x+…" in condition 1/.test(err.message) && err.message.length < 600,
+  );
 });

@@ -391,3 +391,14 @@ test("null/nn on a number, dropdown or boolean column is a validation error; on 
     assert.equal(queryOf(mt.last()).get("filter"), filter);
   }
 });
+
+test("own messages quote a caller's value at most 200 characters long (L3)", async () => {
+  const long = "x".repeat(5000);
+  const { client } = clientFor(fx.unitPage);
+  const bounded = (pattern: RegExp) => (err: Error) => pattern.test(err.message) && err.message.length < 600;
+  await assert.rejects(client.units(long as never), bounded(/got "x+…"/));
+  await assert.rejects(client.units("stromerzeugung", { page: long as never }), bounded(/got "x+…"/));
+  await assert.rejects(client.units("stromerzeugung", { [long]: 1 } as never), bounded(/unknown key "x+…"/));
+  assert.throws(() => new MastrClient({ [long]: 1 } as never), bounded(/Unknown option "x+…"/));
+  assert.throws(() => new MastrClient({ timeoutMs: long as never }), bounded(/got "x+…"/));
+});

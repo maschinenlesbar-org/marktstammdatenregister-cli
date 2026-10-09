@@ -285,3 +285,11 @@ test("a server detail or text snippet cut to its limit keeps the message well-fo
     });
   }
 });
+
+test("a charset label and a text snippet are quoted at most 200 characters long (L3)", async () => {
+  const label = "x".repeat(5000);
+  const charset = new RequestEngine({ transport: async () => rawResponse("{}", `application/json; charset=${label}`) });
+  await assert.rejects(charset.getJson("/x"), (err: Error) => /charset "x+…"/.test(err.message) && err.message.length < 400);
+  const text = new RequestEngine({ transport: async () => rawResponse("y".repeat(5000), "text/plain", 500) });
+  await assert.rejects(text.getJson("/x"), (err: Error) => /: y{200}…$/.test(err.message));
+});

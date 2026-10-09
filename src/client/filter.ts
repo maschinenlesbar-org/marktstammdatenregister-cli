@@ -4,7 +4,7 @@
 // unfiltered total, a truncated condition list, or 0 rows), so specs it would
 // misread are refused before any request.
 
-import { MastrValidationError } from "./errors.js";
+import { MastrValidationError, cutForMessage } from "./errors.js";
 import type { FilterColumn } from "./types.js";
 
 /**
@@ -67,25 +67,25 @@ export function filterProblem(spec: string): string | undefined {
       return `Condition ${n} has no FilterName. ${SHAPE}`;
     }
     if (op === undefined || value === undefined) {
-      return `Condition ${n} ("${parts.slice(i).join("~")}") is incomplete. ${SHAPE}`;
+      return `Condition ${n} ("${cutForMessage(parts.slice(i).join("~"))}") is incomplete. ${SHAPE}`;
     }
     if (!OPERATORS.has(op)) {
       const lower = op.trim().toLowerCase();
       const hint = OPERATORS.has(lower) ? ` Operators are lower case: use "${lower}".` : "";
       return (
-        `Unknown operator "${op}" in condition ${n}. The operators are ` +
+        `Unknown operator "${cutForMessage(op)}" in condition ${n}. The operators are ` +
         `${FILTER_OPERATORS.join(", ")} (gt/lt are strict; there is no gte/lte); the register ` +
         `returns 0 rows for any other.${hint}`
       );
     }
     if (!UNARY_OPERATORS.has(op) && value.trim() === "") {
-      return `Condition ${n} ("${name}~${op}") has no value. ${SHAPE}`;
+      return `Condition ${n} ("${cutForMessage(`${name}~${op}`)}") has no value. ${SHAPE}`;
     }
     // A quoted blank value ('' or ' ') is no value either: on a text column it matches
     // nothing, and on a dropdown the live register did not answer within 30 s
     // (2026-10-05). Only null/nn take ''.
     if (!UNARY_OPERATORS.has(op) && /^'\s*'$/.test(value.trim())) {
-      return `Condition ${n} ("${name}~${op}~${value.trim()}") has no value: '' is only for null/nn. ${SHAPE}`;
+      return `Condition ${n} ("${cutForMessage(`${name}~${op}~${value.trim()}`)}") has no value: '' is only for null/nn. ${SHAPE}`;
     }
     if (value.startsWith("'") && (value.length < 2 || !value.endsWith("'"))) {
       // A later part that closes the quote means the value itself held a "~".
@@ -93,12 +93,12 @@ export function filterProblem(spec: string): string | undefined {
       if (close !== -1) {
         const meant = parts.slice(i + 2, close + 1).join("~");
         return (
-          `The value ${meant} in condition ${n} contains "~". A filter value cannot contain "~": ` +
-          `the register splits the filter on every "~" and has no escape, so it would read ${value}' ` +
+          `The value ${cutForMessage(meant)} in condition ${n} contains "~". A filter value cannot contain "~": ` +
+          `the register splits the filter on every "~" and has no escape, so it would read ${cutForMessage(value)}' ` +
           "and treat the rest as further conditions. Leave the ~ out (e.g. match a part with ct)."
         );
       }
-      return `The value of condition ${n} (${value}) has no closing single quote. ${SHAPE}`;
+      return `The value of condition ${n} (${cutForMessage(value)}) has no closing single quote. ${SHAPE}`;
     }
     i += 3;
     if (i >= parts.length) return undefined;
@@ -111,7 +111,7 @@ export function filterProblem(spec: string): string | undefined {
       );
     }
     if (conjunction !== "and") {
-      return `Expected ~and~ after condition ${n}, got "~${conjunction}~". Conditions are joined by ~and~ only.`;
+      return `Expected ~and~ after condition ${n}, got "~${cutForMessage(conjunction)}~". Conditions are joined by ~and~ only.`;
     }
     i += 1;
     if (parts.slice(i).join("~").trim() === "") {
@@ -199,40 +199,40 @@ export function buildFilter(conditions: readonly FilterCondition[]): string {
     const n = index + 1;
     if (typeof c?.name !== "string" || c.name.trim() === "" || c.name.includes("~")) {
       throw new MastrValidationError(
-        `Invalid filter: condition ${n} needs a non-blank FilterName without "~", got ${JSON.stringify(c?.name)}.`,
+        `Invalid filter: condition ${n} needs a non-blank FilterName without "~", got ${quoted(c?.name)}.`,
       );
     }
     if (!OPERATORS.has(c.op)) {
       throw new MastrValidationError(
-        `Invalid filter: unknown operator ${JSON.stringify(c.op)} in condition ${n}; expected one of ${FILTER_OPERATORS.join(", ")}.`,
+        `Invalid filter: unknown operator ${quoted(c.op)} in condition ${n}; expected one of ${FILTER_OPERATORS.join(", ")}.`,
       );
     }
     if (UNARY_OPERATORS.has(c.op)) return `${c.name}~${c.op}~''`;
     const items: readonly unknown[] = Array.isArray(c.value) ? c.value : [c.value];
     if (items.length === 0) {
-      throw new MastrValidationError(`Invalid filter: condition ${n} ("${c.name}") has an empty value list.`);
+      throw new MastrValidationError(`Invalid filter: condition ${n} ("${cutForMessage(c.name)}") has an empty value list.`);
     }
     const texts = items.map((item) => {
       if ((typeof item !== "string" && typeof item !== "number") || String(item).trim() === "") {
         throw new MastrValidationError(
-          `Invalid filter: condition ${n} ("${c.name}") needs a non-blank value, got ${JSON.stringify(item)}.`,
+          `Invalid filter: condition ${n} ("${cutForMessage(c.name)}") needs a non-blank value, got ${quoted(item)}.`,
         );
       }
       if (typeof item === "number" && !Number.isFinite(item)) {
         throw new MastrValidationError(
-          `Invalid filter: condition ${n} ("${c.name}") needs a finite number, got ${String(item)}.`,
+          `Invalid filter: condition ${n} ("${cutForMessage(c.name)}") needs a finite number, got ${String(item)}.`,
         );
       }
       const text = typeof item === "number" ? plainNumber(item) : item;
       if (text.includes("~")) {
         throw new MastrValidationError(
-          `Invalid filter: the value ${JSON.stringify(text)} in condition ${n} contains "~", which the ` +
+          `Invalid filter: the value ${quoted(text)} in condition ${n} contains "~", which the ` +
             "register reads as a separator (there is no escape).",
         );
       }
       if (items.length > 1 && text.includes(",")) {
         throw new MastrValidationError(
-          `Invalid filter: the list item ${JSON.stringify(text)} in condition ${n} contains ",", which ` +
+          `Invalid filter: the list item ${quoted(text)} in condition ${n} contains ",", which ` +
             "separates the codes of a list.",
         );
       }
@@ -261,6 +261,11 @@ function plainNumber(n: number): string {
 export function validateFilter(spec: string): void {
   const problem = filterProblem(spec);
   if (problem !== undefined) throw new MastrValidationError(`Invalid filter: ${problem}`);
+}
+
+/** A value quoted in a message as JSON, a string cut first (`cutForMessage`). */
+function quoted(value: unknown): string {
+  return JSON.stringify(typeof value === "string" ? cutForMessage(value) : value) ?? String(value);
 }
 
 /** Edit distance between two strings (Levenshtein), for "did you mean". */
@@ -340,7 +345,7 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
     if (column === undefined) {
       const near = closeNames(name, [...byName.keys()]);
       throw new MastrValidationError(
-        `Invalid filter: unknown FilterName ${JSON.stringify(name)} in condition ${n}: ${category} has no such ` +
+        `Invalid filter: unknown FilterName ${quoted(name)} in condition ${n}: ${category} has no such ` +
           "column, and the register would ignore it and return the unfiltered set." +
           (near.length > 0 ? ` Did you mean ${near.map((x) => JSON.stringify(x)).join(", ")}?` : "") +
           ` List the names with \`mastr filters ${category}\` (filterColumns() in the library).`,
@@ -366,7 +371,7 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
         const label = codes.find((o) => typeof o.Name === "string" && o.Name.toLowerCase() === item.toLowerCase());
         const shown = codes.slice(0, 8).map((o) => `${o.Value} (${o.Name ?? ""})`).join(", ");
         throw new MastrValidationError(
-          `Invalid filter: ${JSON.stringify(item)} is not a code of the dropdown column ` +
+          `Invalid filter: ${quoted(item)} is not a code of the dropdown column ` +
             `${JSON.stringify(column.FilterName)} (condition ${n}). ` +
             (label !== undefined
               ? `It is the label of code ${label.Value}: a dropdown takes its code (${column.FilterName}~${op}~'${label.Value}').`

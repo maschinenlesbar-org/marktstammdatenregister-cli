@@ -20,7 +20,7 @@ import {
   MastrParseError,
   MastrValidationError,
   credentialsIn,
-  cutText,
+  cutForMessage,
   redactCredentials,
   redactUrl,
 } from "./errors.js";
@@ -188,7 +188,7 @@ export const MAX_DETAIL_LENGTH = 500;
 
 /** `text` cut at MAX_DETAIL_LENGTH characters (never inside a surrogate pair), ending in "…" when cut. */
 function cutDetail(text: string): string {
-  return text.length > MAX_DETAIL_LENGTH ? `${cutText(text, MAX_DETAIL_LENGTH)}…` : text;
+  return cutForMessage(text, MAX_DETAIL_LENGTH);
 }
 
 /**
@@ -280,7 +280,7 @@ function checkedHeaders(headers: Record<string, string>): Record<string, string>
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
     assertValid("defaultHeaders name", name, headerNameProblem);
-    out[name] = assertHeaderValue(`defaultHeaders["${name}"]`, value);
+    out[name] = assertHeaderValue(`defaultHeaders["${cutForMessage(name)}"]`, value);
   }
   return out;
 }
@@ -390,7 +390,7 @@ export function assertKnownOptions(options: object, extra: readonly string[] = [
     const lower = key.toLowerCase();
     const hint = names.find((name) => name.toLowerCase().includes(lower) || lower.includes(name.toLowerCase()));
     throw new MastrValidationError(
-      `Unknown option ${JSON.stringify(key)}` +
+      `Unknown option ${JSON.stringify(cutForMessage(key))}` +
         (hint === undefined ? `; the options are ${names.join(", ")}.` : ` (did you mean ${hint}?).`),
     );
   }
@@ -674,7 +674,7 @@ export class RequestEngine {
       // collapsed snippet of a textual body; skip HTML pages (start with "<").
       const snippet = text.trim().replace(/\s+/g, " ");
       if (snippet.length > 0 && !snippet.startsWith("<")) {
-        detail = snippet.length > 200 ? `${cutText(snippet, 200)}…` : snippet;
+        detail = cutForMessage(snippet);
       }
     }
     // `detail` came from the response body (JSON field or text snippet); the `\s+`
@@ -698,7 +698,7 @@ function decodeBody(body: Buffer, contentType: string, path: string): string {
   try {
     decoder = new TextDecoder(charset);
   } catch {
-    throw new MastrParseError(`Unsupported response charset "${sanitizeServerText(charset)}" from ${path}.`);
+    throw new MastrParseError(`Unsupported response charset "${cutForMessage(sanitizeServerText(charset))}" from ${path}.`);
   }
   return decoder.decode(body);
 }
