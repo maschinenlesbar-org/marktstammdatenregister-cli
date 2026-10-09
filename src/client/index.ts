@@ -25,6 +25,7 @@ export {
   MAX_DETAIL_LENGTH,
   describeMastrErrors,
   sanitizeServerText,
+  serverTextForMessage,
   isBidiControl,
 } from "./engine.js";
 export type { EngineOptions, RawResponse } from "./engine.js";

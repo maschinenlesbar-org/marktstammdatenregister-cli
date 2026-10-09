@@ -133,7 +133,12 @@ options and queries). Server text in an error message is cut at 500 characters
 Any other value an own message quotes from a server answer or a caller's input (a
 FilterName, a dropdown code, a filter part, a query or option key, a charset) is cut at
 `MAX_QUOTED_LENGTH` (200, `cutForMessage` in `errors.ts`), so `err.message` stays bounded
-for a library caller. `count(category, { filter, sort })` refuses `page` and
+for a library caller. The filter check (`resolveFilter`) quotes the register's own
+filter-columns reply — FilterNames in a "did you mean", dropdown codes and labels — through
+`serverTextForMessage` (exported from `engine.ts`): `sanitizeServerText`, then cut at 200,
+and the list of codes at 500. A hostile reply's line break used to forge log records, its
+ESC/OSC sequences reached the terminal, and a 200 000-character label made a 300 KB record.
+`filterColumns()` and the `filters` command keep the values as the register sent them. `count(category, { filter, sort })` refuses `page` and
 `pageSize` (`countQueryProblem`): the count is the same on every page.
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`

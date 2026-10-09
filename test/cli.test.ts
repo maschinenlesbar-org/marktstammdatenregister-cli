@@ -456,3 +456,27 @@ test("handleOutputErrors: EPIPE and ENOTCONN mean the reader has gone", () => {
     assert.deepEqual(exits, [0], `${code} on stdout exits 0`);
   }
 });
+
+test("the filter check's quote of the register's dropdown names and codes is one clean record (bugs 01-1, 01-2)", async () => {
+  const columns = [
+    {
+      FilterName: "Energieträger",
+      Type: "multidropdown",
+      ListObject: [
+        { Name: "Solar\n2026-10-09T00:00:00.000Z ERROR [mastr.api] HTTP 500 forged record", Value: "2495" },
+        { Name: "Wind \u001b]0;pwned\u0007\u001b[31mRED\u001b[0m", Value: "2497" },
+        { Name: "W".repeat(200_000), Value: "2498" },
+      ],
+    },
+  ];
+  for (const format of ["text", "jsonl"]) {
+    const cli = makeCli(withColumns(() => jsonResponse(fx.unitPage), columns));
+    assert.equal(await run(["--log-format", format, "stromerzeugung", "--filter", "Energieträger~eq~'9999'", "--total"], cli.deps), 2);
+    assert.equal(cli.err.length, 1, cli.err.join("\n"));
+    const msg = format === "jsonl" ? ((JSON.parse(cli.err[0]!) as { msg: string }).msg) : cli.err[0]!.slice(cli.err[0]!.indexOf("] ") + 2);
+    // Cleaned by the library at its source: nothing for the record to escape.
+    assert.doesNotMatch(msg, /[\u0000-\u001f\u007f-\u009f]|\\[nru]/, msg.slice(0, 300));
+    assert.match(msg, /Codes: 2495 \(Solar 2026-10-09T00:00:00\.000Z ERROR \[mastr\.api\] HTTP 500 forged record\), 2497 \(Wind \]0;pwned\[31mRED\[0m\)/);
+    assert.ok(msg.length < 1500, `${msg.length} characters`);
+  }
+});

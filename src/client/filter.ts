@@ -4,6 +4,7 @@
 // unfiltered total, a truncated condition list, or 0 rows), so specs it would
 // misread are refused before any request.
 
+import { MAX_DETAIL_LENGTH, serverTextForMessage } from "./engine.js";
 import { MastrValidationError, cutForMessage } from "./errors.js";
 import type { FilterColumn } from "./types.js";
 
@@ -347,7 +348,7 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
       throw new MastrValidationError(
         `Invalid filter: unknown FilterName ${quoted(name)} in condition ${n}: ${category} has no such ` +
           "column, and the register would ignore it and return the unfiltered set." +
-          (near.length > 0 ? ` Did you mean ${near.map((x) => JSON.stringify(x)).join(", ")}?` : "") +
+          (near.length > 0 ? ` Did you mean ${near.map((x) => JSON.stringify(serverTextForMessage(x))).join(", ")}?` : "") +
           ` List the names with \`mastr filters ${category}\` (filterColumns() in the library).`,
       );
     }
@@ -356,7 +357,7 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
     if (UNARY_OPERATORS.has(op) && NO_NULL_TEST_TYPES.has(String(column.Type))) {
       throw new MastrValidationError(
         `Invalid filter: ${op} (condition ${n}) doesn't work on the ${String(column.Type)} column ` +
-          `${JSON.stringify(column.FilterName)}: the register answers null/nn on number, dropdown and ` +
+          `${JSON.stringify(serverTextForMessage(column.FilterName!))}: the register answers null/nn on number, dropdown and ` +
           "boolean columns with an error (they work on text columns). There is no way to ask for " +
           "the units without a value in such a column.",
       );
@@ -369,12 +370,22 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
       for (const item of value.split(",").map((x) => x.trim())) {
         if (codes.some((o) => o.Value === item)) continue;
         const label = codes.find((o) => typeof o.Name === "string" && o.Name.toLowerCase() === item.toLowerCase());
-        const shown = codes.slice(0, 8).map((o) => `${o.Value} (${o.Name ?? ""})`).join(", ");
+        // The names and codes are the register's text: cleaned and cut before they are quoted
+        // (a hostile reply's line break forged log records, its escapes reached the terminal).
+        const shown = cutForMessage(
+          codes
+            .slice(0, 8)
+            .map((o) => `${serverTextForMessage(o.Value)} (${typeof o.Name === "string" ? serverTextForMessage(o.Name) : ""})`)
+            .join(", "),
+          MAX_DETAIL_LENGTH,
+        );
+        const columnName = serverTextForMessage(column.FilterName!);
+        const code = label === undefined ? "" : serverTextForMessage(label.Value);
         throw new MastrValidationError(
           `Invalid filter: ${quoted(item)} is not a code of the dropdown column ` +
-            `${JSON.stringify(column.FilterName)} (condition ${n}). ` +
+            `${JSON.stringify(columnName)} (condition ${n}). ` +
             (label !== undefined
-              ? `It is the label of code ${label.Value}: a dropdown takes its code (${column.FilterName}~${op}~'${label.Value}').`
+              ? `It is the label of code ${code}: a dropdown takes its code (${columnName}~${op}~'${code}').`
               : `The register would answer 0 rows or an error. Codes: ${shown}${codes.length > 8 ? ", …" : ""}; ` +
                 `all of them with \`mastr filters ${category}\`.`),
         );

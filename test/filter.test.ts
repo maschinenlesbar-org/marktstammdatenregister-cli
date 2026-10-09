@@ -108,3 +108,53 @@ test("own messages quote a typed filter part at most 200 characters long (L3)", 
     (err: Error) => /the value "x+…" in condition 1/.test(err.message) && err.message.length < 600,
   );
 });
+
+// The register's filter-columns reply, as a hostile or broken server could send it: a
+// dropdown Name with a line break and a record-shaped line, ESC/OSC/CSI sequences, C1, DEL,
+// CR, bidi controls, and 200 000 characters (2026-10-09, result 01, bugs 01-1 and 01-2).
+const FORGED = "Solar\n2026-10-09T00:00:00.000Z ERROR [mastr.api] HTTP 500 forged record";
+const ESCAPES = "Wind \u001b]0;pwned\u0007\u001b[31mRED\u001b[0m\u009b2J\u007f\r\u202eevil\u2028ls";
+const HOSTILE_COLUMNS = [
+  {
+    FilterName: "Energieträger",
+    Type: "multidropdown",
+    ListObject: [
+      { Name: FORGED, Value: "2495" },
+      { Name: ESCAPES, Value: "2497" },
+      { Name: "Wasser", Value: `2498\n${FORGED}\u001b[31m` },
+      { Name: "Z".repeat(200_000), Value: "Y".repeat(100_000) },
+    ],
+  },
+  { FilterName: "Ortsteil\n2026 forged", Type: "text", ListObject: [] },
+  { FilterName: "Ortschaft\u009b2J\u202e", Type: "text", ListObject: [] },
+  { FilterName: "Leistung\u001b[31m\nforged", Type: "number", ListObject: [] },
+];
+
+/** The message of the MastrValidationError resolveFilter throws for `spec` against HOSTILE_COLUMNS. */
+function resolveMessage(spec: string): string {
+  try {
+    resolveFilter(spec, HOSTILE_COLUMNS, "stromerzeugung");
+  } catch (err) {
+    assert.ok(err instanceof MastrValidationError, String(err));
+    return err.message;
+  }
+  assert.fail(`no error for ${spec}`);
+}
+
+test("resolveFilter quotes the register's names and codes clean, on one line and cut (bugs 01-1, 01-2)", () => {
+  const messages = [
+    resolveMessage("Energieträger~eq~'9999'"), // the codes list
+    resolveMessage("Energieträger~eq~'wasser'"), // the label path: its code, twice
+    resolveMessage("Orts~eq~'x'"), // did you mean: the server's FilterNames
+    resolveMessage(`${HOSTILE_COLUMNS[3]!.FilterName}~null~''`), // null/nn: the column's name
+  ];
+  for (const message of messages) {
+    assert.doesNotMatch(message, /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202e]/, JSON.stringify(message.slice(0, 300)));
+    assert.ok(message.length < 2000, `${message.length} characters`);
+  }
+  assert.match(messages[0]!, /Codes: 2495 \(Solar 2026-10-09T00:00:00\.000Z ERROR \[mastr\.api\] HTTP 500 forged record\), 2497 \(Wind \]0;pwned\[31mRED/);
+  assert.match(messages[0]!, /Z{10}…/, "a long name is cut");
+  assert.match(messages[1]!, /It is the label of code 2498 Solar 2026-10-09T00:00:00\.000Z ERROR .* forged record\[31m: a dropdown takes its code/);
+  assert.match(messages[2]!, /Did you mean "Ortsteil 2026 forged", "Ortschaft2J"/);
+  assert.match(messages[3]!, /doesn't work on the number column "Leistung\[31m forged"/);
+});

@@ -19,6 +19,7 @@ import {
   MastrNetworkError,
   MastrParseError,
   MastrValidationError,
+  MAX_QUOTED_LENGTH,
   credentialsIn,
   cutForMessage,
   redactCredentials,
@@ -177,6 +178,17 @@ export function sanitizeServerText(text: string): string {
     out += ch;
   }
   return out.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * A short server string — a FilterName, a dropdown code or label from the filter-columns
+ * reply — as an own message quotes it: `sanitizeServerText` (control and bidi characters
+ * dropped, whitespace folded to one space, so it stays on one line) and cut at `max`
+ * characters (`MAX_QUOTED_LENGTH`, 200). The data itself (`filterColumns()`, the `filters`
+ * command's JSON) keeps the value as the register sent it.
+ */
+export function serverTextForMessage(text: string, max = MAX_QUOTED_LENGTH): string {
+  return cutForMessage(sanitizeServerText(text), max);
 }
 
 /**
