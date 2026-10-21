@@ -299,6 +299,27 @@ function areaOf(err: MastrError): string {
   return "cli";
 }
 
+/**
+ * What to do about an answer over the size cap, from the request the network error names
+ * (`GET <url> failed: …`): "Lower --page-size" only for a unit page of more than one row. The
+ * filter columns (`mastr filters`, or the check before a --filter query) have no paging, and
+ * --total asks for one row, so for them the only way is a larger cap.
+ */
+function sizeCapHint(message: string): string {
+  let pageSize = 0;
+  try {
+    const url = new URL(/^GET (\S+) failed: /.exec(message)?.[1] ?? "");
+    if (!url.pathname.includes("/GetFilterColumns")) pageSize = Number(url.searchParams.get("pageSize") ?? "0");
+  } catch {
+    // no URL to read: give the general hint below
+    pageSize = 2;
+  }
+  const raise = "--max-response-bytes <n> (0 = unlimited).";
+  return pageSize > 1
+    ? `The response exceeded the size cap. Lower --page-size or raise ${raise}`
+    : `The response exceeded the size cap. Raise ${raise}`;
+}
+
 export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<number> {
   // The log replaces the secrets of the run in every message, in either format.
   deps = withRedactedOutput(deps, argv);
@@ -349,13 +370,7 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
     }
     if (err instanceof MastrNetworkError) {
       log.error("http", err.message);
-      if (/maxResponseBytes/.test(err.message)) {
-        log.info(
-          "http",
-          "The response exceeded the size cap. Lower --page-size or raise " +
-            "--max-response-bytes <n> (0 = unlimited).",
-        );
-      }
+      if (/maxResponseBytes/.test(err.message)) log.info("http", sizeCapHint(err.message));
       return EXIT.NETWORK;
     }
     if (err instanceof MastrError) {

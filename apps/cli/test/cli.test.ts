@@ -631,3 +631,19 @@ test("a password in a URL inside any argument is redacted in every stderr record
     }
   }
 });
+
+test("the size-cap hint names --page-size only where a smaller page would help (bug 9)", async () => {
+  // `filters` has no --page-size, and --total asks for one row: lowering --page-size can't help.
+  const big = withColumns(() => jsonResponse({ Data: [], Total: 0, Errors: null, pad: "x".repeat(200) }));
+  const cases: Array<[string[], RegExp]> = [
+    [["filters", "stromerzeugung", "--max-response-bytes", "100"], /^INFO  \[mastr\.http\] The response exceeded the size cap\. Raise --max-response-bytes <n> \(0 = unlimited\)\.$/m],
+    [["stromerzeugung", "--total", "--max-response-bytes", "100"], /^INFO  \[mastr\.http\] The response exceeded the size cap\. Raise --max-response-bytes <n>/m],
+    [["stromerzeugung", "--filter", "Ort~eq~'x'", "--max-response-bytes", "100"], /^INFO  \[mastr\.http\] The response exceeded the size cap\. Raise --max-response-bytes <n>/m],
+    [["stromerzeugung", "--max-response-bytes", "100"], /^INFO  \[mastr\.http\] The response exceeded the size cap\. Lower --page-size or raise --max-response-bytes <n>/m],
+  ];
+  for (const [argv, hint] of cases) {
+    const cli = makeCli(big);
+    assert.equal(await run(argv, cli.deps), 6, argv.join(" "));
+    assert.match(untimed(cli.err.join("\n")), hint, argv.join(" "));
+  }
+});

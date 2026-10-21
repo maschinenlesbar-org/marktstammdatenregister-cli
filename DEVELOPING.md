@@ -357,7 +357,9 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 `api` (the register's answers: HTTP errors, the `{"Error":true}` and `Errors` envelopes
 with HTTP 200, a malformed answer — a `MastrParseError`: bad JSON, the wrong shape, an empty
 body, an unknown charset —, the notes on an empty answer with `--sort` or `--filter`, and the
-`WARN` for text replaced with U+FFFD), `http` (the connection: network errors, the size-cap hint, the
+`WARN` for text replaced with U+FFFD), `http` (the connection: network errors, the size-cap hint — "Lower --page-size or raise
+--max-response-bytes" for a unit page of more than one row, only "Raise --max-response-bytes"
+for the filter columns and for `--total`, read from the request the error names —, the
 cleartext warning) and `output` (a failed write to stdout; an answer that can't be printed, an
 `OutputError`: `The answer is nested too deeply to pretty-print[; try --compact].`, `… too large
 (more than 536870888 characters of JSON) to print.`, `… nested too deeply for --iso-dates.`; the
