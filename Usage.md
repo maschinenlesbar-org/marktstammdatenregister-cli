@@ -160,7 +160,8 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
 ## Capacity fields per category
 
 The rows differ per category; `Bruttoleistung`/`Nettonennleistung` exist **only** in
-`stromerzeugung` (sorting another category by them returns 0 rows).
+`stromerzeugung`: sorting another category by them is refused by the register (`{"Error":true}`,
+exit 1, "… a sort key it doesn't know …"; live 2026-10-21).
 
 | Category | Capacity fields (record keys, usable in `--sort`) | Unit |
 |---|---|---|

@@ -96,8 +96,11 @@ mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Inbetriebnahmedatum 
 (several keys joined by `~`). Any other form — no direction, `-down`, a name with spaces —
 is refused by the CLI before any request (exit 2).
 **The `FieldKey` is a record field name, not a `FilterName`** — `mastr filters` can't
-tell you the keys (its `FilterField` is `null`). `Bruttoleistung der Einheit-desc` returns
-0 rows; `Bruttoleistung-desc` works. List the keys from one row:
+tell you the keys (its `FilterField` is `null`). `Bruttoleistung der Einheit-desc` is refused
+by the CLI (a name with spaces is a FilterName, exit 2), and a field the category doesn't have
+(`Bruttoleistung-desc` on `gasverbrauch`) by the register (exit 1, "the register rejected the
+request … a sort key it doesn't know"); `Bruttoleistung-desc` on `stromerzeugung` works. List
+the keys from one row:
 
 ```bash
 mastr stromerzeugung --page-size 1 --compact | jq '.data[0] | keys'
