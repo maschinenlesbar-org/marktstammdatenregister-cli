@@ -247,6 +247,9 @@ CLI's own. Notable coverage:
   starts a process: 30 s), and an option given as `undefined` means its default.
 - `cli.test.ts` — the 4 commands, paging bounds, `--total`, `--iso-dates`, the `filters`
   command, and the hardening guards (control-char UA, empty base URL, bounded retries).
+- `output.test.ts` — rendering (`output.ts`): too deep / too large to print and the probed
+  `--compact` hint, the compact path choice, chunked escaping, the stdout writer for a
+  redirected file.
 - `log.test.ts` — the record helpers of `apps/cli/src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
 - `conformance-p*.test.ts` — the checks shared across the `*-cli` repos (fix plan
@@ -273,8 +276,13 @@ CLI's own. Notable coverage:
   out, so "before any request" means before the unit request. **P25** the
   response corpus: a number a double can't carry exactly, and an empty answer, are errors
   (exit 1, an ERROR of `mastr.api`), never a changed value. Both adapters use `kitParity`
-  (`apps/cli/test/helpers.ts`), `parity` in the kit's shape. P26 (`-o`) does not apply: mastr
-  has no `-o`.
+  (`apps/cli/test/helpers.ts`), `parity` in the kit's shape; P25 also checks that an answer
+  error names the request and the (empty) `bigIntegerKeys`. **P26** output integrity: mastr has
+  no `-o` (`HAS_OUTPUT_OPTION = false`), so only its stdout case runs — stdout redirected to a
+  file and cut short (`ulimit -f`) is exit 1 with an ERROR of `mastr.output`. **P27** big and
+  odd answers (spawns the built bin under a small heap: 30 s): a large flat answer prints with
+  `--compact`, 20 MB of DEL prints escaped, 90 MB of DEL is "too large to print", and a lone
+  surrogate or invalid bytes become U+FFFD with a WARN of `mastr.api`.
 
 Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
 `{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
