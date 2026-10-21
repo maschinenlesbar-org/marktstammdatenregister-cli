@@ -345,7 +345,10 @@ body, an unknown charset —, the notes on an empty answer with `--sort` or `--f
 cleartext warning) and `output` (a failed write to stdout; an answer that can't be printed, an
 `OutputError`: `The answer is nested too deeply to pretty-print[; try --compact].`, `… too large
 (more than 536870888 characters of JSON) to print.`, `… nested too deeply for --iso-dates.`; the
-hint only when `--compact` prints this very answer, which is probed). A failed write to stdout other
+hint only when `--compact` prints this very answer, which is probed; and `The answer is too large
+to print (N characters once its control characters are escaped).` when escaping DEL, C1 and bidi
+controls as `\uXXXX` would pass V8's longest string — the escaping is measured first and built in
+64 Ki chunks, so 20 MB of DEL prints within a 512 MB heap). A failed write to stdout other
 than a closed pipe (`handleOutputErrors`, in the bin shim, outside `run()`) is an ERROR
 record of `mastr.output` (`Could not write to stdout: …`), and the shim's last-resort
 `Unexpected error: …`, should `run()` itself ever reject, an ERROR of `mastr.cli`, both in
