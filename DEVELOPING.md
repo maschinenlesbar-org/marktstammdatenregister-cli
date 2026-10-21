@@ -86,7 +86,9 @@ packages/client/src/
 apps/cli/src/cli/
     io.ts        # injectable I/O (CliDeps / CliIO), the logger and the clock — no env seam (no auth)
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
-    shared.ts    # option parsers, global->engine mapping, JSON render (+ --iso-dates)
+    shared.ts    # option parsers, global->engine mapping, JSON render (+ --iso-dates; too deep
+                 # to pretty-print: an error suggesting --compact, which takes V8's fast path
+                 # unless the answer holds a string of 64 Mi characters or more)
     commands/units.ts  # the 4 category commands + the `filters` command
     program.ts   # assembles the commander program
     run.ts       # parses argv -> exit code (no process.exit; testable)

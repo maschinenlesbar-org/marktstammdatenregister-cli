@@ -155,23 +155,64 @@ export function escapeControlChars(json: string): string {
 /**
  * Render a JSON value to stdout, pretty by default and compact with --compact.
  * With --iso-dates, every MaStR `"/Date(ms)/"` string is rewritten to ISO-8601 first.
+ *
+ * An answer nested too deeply (within the size cap, which JSON.parse reads) can exhaust the
+ * call stack in the recursive isoifyDates transform or in JSON.stringify, throwing a
+ * RangeError: it becomes a MastrParseError (an ERROR record of `mastr.api`, exit 1, nothing on
+ * stdout), consistent with a JSON.parse depth failure, rather than "Unexpected error". The
+ * pretty printer's message suggests --compact, whose printer goes deeper.
  */
 export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown): void {
-  let text: string;
+  let shaped: unknown;
   try {
-    const shaped = global.isoDates ? isoifyDates(value) : value;
-    text = global.compact ? JSON.stringify(shaped) : JSON.stringify(shaped, null, 2);
+    shaped = global.isoDates ? isoifyDates(value) : value;
   } catch (cause) {
-    // Pathologically deep JSON (within the size cap) can exhaust the call stack in
-    // the recursive isoifyDates transform or in JSON.stringify, throwing a
-    // RangeError. Map it to a typed parse error so it surfaces consistently with a
-    // JSON.parse depth failure, rather than as a generic "Unexpected error".
-    if (cause instanceof RangeError) {
-      throw new MastrParseError("Response is too deeply nested to render.", { cause });
-    }
+    if (cause instanceof RangeError) throw new MastrParseError("Response is too deeply nested to render.", { cause });
     throw cause;
   }
-  deps.io.out(escapeControlChars(text));
+  deps.io.out(escapeControlChars(stringifyJson(shaped, global.compact === true)));
+}
+
+/**
+ * JSON.stringify, pretty or compact; a RangeError (nesting too deep) is a MastrParseError.
+ *
+ * Compact output takes V8's fast path (no gap) unless the answer holds a huge string: on Node 26
+ * the fast path aborts the process ("Zone Allocation failed", exit 134, a native dump on stderr)
+ * on a string of some 250 MB that JSON.parse made, while the gap path (an empty gap, the same
+ * text) prints it. The fast path stays the default because on Node 26 only it is iterative and
+ * prints nesting the gap path refuses (~7,000 levels).
+ */
+function stringifyJson(value: unknown, compact: boolean): string {
+  try {
+    if (!compact) return JSON.stringify(value, null, 2);
+    return holdsHugeString(value) ? JSON.stringify(value, null, "") : JSON.stringify(value);
+  } catch (cause) {
+    if (!(cause instanceof RangeError)) throw cause;
+    throw new MastrParseError(
+      compact ? "Response is too deeply nested to render." : "Response is too deeply nested to pretty-print; try --compact.",
+      { cause },
+    );
+  }
+}
+
+/** A string or key this long sends --compact through the gap path: a quarter of where Node 26's fast path aborts. */
+const HUGE_STRING_LENGTH = 64 * 1024 * 1024;
+
+/** Whether `value` holds a string or key of HUGE_STRING_LENGTH or more. Iterative, so nesting costs no stack. */
+function holdsHugeString(value: unknown): boolean {
+  const stack: unknown[] = [value];
+  while (stack.length > 0) {
+    const item = stack.pop();
+    if (typeof item === "string") {
+      if (item.length >= HUGE_STRING_LENGTH) return true;
+    } else if (typeof item === "object" && item !== null) {
+      for (const [key, element] of Object.entries(item)) {
+        if (key.length >= HUGE_STRING_LENGTH) return true;
+        if (typeof element === "string" || (typeof element === "object" && element !== null)) stack.push(element);
+      }
+    }
+  }
+  return false;
 }
 
 export interface ActionContext {
