@@ -7,7 +7,7 @@
 import { MAX_DETAIL_LENGTH, serverTextForMessage } from "./engine.js";
 import { MastrValidationError, cutForMessage, quoteValue } from "./errors.js";
 import type { FilterColumn } from "./types.js";
-import { normalizeText, tokenProblem } from "./validate.js";
+import { normalizeText, textProblem, tokenProblem } from "./validate.js";
 
 /**
  * The operators the register's search understands (from its web form, all checked
@@ -93,7 +93,8 @@ export function filterProblem(spec: string): string | undefined {
     if (!UNARY_OPERATORS.has(op) && /^'\s*'$/.test(value.trim())) {
       return `Condition ${n} (${quoteValue(`${name}~${op}~${value.trim()}`)}) has no value: '' is only for null/nn. ${SHAPE}`;
     }
-    if (value.startsWith("'") && (value.length < 2 || !value.endsWith("'"))) {
+    const unclosed = value.startsWith("'") && (value.length < 2 || !value.endsWith("'"));
+    if (unclosed) {
       // A later part that closes the quote means the value itself held a "~".
       const close = parts.findIndex((part, j) => j > i + 2 && part.endsWith("'"));
       if (close !== -1) {
@@ -105,6 +106,15 @@ export function filterProblem(spec: string): string | undefined {
         );
       }
       return `The value of condition ${n} (${quoteValue(value)}) has no closing single quote. ${SHAPE}`;
+    }
+    // A value is free text (D8): only invisible characters is no value; a control, format or
+    // half character in it makes the register match nothing.
+    if (!UNARY_OPERATORS.has(op)) {
+      const text = textProblem(unquote(value.trim()));
+      if (text === "Expected a non-empty value.") {
+        return `Condition ${n} (${quoteValue(`${name}~${op}~${value.trim()}`)}) has no value: '' is only for null/nn. ${SHAPE}`;
+      }
+      if (text !== undefined) return `The value of condition ${n}: ${text}`;
     }
     i += 3;
     if (i >= parts.length) return undefined;
@@ -140,22 +150,24 @@ export function normalizeFilterName(name: string): string {
 }
 
 /**
- * A value with the whitespace outside its quotes dropped: `'Münster' ` (a space before
- * `~and~`) → `'Münster'`. The register would read the space as part of the value, and the
- * shape check took the unclosed-looking value for one that holds a `~`. Inside the quotes
- * nothing changes; a value that isn't quoted is trimmed.
+ * A value as text, canonical (`normalizeText`, decision D8): the whitespace outside its quotes
+ * dropped (`'Münster' ` before `~and~`; the shape check took the unclosed-looking value for one
+ * that holds a `~`), and the text inside trimmed and in NFC. The register trims dropdown codes
+ * (`' 2495 '` = `'2495'`) but not text: `' Münster '` matched nothing (live 2026-10-21: 0
+ * instead of 27 181). A value that isn't quoted is trimmed and composed too; one whose quote
+ * isn't closed is left for filterProblem to name.
  */
 function normalizeFilterValue(value: string): string {
   const trimmed = value.trim();
-  if (!trimmed.startsWith("'")) return trimmed;
-  return trimmed.length >= 2 && trimmed.endsWith("'") ? trimmed : value;
+  if (!trimmed.startsWith("'")) return normalizeText(trimmed);
+  return trimmed.length >= 2 && trimmed.endsWith("'") ? `'${normalizeText(trimmed.slice(1, -1))}'` : value;
 }
 
 /**
- * The spec with whitespace next to a `~` dropped where it means nothing: every FilterName
- * normalised ({@link normalizeFilterName}), the operators and `and`s trimmed, and the
- * whitespace outside a quoted value dropped (`'Münster' ~and~…`); the inside of a quoted
- * value is left as it is. The spec is split the way the register splits it, on every `~`:
+ * The spec as the register should read it: every FilterName normalised
+ * ({@link normalizeFilterName}), the operators and `and`s trimmed, and every value as text
+ * (`normalizeFilterValue`: the whitespace outside its quotes dropped, the text inside trimmed
+ * and in NFC). The spec is split the way the register splits it, on every `~`:
  * names are parts 0, 4, 8, …, operators 1, 5, …, values 2, 6, …, `and`s 3, 7, … A malformed
  * spec comes back normalised too; {@link filterProblem} then reports it. A non-string is
  * returned as is.

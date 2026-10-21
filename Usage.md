@@ -109,7 +109,11 @@ mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Bruttoleistung der E
 > **The register ignores a FilterName it doesn't know** and returns the unfiltered
 > result; the CLI refuses such a name before sending (with "did you mean"). `--filter` may
 > be given several times; the conditions are joined with `~and~`. Every other option given
-> twice is a usage error (exit 2).
+> twice is a usage error (exit 2). **A value is text:** it is sent trimmed inside its quotes
+> and in composed Unicode (`' Münster '` and a decomposed `Münster` go out as `'Münster'`;
+> the register trims dropdown codes but not text, so a padded text value matched nothing),
+> and a value that is only invisible characters, or holds a control, format (a zero-width
+> space, a soft hyphen, a bidi control) or half character, is a usage error before any request.
 
 ## Examples
 

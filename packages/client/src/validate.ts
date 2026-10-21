@@ -72,11 +72,10 @@ export const headerValueProblem: Problem<string> = (value) => {
 /**
  * A free-text value as the register matches it, canonical: without surrounding whitespace and
  * in composed Unicode (NFC; a decomposed "Münster", u plus U+0308 as pasted from a macOS file
- * name). Inner whitespace is kept. `buildFilter` runs it on every string value it quotes; the
- * register trims and composes values itself (live 2026-10-05), so this changes what is sent,
- * never what matches. Ids and codes (SEE…/ABR… numbers, dropdown codes) are ASCII, where NFC
- * changes nothing. A `--filter` spec is not rewritten: its values are the user's, inside the
- * register's DSL.
+ * name). Inner whitespace is kept. Every filter value goes through it (`normalizeFilter`, and
+ * `buildFilter` for the values it quotes): the register composes values and trims dropdown
+ * codes itself, but not text — `' Münster '` matched nothing (live 2026-10-21). Ids and codes
+ * (SEE…/ABR… numbers, dropdown codes) are ASCII, where NFC changes nothing.
  */
 export function normalizeText(value: string): string {
   return value.trim().normalize("NFC");

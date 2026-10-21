@@ -54,8 +54,10 @@ The register silently ignores a FilterName it doesn't know (you'd get the unfilt
 and answers an unknown dropdown code with 0 rows, so the CLI checks every FilterName and
 every `eq`/`neq` dropdown code against the category's columns (one extra request) and
 rejects an unknown one (exit 2, with "did you mean"); a name typed with a decomposed umlaut,
-padding or in another case is sent the register's way. A malformed spec or an unknown
-operator (e.g. `gte`) is rejected too. Several `--filter` flags are joined with `~and~`;
+padding or in another case is sent the register's way. A **value** is sent as text: trimmed
+inside its quotes and in NFC (the register trims codes, not text: `' Münster '` matched
+nothing), and one with an invisible, control or half character is rejected. A malformed spec
+or an unknown operator (e.g. `gte`) is rejected too. Several `--filter` flags are joined with `~and~`;
 any other option given twice is a usage error. **`--sort` takes `FieldKey-asc` or
 `FieldKey-desc`** (several joined by `~`), sent trimmed; any other form (no direction, `-down`,
 a name with spaces) is a usage error before any request, since the register sorted it ascending

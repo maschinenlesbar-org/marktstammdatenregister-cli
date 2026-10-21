@@ -45,8 +45,18 @@ interface Input<T = string | null> {
 }
 /** The `filter` parameter split the register's way, on every `~`. */
 const filterParts = (url: URL): string[] => (url.searchParams.get("filter") ?? "").split("~");
-/** Every free-text value (sent as a query parameter). */
-const textInputs: Input[] = [];
+/**
+ * Every free-text value: a value in a `--filter` spec (`Ort~eq~'…'`), sent inside the `filter`
+ * parameter. The DSL is the user's and is checked, never rearranged; its values are text (D8).
+ */
+const textInputs: Input[] = [
+  {
+    name: "--filter value",
+    argv: (v) => ["stromerzeugung", "--filter", `Ort~eq~'${v}'`],
+    lib: (c, v) => c.stromerzeugung({ filter: `Ort~eq~'${v}'` }),
+    sent: (u) => filterParts(u)[2]?.replace(/^'(.*)'$/s, "$1") ?? null,
+  },
+];
 /**
  * Every token: a FilterName in a `--filter` spec (compared exactly by the register; checked
  * against a column list that holds the corpus's valid names, so those are sent and the rest is

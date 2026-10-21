@@ -413,7 +413,8 @@ test("whitespace around ~and~ and outside a quoted value is dropped, not reporte
     ["Ort~eq~'Münster' ~and~Energieträger~eq~'2495'", "Ort~eq~'Münster'~and~Energieträger~eq~'2495'"],
     ["Ort~eq~'Münster' ", "Ort~eq~'Münster'"],
     ["Ort ~ eq ~ 'Münster' ~ and ~ Energieträger~eq~ '2495'", "Ort~eq~'Münster'~and~Energieträger~eq~'2495'"],
-    ["Ort~eq~' Münster '", "Ort~eq~' Münster '"],
+    // Inside the quotes a value is text (D8, bug 2): trimmed and composed.
+    ["Ort~eq~' Mu\u0308nster '", "Ort~eq~'Münster'"],
   ] as const) {
     const cli = makeCli(registerResponder(fx.unitPage));
     assert.equal(await run(["stromerzeugung", "--filter", spec, "--total"], cli.deps), 0, `${spec}: ${cli.err.join("\n")}`);

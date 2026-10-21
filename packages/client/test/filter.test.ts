@@ -60,15 +60,23 @@ test("FILTER_OPERATORS lists the ten operators", () => {
   assert.deepEqual([...FILTER_OPERATORS], ["eq", "neq", "sw", "ct", "nct", "ew", "null", "nn", "gt", "lt"]);
 });
 
-test("normalizeFilter writes every FilterName as NFC without padding, and leaves values alone (findings 01#1, 04#5)", () => {
+test("normalizeFilter writes every FilterName as NFC without padding, and every value as text: trimmed, NFC (findings 01#1, 04#5; bug 2)", () => {
   const nfd = "Energietra\u0308ger";
   assert.equal(
     normalizeFilter(`${nfd}~eq~'2495'~and~ Bundesland ~eq~' 1403 '`),
-    "Energieträger~eq~'2495'~and~Bundesland~eq~' 1403 '",
+    "Energieträger~eq~'2495'~and~Bundesland~eq~'1403'",
   );
   assert.equal(normalizeFilter(" Bruttoleistung  der Einheit~gt~'5000'"), "Bruttoleistung der Einheit~gt~'5000'");
-  // A value with a decomposed umlaut stays as typed (the register normalises values itself).
-  assert.equal(normalizeFilter("Ort~eq~'Mu\u0308nster'"), "Ort~eq~'Mu\u0308nster'");
+  // A value is free text (D8): trimmed inside its quotes and composed. Live 2026-10-21 the
+  // register matched ' Münster ' to nothing (0 instead of 27 181): it trims codes, not text.
+  assert.equal(normalizeFilter("Ort~eq~'Mu\u0308nster'"), "Ort~eq~'Münster'");
+  assert.equal(normalizeFilter("Ort~eq~' Münster '~and~Ort~ct~ M\u00fcn "), "Ort~eq~'Münster'~and~Ort~ct~Mün");
+  assert.equal(normalizeFilter("Ort~null~''"), "Ort~null~''");
+  // A value that is no text is refused before any request, shown escaped.
+  assert.equal(filterProblem("Ort~eq~'a\u200bb'"), 'The value of condition 1: "a\\u200bb" contains an invisible character (U+200B).');
+  assert.match(filterProblem("Ort~eq~'a\u0000b'") ?? "", /"a\\u0000b" contains a control character \(U\+0000\)/);
+  assert.match(filterProblem("Ort~eq~'\u200b'") ?? "", /^Condition 1 \("Ort~eq~'\\u200b'"\) has no value/);
+  assert.equal(filterProblem("Ort~eq~'Bonn\u200dx'"), undefined, "ZWJ is part of a text");
   assert.equal(normalizeFilterName(`\t${nfd} `), "Energieträger");
 });
 
