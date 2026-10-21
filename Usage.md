@@ -125,7 +125,7 @@ mastr gasverbrauch --sort "MaximaleGasbezugsLeistung-desc" --page-size 10 --comp
 | Code | Meaning |
 |---|---|
 | `0` | success (help/version included); an empty result also exits 0 |
-| `1` | API/logical error (e.g. the server's `Errors` field, or `{"Error":true}` for a filter value it can't read or an unknown `--sort` key), or a catch-all |
+| `1` | API/logical error (e.g. the server's `Errors` field, or `{"Error":true}` for a filter value it can't read or an unknown `--sort` key), a malformed answer (bad JSON, the wrong shape, an empty body, a number a double can't carry exactly — past 2^53, out of range, or too small and turned into 0), or a catch-all |
 | `2` | usage error (bad flags, unknown command, an option other than `--filter` given twice, a malformed `--filter` — shape, operator, `~or~`, a FilterName the category doesn't have, a dropdown code it doesn't list — or a bad `--page-size`, redirecting base URL) |
 | `4` | HTTP 404 |
 | `6` | network / transport failure (DNS, connection, timeout, response size-cap) |

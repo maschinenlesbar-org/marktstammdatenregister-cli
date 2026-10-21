@@ -307,3 +307,34 @@ test("credentials a server echoes are scrubbed from the error: Basic, user:passw
     return true;
   });
 });
+
+test("a number JSON.parse can't carry exactly is a MastrParseError, never a changed value (K1)", async () => {
+  const inexact = [
+    "1e400", "-1E400", "12345678901234567890", "-9007199254740993", "12345678901234567890.0",
+    "9007199254740993e0", "9007199254740992.5", "1e-400", "1e23",
+  ];
+  for (const literal of inexact) {
+    const mt = makeMockTransport(() => rawResponse(`{"Data":[{"Bruttoleistung":${literal}}],"Total":1,"Errors":null}`, "application/json"));
+    const e = new RequestEngine({ transport: mt.transport });
+    await assert.rejects(
+      e.getJson("/x"),
+      (err) =>
+        err instanceof MastrParseError &&
+        err.message === `Unexpected response from /x: the number ${literal} cannot be represented exactly.`,
+      literal,
+    );
+  }
+  // Exact values, decimal fractions below 2^53 and numbers inside strings pass as they are.
+  const exact: Array<[string, number]> = [
+    ["9007199254740991", 9007199254740991], ["9007199254740992.0", 2 ** 53], ["1e21", 1e21],
+    ["4999.999", 4999.999], ["0.1", 0.1], ["0.0e-500", 0], ["5e-324", 5e-324],
+  ];
+  for (const [literal, value] of exact) {
+    const mt = makeMockTransport(() =>
+      rawResponse(`{"n":${literal},"s":"/Date(12345678901234567890)/","k":"1e400"}`, "application/json"),
+    );
+    const got = await new RequestEngine({ transport: mt.transport }).getJson<{ n: number; s: string }>("/x");
+    assert.equal(got.n, value, literal);
+    assert.equal(got.s, "/Date(12345678901234567890)/");
+  }
+});
