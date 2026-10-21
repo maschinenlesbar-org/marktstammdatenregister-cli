@@ -24,7 +24,7 @@ npm run bump -- <patch|minor|major>  # bump apps/cli, commit, tag vX.Y.Z
 node --test apps/cli/dist/test/cli.test.js   # one file, after a build
 ```
 
-CI (`ci.yml`) type-checks, builds and tests on Node 22/24, then packs the real tarball,
+CI (`ci.yml`) type-checks, builds and tests on Node 22/24/26, then packs the real tarball,
 checks the pack left nothing behind, installs it globally with the registry out of reach and
 runs the bin. `release.yml` (on a `v*` tag, made by `npm run bump`) verifies the tag against
 `apps/cli/package.json`, writes the SBOMs (scoped to the `apps/cli` workspace) and runs
@@ -253,7 +253,7 @@ seconds, ms under 1 s). Tests: `apps/cli/test/retry-log.test.ts`.
 
 ## Conventions to keep
 
-- **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 22/24 (`engines`: Node.js 22.12 or later, the floor commander 15 declares).
+- **Zero runtime HTTP deps**; strict TS + ESM; passes on Node 22/24/26 (`engines`: Node.js 22.12 or later, the floor commander 15 declares).
 - **Plain `http:`** (`engine.ts` `cleartextProblem`, called once per run by `shared.ts`
   `action()` before the client is built): a remote `http:` base URL gets one
   `WARN` record of `mastr.http` on stderr; stdout and the exit code don't change.
