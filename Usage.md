@@ -16,7 +16,7 @@ mastr [global options] <command> [command options]
 | `--max-retries <n>` | retries for transient 429/503 responses and reset connections (0..10; each waits 200 ms, 400 ms, … or the server's `Retry-After` when that is longer, up to 30 s — a longer one waits the 30 s cap, then retries). Each retry logs one WARN record of `mastr.http` before it waits (`HTTP 503 from host: retry 1 of 3 in 2 s`). |
 | `--max-response-bytes <n>` | cap the response body size in bytes (0 = unlimited; default 100 MiB) |
 | `--log-format <format>` | how errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [mastr.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
-| `--compact` | print JSON on a single line (for piping to `jq`); it also prints an answer nested too deeply to pretty-print, which is an error (exit 1) suggesting `--compact` |
+| `--compact` | print JSON on a single line (for piping to `jq`). An answer nested too deeply or too large to print is an `ERROR` record of `mastr.output` (exit 1, nothing on stdout) that names the cause; it suggests `--compact` only when `--compact` prints that answer (on Node 26 it prints nesting the pretty printer can't; on Node 22 and 24 it fails at the same depth, so there is no hint) |
 | `--iso-dates` | rewrite MaStR `/Date(ms)/` timestamps to ISO-8601: a date-only value (sent as UTC midnight) as `YYYY-MM-DD`, a timestamp in German time (`Europe/Berlin`) with an explicit offset, e.g. `2020-02-20T17:28:35.250+01:00` (milliseconds only when not zero) |
 | `-V, --version` / `-h, --help` | version / help |
 

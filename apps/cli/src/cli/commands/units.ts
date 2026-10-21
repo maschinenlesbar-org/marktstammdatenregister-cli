@@ -6,7 +6,8 @@ import { Argument, type Command } from "commander";
 import { logOf, type CliDeps } from "../io.js";
 import { MAX_PAGE, MAX_PAGE_SIZE, type MastrClient } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/client";
 import type { CountQuery, UnitCategory, UnitQuery } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/types";
-import { action, once, parseBoundedInt, parseFilter, parseSort, renderJson } from "../shared.js";
+import { action, once, parseBoundedInt, parseFilter, parseSort } from "../shared.js";
+import { renderJson } from "../output.js";
 
 // `sortKey` is a record field that exists in that category's rows (live 2026-09-26):
 // only stromerzeugung rows carry Bruttoleistung/Nettonennleistung, so the stderr hint

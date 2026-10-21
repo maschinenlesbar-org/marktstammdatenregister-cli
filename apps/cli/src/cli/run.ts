@@ -5,6 +5,7 @@
 import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
 import { logOf, type CliDeps } from "./io.js";
+import { OutputError } from "./output.js";
 import { DEFAULT_LOG_FORMAT, createLogger, logFormatFromArgv, type LogFormat, type Logger } from "./log.js";
 import {
   MastrApiError,
@@ -256,12 +257,13 @@ export function processLogger(argv: readonly string[]): Logger {
 
 /**
  * The log area of a `MastrError` that is neither an API, a network nor a validation error:
- * a malformed answer (`api`: bad JSON, the wrong shape, an empty body, an unknown charset,
- * an answer nested too deeply to render — the register's answer as much as an error
- * status is), else `cli`.
+ * a malformed answer (`api`: bad JSON, the wrong shape, an empty body, an unknown charset —
+ * the register's answer as much as an error status is), an answer that can't be printed
+ * (`output`: nested too deeply, too large), else `cli`.
  */
 function areaOf(err: MastrError): string {
   if (err instanceof MastrParseError) return "api";
+  if (err instanceof OutputError) return "output";
   return "cli";
 }
 

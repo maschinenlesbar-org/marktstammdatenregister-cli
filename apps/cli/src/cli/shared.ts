@@ -1,14 +1,12 @@
-// Shared helpers used across CLI command groups: option parsers, the global
-// option resolver, and JSON rendering (with the --iso-dates transform).
+// Shared helpers used across CLI command groups: option parsers and the global
+// option resolver. Rendering is output.ts's.
 
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
 import type { MastrClientOptions } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/client";
-import { isoifyDates } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/client";
-import { MastrParseError } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/errors";
 import { filterProblem, normalizeFilter } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/filter";
-import { DEFAULT_BASE_URL, cleartextProblem, isBidiControl } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/engine";
+import { DEFAULT_BASE_URL, cleartextProblem } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/engine";
 import {
   baseUrlProblem,
   headerValueProblem,
@@ -129,90 +127,6 @@ export function toEngineOptions(global: GlobalOptions): MastrClientOptions {
   if (global.maxRetries !== undefined) options.maxRetries = global.maxRetries;
   if (global.maxResponseBytes !== undefined) options.maxResponseBytes = global.maxResponseBytes;
   return options;
-}
-
-/**
- * Escape the characters JSON.stringify leaves raw although a terminal acts on them.
- * It escapes C0 (including ESC) but not DEL, the C1 range U+0080–U+009F (U+009B is
- * the 8-bit form of CSI) or the bidi formatting characters (isBidiControl), which
- * reorder the text that follows. The output is server data, so escape them; the
- * result is equivalent, valid JSON (these characters only occur inside strings).
- * Checked by char code so the source stays free of control bytes.
- */
-export function escapeControlChars(json: string): string {
-  let result = "";
-  let from = 0;
-  for (let i = 0; i < json.length; i++) {
-    const c = json.charCodeAt(i);
-    if ((c >= 0x7f && c <= 0x9f) || isBidiControl(c)) {
-      result += json.slice(from, i) + "\\u" + c.toString(16).padStart(4, "0");
-      from = i + 1;
-    }
-  }
-  return from === 0 ? json : result + json.slice(from);
-}
-
-/**
- * Render a JSON value to stdout, pretty by default and compact with --compact.
- * With --iso-dates, every MaStR `"/Date(ms)/"` string is rewritten to ISO-8601 first.
- *
- * An answer nested too deeply (within the size cap, which JSON.parse reads) can exhaust the
- * call stack in the recursive isoifyDates transform or in JSON.stringify, throwing a
- * RangeError: it becomes a MastrParseError (an ERROR record of `mastr.api`, exit 1, nothing on
- * stdout), consistent with a JSON.parse depth failure, rather than "Unexpected error". The
- * pretty printer's message suggests --compact, whose printer goes deeper.
- */
-export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown): void {
-  let shaped: unknown;
-  try {
-    shaped = global.isoDates ? isoifyDates(value) : value;
-  } catch (cause) {
-    if (cause instanceof RangeError) throw new MastrParseError("Response is too deeply nested to render.", { cause });
-    throw cause;
-  }
-  deps.io.out(escapeControlChars(stringifyJson(shaped, global.compact === true)));
-}
-
-/**
- * JSON.stringify, pretty or compact; a RangeError (nesting too deep) is a MastrParseError.
- *
- * Compact output takes V8's fast path (no gap) unless the answer holds a huge string: on Node 26
- * the fast path aborts the process ("Zone Allocation failed", exit 134, a native dump on stderr)
- * on a string of some 250 MB that JSON.parse made, while the gap path (an empty gap, the same
- * text) prints it. The fast path stays the default because on Node 26 only it is iterative and
- * prints nesting the gap path refuses (~7,000 levels).
- */
-function stringifyJson(value: unknown, compact: boolean): string {
-  try {
-    if (!compact) return JSON.stringify(value, null, 2);
-    return holdsHugeString(value) ? JSON.stringify(value, null, "") : JSON.stringify(value);
-  } catch (cause) {
-    if (!(cause instanceof RangeError)) throw cause;
-    throw new MastrParseError(
-      compact ? "Response is too deeply nested to render." : "Response is too deeply nested to pretty-print; try --compact.",
-      { cause },
-    );
-  }
-}
-
-/** A string or key this long sends --compact through the gap path: a quarter of where Node 26's fast path aborts. */
-const HUGE_STRING_LENGTH = 64 * 1024 * 1024;
-
-/** Whether `value` holds a string or key of HUGE_STRING_LENGTH or more. Iterative, so nesting costs no stack. */
-function holdsHugeString(value: unknown): boolean {
-  const stack: unknown[] = [value];
-  while (stack.length > 0) {
-    const item = stack.pop();
-    if (typeof item === "string") {
-      if (item.length >= HUGE_STRING_LENGTH) return true;
-    } else if (typeof item === "object" && item !== null) {
-      for (const [key, element] of Object.entries(item)) {
-        if (key.length >= HUGE_STRING_LENGTH) return true;
-        if (typeof element === "string" || (typeof element === "object" && element !== null)) stack.push(element);
-      }
-    }
-  }
-  return false;
 }
 
 export interface ActionContext {

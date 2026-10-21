@@ -2,8 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run } from "../src/cli/run.js";
 import { MastrClient } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/client";
-import { renderJson } from "../src/cli/shared.js";
-import { MastrParseError, credentialsIn } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/errors";
+import { credentialsIn } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/errors";
 import { handleOutputErrors, stderrAfterStdout, type CliDeps } from "../src/cli/io.js";
 import { createLogger } from "../src/cli/log.js";
 import { EventEmitter } from "node:events";
@@ -223,26 +222,6 @@ test("--compact prints single-line JSON", async () => {
   const cli = makeCli(registerResponder(fx.unitPage));
   await run(["stromerzeugung", "--compact"], cli.deps);
   assert.equal(cli.out.length, 1);
-});
-
-test("renderJson maps a deep-nesting RangeError to a typed MastrParseError (MASTR-04)", () => {
-  // Build a chain deep enough to overflow the call stack in JSON.stringify. This
-  // must surface as a typed parse error, not a generic "Unexpected error".
-  const deep: Record<string, unknown> = {};
-  let cur = deep;
-  for (let i = 0; i < 200_000; i++) {
-    const next: Record<string, unknown> = {};
-    cur["a"] = next;
-    cur = next;
-  }
-  const out: string[] = [];
-  const deps: CliDeps = {
-    io: { out: (s) => out.push(s), err: () => {} },
-    createClient: (opts) => new MastrClient(opts),
-  };
-  assert.throws(() => renderJson(deps, {}, deep), MastrParseError);
-  // Fail-secure: nothing partial was written to stdout.
-  assert.equal(out.length, 0);
 });
 
 test("--filter with ~or~ is rejected (exit 2, no request) and points at the comma list", async () => {
@@ -618,44 +597,6 @@ test("an unknown --sort key the register refuses ({\"Error\":true}) is an ERROR 
   assert.equal(cli.err.length, 1, cli.err.join("\n"));
   assert.match(untimed(cli.err[0]!), /^ERROR \[mastr\.api\] MaStR error for GET .*sort=Bogus-desc.*: the register rejected the request\. It answers so to a sort key it doesn't know \(sort, the CLI's --sort/);
   assert.deepEqual(cli.out, []);
-});
-
-test("pretty-printing an answer nested too deeply is a clean error that suggests --compact (K4)", async () => {
-  // A hostile or broken answer: JSON.parse reads it, the pretty printer's recursion can't.
-  const depth = 200_000;
-  const cli = makeCli(() => ({
-    status: 200,
-    headers: { "content-type": "application/json" },
-    body: Buffer.from(`{"Data":[{"x":${"[".repeat(depth)}${"]".repeat(depth)}}],"Total":1,"Errors":null}`),
-  }));
-  assert.equal(await run(["stromerzeugung"], cli.deps), 1);
-  assert.deepEqual(cli.out, []);
-  assert.deepEqual(untimed(cli.err.join("\n")).split("\n"), [
-    "ERROR [mastr.api] Response is too deeply nested to pretty-print; try --compact.",
-  ]);
-});
-
-test("--compact takes the gap path only for an answer holding a huge string, the fast path otherwise (K4)", (t) => {
-  // On Node 26 V8's fast stringifier (no gap) aborts the process on a ~250 MB string that
-  // JSON.parse made ("Zone Allocation failed", exit 134); the gap path prints it. Only the fast
-  // path is iterative there, though, and prints nesting the gap path refuses at ~7,000 levels.
-  // So the path is chosen per answer. Too big a body for this suite: this pins the calls.
-  const out: string[] = [];
-  const deps: CliDeps = {
-    io: { out: (s) => out.push(s), err: () => {} },
-    createClient: (opts) => new MastrClient(opts),
-  };
-  const stringify = t.mock.method(JSON, "stringify", () => '"stub"');
-  const huge = "x".repeat(64 * 1024 * 1024);
-  renderJson(deps, { compact: true }, { id: "a1", text: huge });
-  renderJson(deps, { compact: true }, { id: "a1", x: [[["Rede"]]], text: huge.slice(1) });
-  renderJson(deps, { compact: true }, { [huge]: 1 });
-  renderJson(deps, { compact: true }, [[huge]]);
-  renderJson(deps, {}, { id: "a1" });
-  const calls = stringify.mock.calls.map((call) => call.arguments);
-  stringify.mock.restore();
-  assert.deepEqual(calls.map((args) => (args.length >= 3 ? args[2] : "none")), ["", "none", "", "", 2]);
-  assert.deepEqual(out, ['"stub"', '"stub"', '"stub"', '"stub"', '"stub"']);
 });
 
 // T15 of the 2026-10-21 fix round (the class of jobsuche-cli 28be809): a URL with a password

@@ -86,9 +86,11 @@ packages/client/src/
 apps/cli/src/cli/
     io.ts        # injectable I/O (CliDeps / CliIO), the logger and the clock — no env seam (no auth)
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
-    shared.ts    # option parsers, global->engine mapping, JSON render (+ --iso-dates; too deep
-                 # to pretty-print: an error suggesting --compact, which takes V8's fast path
-                 # unless the answer holds a string of 64 Mi characters or more)
+    shared.ts    # option parsers, global->engine mapping, action()
+    output.ts    # JSON render to stdout (+ --iso-dates), terminal controls escaped; an answer
+                 # too deep or too large to print is an OutputError naming the cause, with
+                 # "try --compact" only where --compact prints it (probed); --compact takes
+                 # V8's fast path unless the answer holds a string of 64 Mi characters or more
     commands/units.ts  # the 4 category commands + the `filters` command
     program.ts   # assembles the commander program
     run.ts       # parses argv -> exit code (no process.exit; testable)
@@ -340,7 +342,10 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 with HTTP 200, a malformed answer — a `MastrParseError`: bad JSON, the wrong shape, an empty
 body, an unknown charset —, the notes on an empty answer with `--sort` or `--filter`, and the
 `WARN` for text replaced with U+FFFD), `http` (the connection: network errors, the size-cap hint, the
-cleartext warning) and `output` (a failed write to stdout). A failed write to stdout other
+cleartext warning) and `output` (a failed write to stdout; an answer that can't be printed, an
+`OutputError`: `The answer is nested too deeply to pretty-print[; try --compact].`, `… too large
+(more than 536870888 characters of JSON) to print.`, `… nested too deeply for --iso-dates.`; the
+hint only when `--compact` prints this very answer, which is probed). A failed write to stdout other
 than a closed pipe (`handleOutputErrors`, in the bin shim, outside `run()`) is an ERROR
 record of `mastr.output` (`Could not write to stdout: …`), and the shim's last-resort
 `Unexpected error: …`, should `run()` itself ever reject, an ERROR of `mastr.cli`, both in
