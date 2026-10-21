@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildFilter, filterProblem, normalizeFilter, normalizeFilterName, resolveFilter, FILTER_OPERATORS } from "../src/filter.js";
 import { MastrValidationError } from "../src/errors.js";
+import { normalizeText } from "../src/validate.js";
 
 test("filterProblem names a ~ inside a quoted value (the register has no escape)", () => {
   const problem = filterProblem("Anzeige-Name der Einheit~ct~'a~b'");
@@ -157,4 +158,15 @@ test("resolveFilter quotes the register's names and codes clean, on one line and
   assert.match(messages[1]!, /It is the label of code 2498 Solar 2026-10-09T00:00:00\.000Z ERROR .* forged record\[31m: a dropdown takes its code/);
   assert.match(messages[2]!, /Did you mean "Ortsteil 2026 forged", "Ortschaft2J"/);
   assert.match(messages[3]!, /doesn't work on the number column "Leistung\[31m forged"/);
+});
+
+test("buildFilter sends a text value trimmed and in NFC (normalizeText); a blank one is refused (K6)", () => {
+  const decomposed = "Münster";
+  assert.equal(buildFilter([{ name: "Ort", op: "eq", value: `  ${decomposed}\n` }]), "Ort~eq~'Münster'");
+  assert.equal(buildFilter([{ name: "Ort", op: "ct", value: "a  b" }]), "Ort~ct~'a  b'", "inner spaces are kept");
+  assert.equal(buildFilter([{ name: "Energieträger", op: "eq", value: [" 2497", "2498 "] }]), "Energieträger~eq~'2497,2498'");
+  assert.equal(normalizeText(` ${decomposed} `), "Münster");
+  for (const blank of ["", " ", "　", "\n\t"]) {
+    assert.throws(() => buildFilter([{ name: "Ort", op: "eq", value: blank }]), MastrValidationError, JSON.stringify(blank));
+  }
 });

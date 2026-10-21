@@ -7,6 +7,7 @@
 import { MAX_DETAIL_LENGTH, serverTextForMessage } from "./engine.js";
 import { MastrValidationError, cutForMessage } from "./errors.js";
 import type { FilterColumn } from "./types.js";
+import { normalizeText } from "./validate.js";
 
 /**
  * The operators the register's search understands (from its web form, all checked
@@ -176,7 +177,8 @@ export interface FilterCondition {
   /**
    * The value, quoted by `buildFilter`. For a dropdown column pass its code; an array
    * becomes the comma list the register reads as "any of these codes". Ignored for
-   * `null`/`nn` (sent as `''`). Must not contain `~` (nor `,` in an array item).
+   * `null`/`nn` (sent as `''`). Must not contain `~` (nor `,` in an array item). A string
+   * goes out trimmed and in NFC (`normalizeText`); a blank one is refused.
    */
   value?: string | number | readonly (string | number)[] | undefined;
 }
@@ -224,7 +226,8 @@ export function buildFilter(conditions: readonly FilterCondition[]): string {
           `Invalid filter: condition ${n} ("${cutForMessage(c.name)}") needs a finite number, got ${String(item)}.`,
         );
       }
-      const text = typeof item === "number" ? plainNumber(item) : item;
+      // A text value goes out canonical (trimmed, NFC): see normalizeText.
+      const text = typeof item === "number" ? plainNumber(item) : normalizeText(item);
       if (text.includes("~")) {
         throw new MastrValidationError(
           `Invalid filter: the value ${quoted(text)} in condition ${n} contains "~", which the ` +

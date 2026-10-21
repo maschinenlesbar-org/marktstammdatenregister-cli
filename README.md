@@ -110,7 +110,8 @@ check and its request. A query key it doesn't know (`filtr`) is refused the same
 Build filters from user input with `buildFilter`, not string interpolation: a filter
 value cannot contain `~` (the register splits on it and has no escape), so
 `` `Ort~eq~'${input}'` `` lets an input like `Münster'~and~Energieträger~eq~'2497` add a
-condition. `buildFilter` quotes each value and throws `MastrValidationError` for a `~`:
+condition. `buildFilter` quotes each value, sends a text value trimmed and in Unicode NFC
+(`normalizeText`), and throws `MastrValidationError` for a `~` or a blank value:
 
 ```ts
 import { buildFilter } from "@maschinenlesbar.org/marktstammdatenregister-cli";

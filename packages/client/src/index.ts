@@ -42,6 +42,7 @@ export {
   headerValueProblem,
   intRangeProblem,
   nonBlankProblem,
+  normalizeText,
   sortProblem,
 } from "./validate.js";
 export type { Problem } from "./validate.js";
