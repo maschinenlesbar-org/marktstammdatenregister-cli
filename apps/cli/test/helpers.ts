@@ -81,3 +81,27 @@ export async function parity(
 export function requestShapes(requests: HttpRequest[]): { method: string; url: string; headers: unknown }[] {
   return requests.map((r) => ({ method: r.method, url: r.url, headers: r.headers }));
 }
+
+/** What the library call did, in the shape the kit's conformance tests (P24, P25) read. */
+export interface KitLibOutcome {
+  ok: boolean;
+  value?: unknown;
+  error?: { name: string; message: string };
+  requests: HttpRequest[];
+}
+
+/**
+ * `parity` in the kit's shape: `lib` as `{ ok, value?, error?: { name, message }, requests }`
+ * (the error's class name, as the kit's helper reports it), for the shared bodies of P24 and P25.
+ */
+export async function kitParity(
+  argv: string[],
+  call: (transport: Transport) => unknown,
+  responder?: (req: HttpRequest) => HttpResponse | Promise<HttpResponse>,
+): Promise<{ cli: CliOutcome; lib: KitLibOutcome }> {
+  const { cli, lib } = await parity(argv, call, responder);
+  if (lib.ok) return { cli, lib: { ok: true, value: lib.value, requests: lib.requests } };
+  const e = lib.error;
+  const error = e instanceof Error ? { name: e.constructor.name, message: e.message } : { name: typeof e, message: String(e) };
+  return { cli, lib: { ok: false, error, requests: lib.requests } };
+}

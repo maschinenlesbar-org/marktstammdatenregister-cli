@@ -250,6 +250,14 @@ CLI's own. Notable coverage:
   `README.md` (shown on npmjs.com) must target a file `package.json` `files` ships
   (`DATA_LICENSE.md`, `LICENSING.md`, `CONTRIBUTING.md`, plus README/LICENSE); the other
   documents are linked as `https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/<path>`.
+  **P24** the input corpus (kit rollout 2026-10-21): every text filter and every id that goes
+  into a path is sent canonical or refused, alike on the CLI and in the library; mastr has
+  neither (free text only inside the `--filter` DSL, which is checked, never rewritten; the path
+  is the category), so its lists are empty, with the reason in the adapter. **P25** the
+  response corpus: a number a double can't carry exactly, and an empty answer, are errors
+  (exit 1, an ERROR of `mastr.api`), never a changed value. Both adapters use `kitParity`
+  (`apps/cli/test/helpers.ts`), `parity` in the kit's shape. P26 (`-o`) does not apply: mastr
+  has no `-o`.
 
 Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
 `{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
