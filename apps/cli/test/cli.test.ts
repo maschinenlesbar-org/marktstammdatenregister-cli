@@ -647,3 +647,16 @@ test("the size-cap hint names --page-size only where a smaller page would help (
     assert.match(untimed(cli.err.join("\n")), hint, argv.join(" "));
   }
 });
+
+test("no option can be switched both ways: no --x/--no-x pair, no optional value (kit T11 n/a)", async () => {
+  // The kit's forbidRepeatedOptions guards such options (`--x false --x` turned true silently in
+  // fragdenstaat-cli). mastr has none, and repeats of its value options are refused by once();
+  // a new negatable or optional-value option must take the kit's guard first.
+  const { buildProgram } = await import("../src/cli/program.js");
+  const program = buildProgram(makeCli(() => jsonResponse({})).deps);
+  for (const command of [program, ...program.commands]) {
+    for (const option of command.options) {
+      assert.ok(!option.negate && !option.optional, `${command.name()} ${option.flags}`);
+    }
+  }
+});
