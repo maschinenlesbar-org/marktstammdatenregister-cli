@@ -285,7 +285,10 @@ seconds, ms under 1 s). Tests: `apps/cli/test/retry-log.test.ts`.
   argv asks for: `processLogger`) and exits 1; an EPIPE/ENOTCONN on stderr is ignored, so a failed run
   keeps its own exit code (`2>&1 | true` after a usage error still exits 2). A stdout closed
   with `>&-` can't be told apart from `> /dev/null` (Node reopens the closed descriptor on
-  `/dev/null`), so that run exits 0.
+  `/dev/null`), so that run exits 0. stdout redirected to a regular file (`> out.json`) is written
+  with every byte or an error (`stdoutWriter`: Node's stream ignored a short write, so a
+  file-size limit or a full disk cut the output with exit 0): EFBIG or ENOSPC is that ERROR
+  record and exit 1 (P26).
 - Retry transient `429`/`503` (and reset connections, `isTransientNetworkError`) up to
   `maxRetries`, waiting `retryDelayMs * attempt` (200 ms, 400 ms, …) or the `Retry-After`
   (seconds or an IMF-fixdate, `parseRetryAfter`) when that is longer — the backoff is the
