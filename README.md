@@ -56,7 +56,10 @@ every `eq`/`neq` dropdown code against the category's columns (one extra request
 rejects an unknown one (exit 2, with "did you mean"); a name typed with a decomposed umlaut,
 padding or in another case is sent the register's way. A malformed spec or an unknown
 operator (e.g. `gte`) is rejected too. Several `--filter` flags are joined with `~and~`;
-any other option given twice is a usage error. A **wrong `--sort` key is refused by the
+any other option given twice is a usage error. **`--sort` takes `FieldKey-asc` or
+`FieldKey-desc`** (several joined by `~`), sent trimmed; any other form (no direction, `-down`,
+a name with spaces) is a usage error before any request, since the register sorted it ascending
+or not at all without a word. A **wrong `--sort` field name is refused by the
 register** (live 2026-10-09: `{"Error":true}`, exit 1 with an `ERROR` record of `mastr.api`
 that names the sort key; it used to answer 0 rows, so sanity-check a sorted query with
 `--total`); sort keys are record field names (`Bruttoleistung`), not FilterNames — list them with

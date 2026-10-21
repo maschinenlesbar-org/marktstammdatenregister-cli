@@ -92,7 +92,9 @@ mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Inbetriebnahmedatum 
 
 ## Sorting
 
-`--sort "FieldKey-asc"` or `--sort "FieldKey-desc"`, e.g. `--sort "Bruttoleistung-desc"`.
+`--sort "FieldKey-asc"` or `--sort "FieldKey-desc"`, e.g. `--sort "Bruttoleistung-desc"`
+(several keys joined by `~`). Any other form — no direction, `-down`, a name with spaces —
+is refused by the CLI before any request (exit 2).
 **The `FieldKey` is a record field name, not a `FilterName`** — `mastr filters` can't
 tell you the keys (its `FilterField` is `null`). `Bruttoleistung der Einheit-desc` returns
 0 rows; `Bruttoleistung-desc` works. List the keys from one row:

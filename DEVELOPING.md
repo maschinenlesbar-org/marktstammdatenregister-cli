@@ -170,8 +170,10 @@ characters: `echoedCredentialForms`) from error bodies and details,
 
 The client validates its own inputs before any request, for library callers the CLI's
 parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),
-`pageSize` outside 1..`MAX_PAGE_SIZE` (5000), a blank or whitespace-only `sort`
-(`sortProblem`) and a malformed filter throw
+`pageSize` outside 1..`MAX_PAGE_SIZE` (5000), a `sort` that is not `FieldKey-asc|desc`
+(several joined by `~`; `sortProblem`, a token: sent trimmed and NFC — live 2026-10-21 the
+register sorted `Bruttoleistung-desc ` with a trailing space and `Bruttoleistung-down`
+ascending, and `Bruttoleistung` not at all, silently) and a malformed filter throw
 `MastrValidationError` (`Invalid <name>: expected …, got <v>.`). The client
 constructor range-checks the engine options the same way (`intRangeProblem`):
 `timeoutMs` 0..`MAX_TIMEOUT_MS`, `maxRetries` 0..`MAX_RETRIES` (10),

@@ -13,7 +13,7 @@
 import { RequestEngine, describeMastrErrors, optionsObject, type EngineOptions } from "./engine.js";
 import { MastrApiError, MastrParseError, MastrValidationError, cutForMessage } from "./errors.js";
 import { normalizeFilter, resolveFilter, validateFilter } from "./filter.js";
-import { COUNT_IGNORED_KEYS, assertValid, countQueryProblem, sortProblem } from "./validate.js";
+import { COUNT_IGNORED_KEYS, assertValid, countQueryProblem, normalizeToken, sortProblem } from "./validate.js";
 import type { QueryParams } from "./query.js";
 import type { CountQuery, FilterColumn, MastrUnit, UnitCategory, UnitPage, UnitQuery } from "./types.js";
 
@@ -272,7 +272,8 @@ export class MastrClient {
     // unfiltered set, so the filter is normalised and checked first (checkedFilter).
     const filter = query.filter === undefined ? undefined : await this.checkedFilter(category, query.filter);
     const params: QueryParams = {
-      sort: query.sort ?? "",
+      // A sort key is a token: sent trimmed and in NFC (a trailing space sorted ascending).
+      sort: query.sort === undefined ? "" : normalizeToken(query.sort),
       page: query.page ?? DEFAULT_PAGE,
       pageSize: query.pageSize ?? DEFAULT_PAGE_SIZE,
       group: "",

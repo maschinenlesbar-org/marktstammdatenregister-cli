@@ -235,14 +235,30 @@ export const baseUrlProblem: Problem<string> = (value) => {
   return undefined;
 };
 
+/** One sort key in the documented syntax: a record field name (ASCII, as the register's are), then `-asc` or `-desc`. */
+const SORT_KEY = /^[A-Za-z_][A-Za-z0-9_]*-(?:asc|desc)$/i;
+
 /**
- * A `sort` spec (`FieldKey-asc` / `FieldKey-desc`): not blank. A blank one would go
- * out as `sort=` (the same as no sort) or `sort=%20%20`, and an explicitly blank
- * sort is a mistake rather than a request for the default order. The shape itself is
- * left to the register: it refused an unknown sort key with `{"Error":true}` (live
- * 2026-10-09; it used to answer 0 rows), which the client turns into a MastrApiError.
+ * A `sort` spec: `FieldKey-asc` or `FieldKey-desc`, several joined by `~` (the Kendo grid's
+ * syntax). It is a token ({@link tokenProblem}: not blank, no lone surrogate, no control or
+ * format character) and is sent as {@link normalizeToken} makes it (trimmed, NFC). Each key
+ * must be a record field name (`Bruttoleistung`, `InbetriebnahmeDatum`) followed by `-asc` or
+ * `-desc` (any case): the register read anything else silently — `Bruttoleistung-desc ` (a
+ * trailing space) and `Bruttoleistung-down` sorted ascending, `Bruttoleistung` not at all, with
+ * exit 0 (live 2026-10-21). A field name it doesn't know, in this syntax, is refused by the
+ * register with `{"Error":true}` (live 2026-10-09), which the client turns into a MastrApiError.
  */
-export const sortProblem: Problem<string> = (value) => nonBlankProblem(value);
+export const sortProblem: Problem<string> = (value) => {
+  if (typeof value !== "string") return nonBlankProblem(value);
+  const token = tokenProblem(value);
+  if (token !== undefined) return token;
+  for (const key of normalizeToken(value).split("~")) {
+    if (SORT_KEY.test(key)) continue;
+    const hint = /\s/.test(key) ? " (a record field name such as Bruttoleistung, not a FilterName such as \"Bruttoleistung der Einheit\")" : "";
+    return `Expected FieldKey-asc or FieldKey-desc (a record field name, then -asc or -desc; several joined by ~)${hint}, got ${quoteValue(key)}.`;
+  }
+  return undefined;
+};
 
 /**
  * The `UnitQuery` keys that page the rows. The match count is the same on every

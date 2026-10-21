@@ -96,6 +96,39 @@ test("nonBlankProblem and sortProblem reject blank strings and non-strings", asy
   }
 });
 
+test("a sort key is a token in the documented syntax, FieldKey-asc or FieldKey-desc; it goes out trimmed (bug 1, D8)", async () => {
+  // Live 2026-10-21: "Bruttoleistung-desc " (a trailing space) and "Bruttoleistung-down" sorted
+  // ascending, "Bruttoleistung" (no direction) not at all; all with exit 0 and no word.
+  const { sortProblem } = await import("@maschinenlesbar.org/marktstammdatenregister-client/internal/validate");
+  for (const ok of ["Bruttoleistung-desc", "Bruttoleistung-asc", " Bruttoleistung-desc ", "bruttoleistung-DESC", "Bruttoleistung-desc~Ort-asc", "Ort_2-asc"]) {
+    assert.equal(sortProblem(ok), undefined, ok);
+  }
+  for (const [bad, reason] of [
+    ["Bruttoleistung", /^Expected FieldKey-asc or FieldKey-desc .*got "Bruttoleistung"\.$/],
+    ["Bruttoleistung-down", /got "Bruttoleistung-down"/],
+    ["Bruttoleistung der Einheit-desc", /a record field name such as Bruttoleistung, not a FilterName/],
+    ["Bruttoleistung-desc~", /got ""/],
+    ["Bruttoleistung-desc\u200b", /"Bruttoleistung-desc\\u200b" contains an invisible or control character \(U\+200B\)/],
+    ["\u200b", /^Expected a non-empty value\.$/],
+  ] as const) {
+    assert.match(sortProblem(bad) ?? "", reason, JSON.stringify(bad));
+  }
+  // The CLI refuses before any request; the library sends the key trimmed.
+  for (const sort of ["Bruttoleistung-desc ", "Bruttoleistung-down", "Bruttoleistung"]) {
+    const { cli, lib } = await parity(["stromerzeugung", "--sort", sort], (transport) => new MastrClient({ transport }).stromerzeugung({ sort }));
+    if (sort.endsWith(" ")) {
+      assert.equal(cli.code, 0, cli.err);
+      assert.equal(new URL(cli.requests[0]!.url).searchParams.get("sort"), "Bruttoleistung-desc");
+      assert.deepEqual(lib.requests.map((r) => r.url), cli.requests.map((r) => r.url));
+      continue;
+    }
+    assert.equal(cli.code, 2, sort);
+    assert.deepEqual(cli.requests, [], sort);
+    assert.equal(lib.ok, false, sort);
+    assert.deepEqual(lib.requests, [], sort);
+  }
+});
+
 test("intRangeProblem accepts safe integers in range and names everything else", async () => {
   const { intRangeProblem } = await import("@maschinenlesbar.org/marktstammdatenregister-client/internal/validate");
   const p = intRangeProblem(0, 10);

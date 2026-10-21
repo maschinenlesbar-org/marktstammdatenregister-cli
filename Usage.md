@@ -36,7 +36,7 @@ mastr [global options] <command> [command options]
 |---|---|
 | `--page <n>` | 1-based page (default 1) |
 | `--page-size <n>` | rows per page (1..5000, default 25) |
-| `--sort <spec>` | `FieldKey-asc` or `FieldKey-desc`, e.g. `Bruttoleistung-desc`. `FieldKey` is a record field name of **that category**, not a `FilterName` (`Bruttoleistung` exists only in `stromerzeugung`; see [Capacity fields](#capacity-fields-per-category)) |
+| `--sort <spec>` | `FieldKey-asc` or `FieldKey-desc`, e.g. `Bruttoleistung-desc` (several joined by `~`; the direction in any case). `FieldKey` is a record field name of **that category**, not a `FilterName` (`Bruttoleistung` exists only in `stromerzeugung`; see [Capacity fields](#capacity-fields-per-category)). The spec is sent trimmed; anything else — no direction (`Bruttoleistung`), another direction (`-down`), a name with spaces (a FilterName), an invisible or control character — is a usage error (exit 2) before any request: the register sorted such a spec ascending or not at all, silently |
 | `--filter <spec>` | filter expression (see below); repeatable — several are joined with `~and~` |
 | `--total` | print only the total match count, not the rows (a one-row request, the library's `count()`; `--page` and `--page-size` are ignored) |
 

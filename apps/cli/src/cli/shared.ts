@@ -49,7 +49,7 @@ export function parseWith(problem: Problem<string>): (value: string) => string {
 /** commander value-parser: a non-empty (after trimming) string (the library's `nonBlankProblem`). */
 export const parseNonEmpty = parseWith(nonBlankProblem);
 
-/** commander value-parser for `--sort`: the library's `sortProblem` (not blank). */
+/** commander value-parser for `--sort`: the library's `sortProblem` (a token, `FieldKey-asc|desc`). */
 export const parseSort = parseWith(sortProblem);
 
 /**

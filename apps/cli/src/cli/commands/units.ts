@@ -56,8 +56,8 @@ export function registerCommands(program: Command, deps: CliDeps): void {
       )
       .option(
         "--sort <spec>",
-        "sort: FieldKey-asc | FieldKey-desc, where FieldKey is a record field name, not a " +
-          `FilterName (e.g. ${cat.sortKey}-desc)`,
+        "sort: FieldKey-asc | FieldKey-desc (several joined by ~), where FieldKey is a record " +
+          `field name, not a FilterName (e.g. ${cat.sortKey}-desc); any other form is rejected`,
         once("--sort", parseSort),
       )
       .option(

@@ -48,9 +48,10 @@ const filterParts = (url: URL): string[] => (url.searchParams.get("filter") ?? "
 /** Every free-text value (sent as a query parameter). */
 const textInputs: Input[] = [];
 /**
- * Every token: a FilterName in a `--filter` spec (compared exactly by the register). Checked
+ * Every token: a FilterName in a `--filter` spec (compared exactly by the register; checked
  * against a column list that holds the corpus's valid names, so those are sent and the rest is
- * refused as unknown.
+ * refused as unknown), and a `--sort` key, sent as `<value>-desc` (the documented syntax,
+ * FieldKey-asc|desc; a key that isn't a record field name is refused).
  */
 const idInputs: Input[] = [
   {
@@ -58,6 +59,12 @@ const idInputs: Input[] = [
     argv: (v) => ["stromerzeugung", "--filter", `${v}~eq~'x'`],
     lib: (c, v) => c.stromerzeugung({ filter: `${v}~eq~'x'` }),
     sent: (u) => filterParts(u)[0] ?? null,
+  },
+  {
+    name: "--sort",
+    argv: (v) => ["stromerzeugung", "--sort", `${v}-desc`],
+    lib: (c, v) => c.stromerzeugung({ sort: `${v}-desc` }),
+    sent: (u) => u.searchParams.get("sort")?.replace(/-desc$/, "") ?? null,
   },
 ];
 /**
