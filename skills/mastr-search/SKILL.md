@@ -39,18 +39,32 @@ mastr gasverbrauch     # gas consumption
 Each prints `{ total, data }` — `total` is the full match count (respects the
 filter), `data` is the current page.
 
+**The register keeps every unit ever registered, whatever its state** — `Betriebs-Status`
+`35` In Betrieb, `31` In Planung, `37` Vorübergehend stillgelegt, `38` Endgültig stillgelegt.
+"How many solar plants are there?", "the largest units", "wind turbines in Bavaria" mean units
+**in operation**: add `Betriebs-Status~eq~'35'` to every count and list unless the user asks
+for registered, planned or decommissioned units, and say which status the answer counts.
+Without it the largest units are shut-down nuclear plants and wind in Bavaria is a third too
+high (live 2026-10-21: 1,883 registered, 1,377 in operation).
+
 ## Recipes
 
 ```bash
-# How many electricity-generation units exist? (just the count)
-mastr stromerzeugung --total
+# How many electricity-generation units are in operation? (just the count)
+mastr stromerzeugung --filter "Betriebs-Status~eq~'35'" --total
 
-# How many are solar? (Energieträger code 2495 — see mastr-filters)
+# How many solar units are in operation? (Energieträger code 2495 — see mastr-filters)
+mastr stromerzeugung --filter "Energieträger~eq~'2495'~and~Betriebs-Status~eq~'35'" --total
+
+# Wind turbines in operation in Bavaria (Energieträger 2497, Bundesland 1403)
+mastr stromerzeugung --filter "Energieträger~eq~'2497'~and~Bundesland~eq~'1403'~and~Betriebs-Status~eq~'35'" --total
+
+# First page of the largest units in operation, dates as ISO; keep the status in the projection
+mastr stromerzeugung --filter "Betriebs-Status~eq~'35'" --sort "Bruttoleistung-desc" --page-size 20 --iso-dates --compact \
+  | jq '.data[] | {MaStRNummer, EinheitName, Bruttoleistung, BetriebsStatusName, Bundesland, Ort}'
+
+# Every status, when the user asks for all registered units (planned and shut-down included)
 mastr stromerzeugung --filter "Energieträger~eq~'2495'" --total
-
-# First page of the largest units, dates as ISO
-mastr stromerzeugung --sort "Bruttoleistung-desc" --page-size 20 --iso-dates --compact \
-  | jq '.data[] | {MaStRNummer, EinheitName, Bruttoleistung, Bundesland, Ort}'
 
 # Page through results
 mastr stromerzeugung --page 1 --page-size 100 --compact
@@ -59,6 +73,10 @@ mastr stromerzeugung --page 2 --page-size 100 --compact
 
 ## Traps
 
+- **Filter by the operating status** (`Betriebs-Status~eq~'35'`, in operation) unless the
+  user asks otherwise — see above. Project `BetriebsStatusName` into every listing, so a
+  planned or shut-down unit can't pass for a running one. Check the codes with
+  `mastr filters <category>`; a category without that column is refused by the CLI (exit 2).
 - **Prefer `--total` for "how many?"** — never page through 9M rows to count. The
   server returns the exact total for free.
 - **You cannot sum capacity server-side.** There is no aggregate endpoint; to total
