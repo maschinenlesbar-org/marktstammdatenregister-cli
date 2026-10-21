@@ -312,6 +312,9 @@ test("a number JSON.parse can't carry exactly is a MastrParseError, never a chan
   const inexact = [
     "1e400", "-1E400", "12345678901234567890", "-9007199254740993", "12345678901234567890.0",
     "9007199254740993e0", "9007199254740992.5", "1e-400", "123456789012345678901234567890",
+    // Subnormal: below 2.2250738585072014e-308 a double has fewer digits, so a value that does
+    // not print as written was changed (D4; bug 5: 4e-324 printed as 5e-324).
+    "3e-324", "4e-324", "-4.9e-324", "1.2345678901234567e-310", "2.225073858507201e-309",
   ];
   for (const literal of inexact) {
     const mt = makeMockTransport(() => rawResponse(`{"Data":[{"Bruttoleistung":${literal}}],"Total":1,"Errors":null}`, "application/json"));
@@ -331,6 +334,8 @@ test("a number JSON.parse can't carry exactly is a MastrParseError, never a chan
     // Past 2^53 a number passes when it prints as written: a double a server printed in its
     // own shortest form (an ArcGIS sentinel) is the same number, not a changed one.
     ["1e23", 1e23], ["100000000000000000000000", 1e23], ["1.7976931348623157E308", Number.MAX_VALUE],
+    // A subnormal printed as written, and the smallest normal double, are the same number (D4).
+    ["-5e-324", -5e-324], ["1e-310", 1e-310], ["2.2250738585072014e-308", 2.2250738585072014e-308],
   ];
   for (const [literal, value] of exact) {
     const mt = makeMockTransport(() =>
