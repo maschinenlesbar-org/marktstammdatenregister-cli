@@ -581,6 +581,16 @@ export class RequestEngine {
   }
 
   /**
+   * The request URL as an error about the answer shows it (`GET <this>: …`): absolute, so the
+   * message names the host that gave the bad answer (it matters with a mirror's base URL), with
+   * the query, userinfo redacted, and cut at MAX_DETAIL_LENGTH characters. The client's own
+   * answer errors (a wrong shape) use it too.
+   */
+  describeUrl(path: string, query?: QueryParams): string {
+    return cutDetail(redactUrl(this.buildUrl(path, query)));
+  }
+
+  /**
    * Call the transport under the overall deadline (`timeoutMs`): the request gets an
    * AbortSignal that fires at the deadline, and the call rejects then whether the transport
    * stops or not — a custom transport (fetch, a node:http wrapper) that ignores `timeoutMs`
@@ -711,27 +721,32 @@ export class RequestEngine {
    * endpoint answers with a JSON document, so an empty body or a 204 is a
    * `MastrParseError`, never a silent `null`. So is a number JSON.parse can't carry
    * exactly (`firstInexactNumber`): out of a double's range, past 2^53 in any written
-   * form, or non-zero and too small for a double — never a changed value.
+   * form, non-zero and too small for a double, or a subnormal that would print changed —
+   * never a changed value. Every error about the answer names the request (`GET <url>: …`,
+   * userinfo redacted).
    */
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
     const res = await this.request(path, query);
-    const text = decodeBody(res.data, res.contentType, path);
+    const request = `GET ${this.describeUrl(path, query)}`;
+    const text = decodeBody(res.data, res.contentType, request);
     if (res.status === 204 || text.trim().length === 0) {
-      throw new MastrParseError(`Empty response body from ${path}`);
+      throw new MastrParseError(`${request}: empty response body.`);
     }
     let parsed: T;
     try {
       parsed = JSON.parse(text) as T;
     } catch (cause) {
-      throw new MastrParseError(`Failed to parse JSON response from ${path}`, { cause });
+      // An HTML maintenance or proxy page is the usual non-JSON answer: name its type, so it
+      // reads as an upstream problem rather than a client bug.
+      const type = res.contentType.split(";")[0]?.trim() ?? "";
+      const hint = type !== "" && !/json/i.test(type) ? ` (expected JSON, got Content-Type "${cutDetail(sanitizeServerText(type))}")` : "";
+      throw new MastrParseError(`${request}: the answer is not valid JSON${hint}.`, { cause });
     }
     // JSON.parse rounds and overflows numbers silently: refuse the answer rather than print
     // a changed value.
     const inexact = firstInexactNumber(text);
     if (inexact !== undefined) {
-      throw new MastrParseError(
-        `Unexpected response from ${path}: the number ${cutForMessage(inexact)} cannot be represented exactly.`,
-      );
+      throw new MastrParseError(`${request}: the number ${cutForMessage(inexact)} cannot be represented exactly.`);
     }
     return parsed;
   }
@@ -766,15 +781,15 @@ export class RequestEngine {
  * Decode a response body by the charset its Content-Type names (UTF-8 when it names none):
  * a Latin-1 body from a re-encoding proxy or mirror became U+FFFD with `toString("utf8")`.
  * TextDecoder also drops a leading byte order mark, which JSON.parse would reject. An
- * unknown charset label is a MastrParseError.
+ * unknown charset label is a MastrParseError naming `request`.
  */
-function decodeBody(body: Buffer, contentType: string, path: string): string {
+function decodeBody(body: Buffer, contentType: string, request: string): string {
   const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(charset);
   } catch {
-    throw new MastrParseError(`Unsupported response charset "${cutForMessage(sanitizeServerText(charset))}" from ${path}.`);
+    throw new MastrParseError(`${request}: unsupported response charset "${cutForMessage(sanitizeServerText(charset))}".`);
   }
   return decoder.decode(body);
 }

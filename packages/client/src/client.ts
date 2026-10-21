@@ -205,8 +205,9 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function shapeError(path: string, expected: string): MastrParseError {
-  return new MastrParseError(`Unexpected response shape from ${path}: expected ${expected}.`);
+/** An answer of the wrong shape, naming the request (`GET <url>: …`, userinfo redacted). */
+function shapeError(request: string, expected: string): MastrParseError {
+  return new MastrParseError(`${request}: unexpected response shape: expected ${expected}.`);
 }
 
 export class MastrClient {
@@ -279,7 +280,8 @@ export class MastrClient {
     };
     const path = `${SERVICE}/GetErweiterteOeffentlicheEinheit${suffix}`;
     const res = await this.engine.getJson<unknown>(path, params);
-    if (!isObject(res)) throw shapeError(path, "a JSON object with Data and Total");
+    const request = `GET ${this.engine.describeUrl(path, params)}`;
+    if (!isObject(res)) throw shapeError(request, "a JSON object with Data and Total");
     // MaStR answers HTTP 200 with a logical error in `Errors`: a string such as "Die
     // Anfrage ist Null.", or a Kendo ModelState object. Anything but null is an error
     // (a broken reply must not read as "no matches"). The text is server-controlled
@@ -295,21 +297,21 @@ export class MastrClient {
     if (res["Error"] === true) throw this.registerRejected(path, params, res);
     const total = res["Total"];
     if (typeof total !== "number" || !Number.isSafeInteger(total) || total < 0) {
-      throw shapeError(path, "a numeric Total");
+      throw shapeError(request, "a numeric Total");
     }
     const data = res["Data"];
     // A reply with no matches may carry `Data: null`; with a positive Total it must be an array.
     if (data === null && total === 0) return { total, data: [] };
-    if (!Array.isArray(data)) throw shapeError(path, "a Data array");
+    if (!Array.isArray(data)) throw shapeError(request, "a Data array");
     // A page can't hold more rows than match, nor more than were asked for: such a reply
     // would print rows next to `"total": 0` (and the CLI's "0 results" note), or a page
     // larger than --page-size.
     if (data.length > total) {
-      throw shapeError(path, `a Total of at least the ${data.length} rows on the page, got ${total}`);
+      throw shapeError(request, `a Total of at least the ${data.length} rows on the page, got ${total}`);
     }
     const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
     if (data.length > pageSize) {
-      throw shapeError(path, `at most ${pageSize} rows (the pageSize), got ${data.length}`);
+      throw shapeError(request, `at most ${pageSize} rows (the pageSize), got ${data.length}`);
     }
     return { total, data: data as MastrUnit[] };
   }
@@ -318,7 +320,7 @@ export class MastrClient {
    * The register's second error envelope, `{"Error":true,"Message":…,"Type":"danger"}`
    * (HTTP 200), as a MastrApiError: its answer to a filter value it can't read, and (live
    * 2026-10-09) to a sort key it doesn't know. It used to surface as "Unexpected response
-   * shape … expected a numeric Total", which reads like a broken server or client and
+   * shape: expected a numeric Total", which reads like a broken server or client and
    * doesn't say what to fix. A request with a sort key names that cause first; one with a
    * filter (or neither) names the filter values.
    */
@@ -398,7 +400,7 @@ export class MastrClient {
       });
     }
     if (!Array.isArray(res) || !res.every(isObject)) {
-      throw shapeError(path, "a JSON array of filter columns");
+      throw shapeError(`GET ${this.engine.describeUrl(path)}`, "a JSON array of filter columns");
     }
     return res as FilterColumn[];
   }

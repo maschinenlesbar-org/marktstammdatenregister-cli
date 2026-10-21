@@ -43,7 +43,7 @@ test("getJson throws MastrParseError on an empty/204 body (never a silent null)"
     const e = new RequestEngine({ transport: mt.transport });
     await assert.rejects(
       () => e.getJson("/x"),
-      (err) => err instanceof MastrParseError && err.message === "Empty response body from /x",
+      (err) => err instanceof MastrParseError && err.message === "GET https://www.marktstammdatenregister.de/MaStR/x: empty response body.",
     );
   }
 });
@@ -245,7 +245,7 @@ test("getJson decodes the body by its declared charset (finding 03#4) and drops 
   const e2 = new RequestEngine({ transport: body(bom, "application/json; charset=utf-8") });
   assert.deepEqual(await e2.getJson("/x"), { a: 1 });
   const e3 = new RequestEngine({ transport: body(Buffer.from("{}"), "application/json; charset=x-bogus") });
-  await assert.rejects(e3.getJson("/x"), (e: unknown) => e instanceof MastrParseError && /Unsupported response charset "x-bogus"/.test((e as Error).message));
+  await assert.rejects(e3.getJson("/x"), (e: unknown) => e instanceof MastrParseError && /^GET \S+\/x: unsupported response charset "x-bogus"\.$/.test((e as Error).message));
 });
 
 test("cleartextProblem: wording, loopback and https exemptions", () => {
@@ -323,7 +323,7 @@ test("a number JSON.parse can't carry exactly is a MastrParseError, never a chan
       e.getJson("/x"),
       (err) =>
         err instanceof MastrParseError &&
-        err.message === `Unexpected response from /x: the number ${literal} cannot be represented exactly.`,
+        err.message === `GET https://www.marktstammdatenregister.de/MaStR/x: the number ${literal} cannot be represented exactly.`,
       literal,
     );
   }
@@ -402,4 +402,24 @@ test("a header named __proto__ is an ordinary header, never the prototype of the
   const fetchLike = new Headers([["__proto__", "x"], ["content-type", "application/json"]]);
   const f = new RequestEngine({ transport: async () => ({ status: 200, headers: fetchLike as unknown as Record<string, string>, body: Buffer.from('{"a":1}') }) });
   assert.deepEqual(await f.getJson("/x"), { a: 1 });
+});
+
+test("an answer error names the request: method and URL, userinfo redacted (D9)", async () => {
+  const answers: Array<[string, () => ReturnType<typeof rawResponse>]> = [
+    ["the answer is not valid JSON (expected JSON, got Content-Type \"text/html\")", () => rawResponse("<html>", "text/html")],
+    ["the answer is not valid JSON.", () => rawResponse("{", "application/json")],
+    ["empty response body", () => rawResponse(" ", "application/json")],
+    ["cannot be represented exactly", () => rawResponse('{"n":1e400}', "application/json")],
+    ["unsupported response charset", () => rawResponse("{}", "application/json; charset=x-bogus")],
+  ];
+  for (const [what, respond] of answers) {
+    const e = new RequestEngine({ baseUrl: "https://alice:s3cret@h.test/MaStR", transport: makeMockTransport(respond).transport });
+    await assert.rejects(e.getJson("/Einheit", { page: 1, filter: "Ort~eq~'x'" }), (err: unknown) => {
+      assert.ok(err instanceof MastrParseError, what);
+      assert.ok(err.message.startsWith("GET https://***@h.test/MaStR/Einheit?page=1&filter=Ort%7Eeq%7E%27x%27: "), err.message);
+      assert.ok(err.message.includes(what), `${what}: ${err.message}`);
+      assert.ok(!err.message.includes("s3cret"), err.message);
+      return true;
+    });
+  }
 });

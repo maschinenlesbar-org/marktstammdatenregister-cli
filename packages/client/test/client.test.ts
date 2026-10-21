@@ -182,7 +182,8 @@ test("a malformed 200 envelope throws MastrParseError instead of reading as 0 ma
       () => client.stromerzeugung(),
       (err) =>
         err instanceof MastrParseError &&
-        err.message === `Unexpected response shape from ${path}: expected ${expected}.`,
+        err.message ===
+          `GET https://www.marktstammdatenregister.de/MaStR${path}?sort=&page=1&pageSize=25&group=&filter=: unexpected response shape: expected ${expected}.`,
       JSON.stringify(body),
     );
   }
