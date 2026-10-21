@@ -311,7 +311,7 @@ test("credentials a server echoes are scrubbed from the error: Basic, user:passw
 test("a number JSON.parse can't carry exactly is a MastrParseError, never a changed value (K1)", async () => {
   const inexact = [
     "1e400", "-1E400", "12345678901234567890", "-9007199254740993", "12345678901234567890.0",
-    "9007199254740993e0", "9007199254740992.5", "1e-400", "1e23",
+    "9007199254740993e0", "9007199254740992.5", "1e-400", "123456789012345678901234567890",
   ];
   for (const literal of inexact) {
     const mt = makeMockTransport(() => rawResponse(`{"Data":[{"Bruttoleistung":${literal}}],"Total":1,"Errors":null}`, "application/json"));
@@ -328,6 +328,9 @@ test("a number JSON.parse can't carry exactly is a MastrParseError, never a chan
   const exact: Array<[string, number]> = [
     ["9007199254740991", 9007199254740991], ["9007199254740992.0", 2 ** 53], ["1e21", 1e21],
     ["4999.999", 4999.999], ["0.1", 0.1], ["0.0e-500", 0], ["5e-324", 5e-324],
+    // Past 2^53 a number passes when it prints as written: a double a server printed in its
+    // own shortest form (an ArcGIS sentinel) is the same number, not a changed one.
+    ["1e23", 1e23], ["100000000000000000000000", 1e23], ["1.7976931348623157E308", Number.MAX_VALUE],
   ];
   for (const [literal, value] of exact) {
     const mt = makeMockTransport(() =>
