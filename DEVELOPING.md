@@ -215,7 +215,7 @@ outcome.
 ## Testing
 
 `node --test` on each workspace's compiled `dist/test/`. The client's tests are in
-`packages/client/test/` (`query`, `http`, `engine`, `client`, `filter`), with the transport
+`packages/client/test/` (`query`, `http`, `engine`, `client`, `filter`, `types`), with the transport
 helpers and the fixtures (`helpers.ts`, `fixtures.ts`); everything that drives the CLI is in
 `apps/cli/test/`, and `apps/cli/test/helpers.ts` re-exports the client's helpers next to the
 CLI's own. Notable coverage:
@@ -224,6 +224,9 @@ CLI's own. Notable coverage:
 - `client.test.ts` — `units()` ALWAYS sends the full Kendo param set; category routing;
   the `Errors` envelope throws; `parseMsDate`/`isoifyDates`/`formatMastrDate` (incl. the
   2024 DST edges).
+- `types.test.ts` — every optional field of the exported option and query types is
+  `?: T | undefined` (a consumer compiled by `tsc` with `exactOptionalPropertyTypes`, which
+  starts a process: 30 s), and an option given as `undefined` means its default.
 - `cli.test.ts` — the 4 commands, paging bounds, `--total`, `--iso-dates`, the `filters`
   command, and the hardening guards (control-char UA, empty base URL, bounded retries).
 - `log.test.ts` — the record helpers of `apps/cli/src/cli/log.ts` on their own

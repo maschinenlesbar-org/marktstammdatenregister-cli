@@ -75,7 +75,7 @@ export interface MastrClientOptions extends EngineOptions {
    * (the unfiltered set) and answers an unknown code with 0 rows. The shape check and the
    * name normalisation apply either way.
    */
-  allowUnknownFilters?: boolean;
+  allowUnknownFilters?: boolean | undefined;
 }
 
 /** The UnitQuery keys; any other key is refused (a misspelled `filtr` was ignored: the unfiltered set). */

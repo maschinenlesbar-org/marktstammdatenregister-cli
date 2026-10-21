@@ -96,11 +96,11 @@ export type CountQuery = Pick<UnitQuery, "filter" | "sort">;
 
 export interface UnitQuery {
   /** 1-based page number (default 1). */
-  page?: number;
+  page?: number | undefined;
   /** Rows per page. */
-  pageSize?: number;
+  pageSize?: number | undefined;
   /** Sort spec: `FieldKey-asc` or `FieldKey-desc`, e.g. `"Bruttoleistung-desc"`. */
-  sort?: string;
+  sort?: string | undefined;
   /**
    * Filter spec: `FilterName~op~'value'~and~…` with ops
    * `eq|neq|sw|ct|nct|ew|null|nn|gt|lt`, e.g. `"Energieträger~eq~'2495'"`. There is
@@ -110,7 +110,7 @@ export interface UnitQuery {
    * via {@link MastrClient.filterColumns}; the client checks them against that list
    * (unless `allowUnknownFilters`), because the register ignores an unknown name.
    */
-  filter?: string;
+  filter?: string | undefined;
 }
 
 /** A filterable column, from a `GetFilterColumns…` endpoint. */

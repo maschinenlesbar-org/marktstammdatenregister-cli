@@ -51,22 +51,22 @@ export interface EngineOptions {
    * control characters, not an absolute http(s) URL, a query or fragment) throws a
    * MastrValidationError.
    */
-  baseUrl?: string;
+  baseUrl?: string | undefined;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
-  transport?: Transport;
+  transport?: Transport | undefined;
   /**
    * Value of the User-Agent header: not blank, Latin-1 without control characters
    * (tab is fine), else a MastrValidationError.
    */
-  userAgent?: string;
+  userAgent?: string | undefined;
   /** Extra headers sent on every request; names must be tokens, values follow the `userAgent` rule. */
-  defaultHeaders?: Record<string, string>;
+  defaultHeaders?: Record<string, string> | undefined;
   /**
    * Time limit per request in milliseconds, covering the whole response body, not
    * only idle gaps: an integer 0..`MAX_TIMEOUT_MS` (2^31 - 1 ms); 0 disables.
    * Defaults to 30000.
    */
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
   /**
    * Number of automatic retries for transient (429/503) responses and reset
    * connections (`isTransientNetworkError`), an integer
@@ -74,26 +74,26 @@ export interface EngineOptions {
    * response's `Retry-After` when that is longer. A `Retry-After` above
    * `MAX_RETRY_AFTER_MS` waits that cap (30 s) and then retries.
    */
-  maxRetries?: number;
+  maxRetries?: number | undefined;
   /**
    * Base backoff between retries in milliseconds (grows linearly: `retryDelayMs * attempt`),
    * an integer 0..`MAX_RETRY_AFTER_MS` (30 000). Defaults to 200. It is also the floor: a
    * `Retry-After` can make a wait longer, never shorter.
    */
-  retryDelayMs?: number;
+  retryDelayMs?: number | undefined;
   /**
    * Hard cap on response body size in bytes (defends against memory exhaustion
    * from a hostile/buggy endpoint), a non-negative integer. Defaults to 100 MiB;
    * set to 0 for no limit.
    */
-  maxResponseBytes?: number;
+  maxResponseBytes?: number | undefined;
   /** Injectable sleep, primarily for deterministic tests. */
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: ((ms: number) => Promise<void>) | undefined;
   /**
    * Called once per retry, right before the backoff sleep, for each retried status
    * and reset connection; never when there is no retry. A throw is swallowed.
    */
-  onRetry?: (event: RetryEvent) => void;
+  onRetry?: ((event: RetryEvent) => void) | undefined;
 }
 
 /** What `EngineOptions.onRetry` is told about one retry. */

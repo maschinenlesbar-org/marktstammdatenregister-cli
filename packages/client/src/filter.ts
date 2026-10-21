@@ -178,7 +178,7 @@ export interface FilterCondition {
    * becomes the comma list the register reads as "any of these codes". Ignored for
    * `null`/`nn` (sent as `''`). Must not contain `~` (nor `,` in an array item).
    */
-  value?: string | number | readonly (string | number)[];
+  value?: string | number | readonly (string | number)[] | undefined;
 }
 
 /**
