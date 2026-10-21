@@ -209,7 +209,17 @@ ESC/OSC sequences reached the terminal, and a 200 000-character label made a 300
 
 **The library owns every input rule.** A rule is a pure, exported `…Problem(value)`
 function (the reason a value is invalid, or `undefined`), in `validate.ts` or next to
-the code it guards (`filterProblem` in `filter.ts`). The library enforces it with
+the code it guards (`filterProblem` in `filter.ts`). Every value that goes into a request
+passes one rule for its kind (the kit's D8): `tokenProblem`/`normalizeToken` for what the
+register compares exactly — a FilterName, a sort key, a dropdown code (trimmed, NFC; refused
+when blank or only invisible characters and combining marks, with a lone surrogate, or with any
+control or format character: a zero-width space, a soft hyphen, a bidi control);
+`textProblem`/`normalizeText` for free text (the same, but TAB/LF/CR and ZWJ/ZWNJ are allowed
+inside); `splitList`/`listProblem` for a comma list (per item; an empty item refuses the list).
+A refusal quotes the value with `quoteValue` (`errors.ts`): JSON-quoted, cut at 200 characters,
+and DEL, C1, U+2028/2029, lone surrogates and every format character escaped (`\u200b`), so a
+refused name never prints like the one it was refused for; commander's own echo of a rejected
+argument is escaped the same way (`escapeTerminalText` in `run.ts`). The library enforces it with
 `assertValid(name, value, problem)`, which throws `MastrValidationError` with
 `Invalid <name>: <reason>` before any request (constructors throw, async methods
 reject). The CLI's commander parsers call the same function and turn the reason into a

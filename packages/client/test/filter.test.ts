@@ -6,8 +6,8 @@ import { normalizeText } from "../src/validate.js";
 
 test("filterProblem names a ~ inside a quoted value (the register has no escape)", () => {
   const problem = filterProblem("Anzeige-Name der Einheit~ct~'a~b'");
-  assert.match(problem ?? "", /The value 'a~b' in condition 1 contains "~"/);
-  assert.match(problem ?? "", /would read 'a'/);
+  assert.match(problem ?? "", /The value "'a~b'" in condition 1 contains "~"/);
+  assert.match(problem ?? "", /would read "'a'"/);
   // The injection shape a naive `Ort~eq~'${input}'` produces is well-formed and so
   // passes the spec check; only buildFilter can refuse it (below).
   assert.equal(filterProblem("Ort~eq~'Münster'~and~Energieträger~eq~'2497'"), undefined);
@@ -97,16 +97,16 @@ test("own messages quote a typed filter part at most 200 characters long (L3)", 
   const long = "x".repeat(5000);
   for (const spec of [`Ort~${long}~'a'`, `Ort~eq~'${long}`, `Ort~eq~'a'~${long}~Ort~eq~'b'`, `Ort~eq~'a'~and~${long}`]) {
     const problem = filterProblem(spec) ?? "";
-    assert.match(problem, /x…/, spec.slice(0, 20));
+    assert.match(problem, /x"?…/, spec.slice(0, 20));
     assert.ok(problem.length < 600, `${problem.length}`);
   }
   assert.throws(
     () => resolveFilter(`${long}~eq~'a'`, [{ FilterName: "Ort", Type: "text" }], "stromerzeugung"),
-    (err: Error) => /unknown FilterName "x+…"/.test(err.message) && err.message.length < 600,
+    (err: Error) => /unknown FilterName "x+"…/.test(err.message) && err.message.length < 600,
   );
   assert.throws(
     () => buildFilter([{ name: "Ort", op: "eq", value: `${long}~` }]),
-    (err: Error) => /the value "x+…" in condition 1/.test(err.message) && err.message.length < 600,
+    (err: Error) => /the value "x+"…/.test(err.message) && err.message.length < 600,
   );
 });
 
@@ -169,4 +169,17 @@ test("buildFilter sends a text value trimmed and in NFC (normalizeText); a blank
   for (const blank of ["", " ", "　", "\n\t"]) {
     assert.throws(() => buildFilter([{ name: "Ort", op: "eq", value: blank }]), MastrValidationError, JSON.stringify(blank));
   }
+});
+
+test("an invisible character in a FilterName is refused before any request and shown escaped (bug 3, D8, D10)", () => {
+  // A zero-width space after the name: the rejected name and the "did you mean" used to print
+  // identically. Now the shape check refuses it, the character escaped.
+  const problem = filterProblem("Energieträger​~eq~'2495'") ?? "";
+  assert.equal(problem, 'The FilterName of condition 1: "Energieträger\\u200b" contains an invisible or control character (U+200B).');
+  for (const name of ["Ort­", "‮Ort", "O\u0000rt", "Ort\ud800"]) {
+    assert.match(filterProblem(`${name}~eq~'x'`) ?? "", /^The FilterName of condition 1: "[^"]*\\u[0-9a-f]{4}[^"]*" contains/, JSON.stringify(name));
+  }
+  // Only invisible characters or combining marks: no FilterName at all.
+  assert.match(filterProblem("​~eq~'x'") ?? "", /^Condition 1 has no FilterName/);
+  assert.throws(() => buildFilter([{ name: "Ort​", op: "eq", value: "x" }]), /needs a non-blank FilterName without "~" or invisible characters, got "Ort\\u200b"/);
 });

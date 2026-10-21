@@ -5,9 +5,9 @@
 // misread are refused before any request.
 
 import { MAX_DETAIL_LENGTH, serverTextForMessage } from "./engine.js";
-import { MastrValidationError, cutForMessage } from "./errors.js";
+import { MastrValidationError, cutForMessage, quoteValue } from "./errors.js";
 import type { FilterColumn } from "./types.js";
-import { normalizeText } from "./validate.js";
+import { normalizeText, tokenProblem } from "./validate.js";
 
 /**
  * The operators the register's search understands (from its web form, all checked
@@ -65,29 +65,33 @@ export function filterProblem(spec: string): string | undefined {
     const name = parts[i];
     const op = parts[i + 1];
     const value = parts[i + 2];
-    if (name === undefined || name.trim() === "") {
+    // A FilterName is a token: the register compares it exactly, so an invisible character in it
+    // (a zero-width space, a soft hyphen, a bidi control) only makes it a name it doesn't know.
+    const nameProblem = name === undefined ? "Expected a non-empty value." : tokenProblem(name);
+    if (nameProblem === "Expected a non-empty value.") {
       return `Condition ${n} has no FilterName. ${SHAPE}`;
     }
+    if (nameProblem !== undefined) return `The FilterName of condition ${n}: ${nameProblem}`;
     if (op === undefined || value === undefined) {
-      return `Condition ${n} ("${cutForMessage(parts.slice(i).join("~"))}") is incomplete. ${SHAPE}`;
+      return `Condition ${n} (${quoteValue(parts.slice(i).join("~"))}) is incomplete. ${SHAPE}`;
     }
     if (!OPERATORS.has(op)) {
       const lower = op.trim().toLowerCase();
       const hint = OPERATORS.has(lower) ? ` Operators are lower case: use "${lower}".` : "";
       return (
-        `Unknown operator "${cutForMessage(op)}" in condition ${n}. The operators are ` +
+        `Unknown operator ${quoteValue(op)} in condition ${n}. The operators are ` +
         `${FILTER_OPERATORS.join(", ")} (gt/lt are strict; there is no gte/lte); the register ` +
         `returns 0 rows for any other.${hint}`
       );
     }
     if (!UNARY_OPERATORS.has(op) && value.trim() === "") {
-      return `Condition ${n} ("${cutForMessage(`${name}~${op}`)}") has no value. ${SHAPE}`;
+      return `Condition ${n} (${quoteValue(`${name}~${op}`)}) has no value. ${SHAPE}`;
     }
     // A quoted blank value ('' or ' ') is no value either: on a text column it matches
     // nothing, and on a dropdown the live register did not answer within 30 s
     // (2026-10-05). Only null/nn take ''.
     if (!UNARY_OPERATORS.has(op) && /^'\s*'$/.test(value.trim())) {
-      return `Condition ${n} ("${cutForMessage(`${name}~${op}~${value.trim()}`)}") has no value: '' is only for null/nn. ${SHAPE}`;
+      return `Condition ${n} (${quoteValue(`${name}~${op}~${value.trim()}`)}) has no value: '' is only for null/nn. ${SHAPE}`;
     }
     if (value.startsWith("'") && (value.length < 2 || !value.endsWith("'"))) {
       // A later part that closes the quote means the value itself held a "~".
@@ -95,12 +99,12 @@ export function filterProblem(spec: string): string | undefined {
       if (close !== -1) {
         const meant = parts.slice(i + 2, close + 1).join("~");
         return (
-          `The value ${cutForMessage(meant)} in condition ${n} contains "~". A filter value cannot contain "~": ` +
-          `the register splits the filter on every "~" and has no escape, so it would read ${cutForMessage(value)}' ` +
+          `The value ${quoteValue(meant)} in condition ${n} contains "~". A filter value cannot contain "~": ` +
+          `the register splits the filter on every "~" and has no escape, so it would read ${quoteValue(`${value}'`)} ` +
           "and treat the rest as further conditions. Leave the ~ out (e.g. match a part with ct)."
         );
       }
-      return `The value of condition ${n} (${cutForMessage(value)}) has no closing single quote. ${SHAPE}`;
+      return `The value of condition ${n} (${quoteValue(value)}) has no closing single quote. ${SHAPE}`;
     }
     i += 3;
     if (i >= parts.length) return undefined;
@@ -113,7 +117,7 @@ export function filterProblem(spec: string): string | undefined {
       );
     }
     if (conjunction !== "and") {
-      return `Expected ~and~ after condition ${n}, got "~${cutForMessage(conjunction)}~". Conditions are joined by ~and~ only.`;
+      return `Expected ~and~ after condition ${n}, got ${quoteValue(`~${conjunction}~`)}. Conditions are joined by ~and~ only.`;
     }
     i += 1;
     if (parts.slice(i).join("~").trim() === "") {
@@ -200,9 +204,9 @@ export function buildFilter(conditions: readonly FilterCondition[]): string {
   }
   const parts = conditions.map((c, index) => {
     const n = index + 1;
-    if (typeof c?.name !== "string" || c.name.trim() === "" || c.name.includes("~")) {
+    if (typeof c?.name !== "string" || tokenProblem(c.name) !== undefined || c.name.includes("~")) {
       throw new MastrValidationError(
-        `Invalid filter: condition ${n} needs a non-blank FilterName without "~", got ${quoted(c?.name)}.`,
+        `Invalid filter: condition ${n} needs a non-blank FilterName without "~" or invisible characters, got ${quoted(c?.name)}.`,
       );
     }
     if (!OPERATORS.has(c.op)) {
@@ -213,17 +217,17 @@ export function buildFilter(conditions: readonly FilterCondition[]): string {
     if (UNARY_OPERATORS.has(c.op)) return `${c.name}~${c.op}~''`;
     const items: readonly unknown[] = Array.isArray(c.value) ? c.value : [c.value];
     if (items.length === 0) {
-      throw new MastrValidationError(`Invalid filter: condition ${n} ("${cutForMessage(c.name)}") has an empty value list.`);
+      throw new MastrValidationError(`Invalid filter: condition ${n} (${quoteValue(c.name)}) has an empty value list.`);
     }
     const texts = items.map((item) => {
       if ((typeof item !== "string" && typeof item !== "number") || String(item).trim() === "") {
         throw new MastrValidationError(
-          `Invalid filter: condition ${n} ("${cutForMessage(c.name)}") needs a non-blank value, got ${quoted(item)}.`,
+          `Invalid filter: condition ${n} (${quoteValue(c.name)}) needs a non-blank value, got ${quoted(item)}.`,
         );
       }
       if (typeof item === "number" && !Number.isFinite(item)) {
         throw new MastrValidationError(
-          `Invalid filter: condition ${n} ("${cutForMessage(c.name)}") needs a finite number, got ${String(item)}.`,
+          `Invalid filter: condition ${n} (${quoteValue(c.name)}) needs a finite number, got ${String(item)}.`,
         );
       }
       // A text value goes out canonical (trimmed, NFC): see normalizeText.
@@ -267,9 +271,9 @@ export function validateFilter(spec: string): void {
   if (problem !== undefined) throw new MastrValidationError(`Invalid filter: ${problem}`);
 }
 
-/** A value quoted in a message as JSON, a string cut first (`cutForMessage`). */
+/** A value quoted in a message: a string visibly (`quoteValue`: invisible characters escaped, cut), anything else as JSON. */
 function quoted(value: unknown): string {
-  return JSON.stringify(typeof value === "string" ? cutForMessage(value) : value) ?? String(value);
+  return typeof value === "string" ? quoteValue(value) : (JSON.stringify(value) ?? String(value));
 }
 
 /** Edit distance between two strings (Levenshtein), for "did you mean". */

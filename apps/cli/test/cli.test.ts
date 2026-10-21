@@ -290,7 +290,7 @@ test("a malformed --filter is a usage error (exit 2, no request)", async () => {
     ["Energieträger~EQ~'2495'", /Unknown operator "EQ" in condition 1\..*use "eq"/],
     ["Bruttoleistung der Einheit~gte~'5000'", /Unknown operator "gte".*there is no gte\/lte/],
     ["Ort~eq~'Münster'~and~Ort~ct~ ", /Condition 2 \("Ort~ct"\) has no value/],
-    ["Ort~eq~'Münster", /value of condition 1 \('Münster\) has no closing single quote/],
+    ["Ort~eq~'Münster", /value of condition 1 \("'Münster"\) has no closing single quote/],
   ];
   for (const [spec, message] of cases) {
     const cli = makeCli(registerResponder(fx.unitPage));
