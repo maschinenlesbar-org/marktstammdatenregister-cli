@@ -647,15 +647,12 @@ export class RequestEngine {
         }
         // The default transport rejects with MastrNetworkError only; an injected one may
         // throw anything (fetch's TypeError, a string, null). Keep the library's contract:
-        // every failure is a MastrError.
-        if (cause instanceof MastrNetworkError) {
-          // Its text may echo the request URL; re-raise it scrubbed when it does.
-          const message = this.scrub(cause.message);
-          const inner = this.scrubCause(cause.cause);
-          if (message === cause.message && inner === cause.cause) throw cause;
-          throw new MastrNetworkError(message, inner === undefined ? undefined : { cause: inner });
-        }
-        if (cause instanceof MastrError) throw cause;
+        // every failure is a MastrError. A network error — a timeout, the size cap, a refused
+        // connection, a DNS failure, a reset — is re-raised naming the request (Node's text,
+        // "connect ECONNREFUSED 127.0.0.1:443", says nothing about which request failed), its
+        // text and the original (the `cause`) scrubbed of the base URL's credentials; any
+        // other MastrError passes through.
+        if (cause instanceof MastrError && !(cause instanceof MastrNetworkError)) throw cause;
         const reason = cause instanceof Error ? cause.message : String(cause);
         throw new MastrNetworkError(`GET ${redactUrl(url)} failed: ${sanitizeServerText(this.scrub(reason))}`, {
           cause: this.scrubCause(cause),
@@ -676,7 +673,7 @@ export class RequestEngine {
       // The size cap holds whatever the transport did: the default one aborts early, a
       // custom one may have read everything.
       if (this.maxResponseBytes > 0 && body.byteLength > this.maxResponseBytes) {
-        throw new MastrNetworkError(sizeLimitMessage(this.maxResponseBytes));
+        throw new MastrNetworkError(`GET ${redactUrl(url)} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
       }
 
       const retryable = status === 429 || status === 503;

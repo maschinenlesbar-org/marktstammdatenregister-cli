@@ -134,7 +134,9 @@ the body any transport returns (the message names `--max-response-bytes` too). A
 a Buffer, any `ArrayBuffer` view (fetch's `Uint8Array`, from any realm) or an `ArrayBuffer`;
 headers a plain record in any case, a `Headers` object or a `Map`. Whatever a transport
 throws, and a response without a valid status, headers or body, becomes a
-`MastrNetworkError`; a reset reported as `ECONNRESET`/`EPIPE`/`ECONNABORTED` or undici's
+`MastrNetworkError` that names the request — `GET <url> failed: <reason>` (userinfo redacted)
+for a timeout, the size cap, a refused connection, a DNS failure and a reset alike, the
+original kept as its `cause`; a reset reported as `ECONNRESET`/`EPIPE`/`ECONNABORTED` or undici's
 `UND_ERR_SOCKET` anywhere in the `cause` chain is retried like a 503.
 
 **Credentials in the base URL.** A `user:password@` in `--base-url` (a mirror behind a

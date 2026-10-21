@@ -341,3 +341,48 @@ test("a number JSON.parse can't carry exactly is a MastrParseError, never a chan
     assert.equal(got.s, "/Date(12345678901234567890)/");
   }
 });
+
+test("a timeout, the size cap, a refused connection and a DNS failure name the request (K3)", async () => {
+  const { MastrNetworkError } = await import("../src/errors.js");
+  const http = await import("node:http");
+  const url = (base: string) => `${base}/x?page=1`;
+  const expectNamed = (base: string, reason: RegExp, hasCause = true) => (err: unknown) => {
+    assert.ok(err instanceof MastrNetworkError, String(err));
+    assert.ok(err.message.startsWith(`GET ${redactUrl(url(base))} failed: `), err.message);
+    assert.doesNotMatch(err.message, /:pw@/);
+    assert.match(err.message, reason);
+    if (hasCause) assert.ok(err.cause instanceof Error, "the original is the cause");
+    return true;
+  };
+  // The engine's deadline, with a transport that never answers.
+  const hang = new RequestEngine({ baseUrl: "https://h.test", timeoutMs: 20, transport: () => new Promise(() => {}) });
+  await assert.rejects(hang.getJson("/x", { page: 1 }), expectNamed("https://h.test", /timed out after 20ms/));
+  // The size cap, checked by the engine on a custom transport's body.
+  const big = new RequestEngine({ baseUrl: "https://h.test", maxResponseBytes: 4, transport: async () => jsonResponse({ Total: 0 }) });
+  await assert.rejects(big.getJson("/x", { page: 1 }), expectNamed("https://h.test", /size limit of 4 bytes/, false));
+  // A DNS failure as a transport reports it (a MastrNetworkError, like the default transport's).
+  const dns = new RequestEngine({
+    baseUrl: "https://user:pw@nowhere.test",
+    transport: async () => {
+      throw new MastrNetworkError("getaddrinfo ENOTFOUND nowhere.test", { cause: Object.assign(new Error("x"), { code: "ENOTFOUND" }) });
+    },
+  });
+  await assert.rejects(dns.getJson("/x", { page: 1 }), expectNamed("https://user:pw@nowhere.test", /ENOTFOUND nowhere\.test/));
+  // The default transport, against a local server: the size cap and a refused connection.
+  const server = http.createServer((_req, res) => res.end("x".repeat(100)));
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as { port: number }).port;
+  const local = `http://127.0.0.1:${port}`;
+  try {
+    await assert.rejects(
+      new RequestEngine({ baseUrl: local, maxResponseBytes: 10 }).getJson("/x", { page: 1 }),
+      expectNamed(local, /size limit of 10 bytes/),
+    );
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()));
+  }
+  await assert.rejects(
+    new RequestEngine({ baseUrl: local, maxRetries: 0 }).getJson("/x", { page: 1 }),
+    expectNamed(local, /ECONNREFUSED/),
+  );
+});
