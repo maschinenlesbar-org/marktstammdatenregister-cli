@@ -267,11 +267,22 @@ export function buildFilter(conditions: readonly FilterCondition[]): string {
 
 /**
  * A number as the register reads it: decimal point, no exponent, no grouping. `String()`
- * writes `1e-7` and `1e+21`, which the register answers with `{"Error":true}`.
+ * writes `1e-7` and `1e+21`, which the register answers with `{"Error":true}`; so the digits
+ * `String()` prints (the shortest decimal that reads back as the same double) are written out
+ * in full, never rounded: `1.23456789e-15` is `0.00000000000000123456789` (toLocaleString's 20
+ * fraction digits made it `…123457`, and `5e-324` became `0`, so `gt 5e-324` was sent as `gt 0`).
  */
 function plainNumber(n: number): string {
   const text = String(n);
-  return /e/i.test(text) ? n.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 20 }) : text;
+  const match = /^(-?)(\d+)(?:\.(\d+))?e([+-]\d+)$/.exec(text);
+  if (match === null) return text;
+  const [, sign = "", whole = "", fraction = "", exp = "0"] = match;
+  const digits = whole + fraction;
+  // The decimal point sits `point` digits into `digits`.
+  const point = whole.length + Number(exp);
+  if (point <= 0) return `${sign}0.${"0".repeat(-point)}${digits}`;
+  if (point >= digits.length) return `${sign}${digits}${"0".repeat(point - digits.length)}`;
+  return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
 }
 
 /**

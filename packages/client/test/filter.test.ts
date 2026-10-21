@@ -191,3 +191,18 @@ test("an invisible character in a FilterName is refused before any request and s
   assert.match(filterProblem("​~eq~'x'") ?? "", /^Condition 1 has no FilterName/);
   assert.throws(() => buildFilter([{ name: "Ort​", op: "eq", value: "x" }]), /needs a non-blank FilterName without "~" or invisible characters, got "Ort\\u200b"/);
 });
+
+test("buildFilter writes a number exactly as JavaScript prints it, without exponent and never rounded (bug 4)", () => {
+  const sent = (value: number) => buildFilter([{ name: "Bruttoleistung der Einheit", op: "gt", value }]).split("~")[2];
+  assert.equal(sent(1.23456789e-15), "'0.00000000000000123456789'");
+  assert.equal(sent(5e-324), `'0.${"0".repeat(323)}5'`);
+  assert.equal(sent(-1.5e-7), "'-0.00000015'");
+  assert.equal(sent(1e21), "'1000000000000000000000'");
+  assert.equal(sent(1.2345e25), "'12345000000000000000000000'");
+  assert.equal(sent(4999.999), "'4999.999'");
+  assert.equal(sent(-0), "'0'");
+  // Read back, the text is the same double.
+  for (const n of [1.23456789e-15, 5e-324, 1e-7, 2.5e-10, 1.7976931348623157e308]) {
+    assert.equal(Number(sent(n)!.slice(1, -1)), n, String(n));
+  }
+});
