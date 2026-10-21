@@ -657,3 +657,35 @@ test("--compact takes the gap path only for an answer holding a huge string, the
   assert.deepEqual(calls.map((args) => (args.length >= 3 ? args[2] : "none")), ["", "none", "", "", 2]);
   assert.deepEqual(out, ['"stub"', '"stub"', '"stub"', '"stub"', '"stub"']);
 });
+
+// T15 of the 2026-10-21 fix round (the class of jobsuche-cli 28be809): a URL with a password
+// inside an argument (a --filter value, a --sort spec, padded or mid-phrase) was not found by
+// the redaction, which looked for a scheme at the start of each argument only, so the password
+// reached stderr: raw in a refusal, percent-encoded in the request URL of an error record.
+test("a password in a URL inside any argument is redacted in every stderr record (T15)", async () => {
+  const url = "https://bob:s3cret+pw@host.example/";
+  const argvs = [
+    ["stromerzeugung", "--filter", `Ort~eq~'${url}'`],
+    ["stromerzeugung", "--filter", `Ort~eq~' ${url}'`],
+    ["stromerzeugung", "--filter", `Ort~eq~'Bonn ${url} x'`],
+    ["stromerzeugung", `--filter=Ort~ct~'${url}'`],
+    ["stromerzeugung", "--filter", `Energieträger~eq~'${url}'`],
+    ["stromerzeugung", "--filter", `Ort~bogus~'${url}'`],
+    ["stromerzeugung", "--sort", `Bruttoleistung-desc ${url}`],
+    ["stromerzeugung", "--sort", ` ${url}`],
+    ["stromerzeugung", "--page", url],
+  ];
+  const answers: Array<() => HttpResponse> = [
+    () => jsonResponse({ Data: [], Total: 0, Errors: null }),
+    () => jsonResponse({ message: "not found" }, 404),
+    () => ({ status: 200, headers: { "content-type": "text/html" }, body: Buffer.from("<html>") }),
+  ];
+  for (const argv of argvs) {
+    for (const [i, answer] of answers.entries()) {
+      const cli = makeCli(withColumns(answer));
+      await run(argv, cli.deps);
+      const err = cli.err.join("\n");
+      assert.doesNotMatch(err, /s3cret|bob%3A|bob:/i, `${JSON.stringify(argv)} answer ${i}: ${err}`);
+    }
+  }
+});

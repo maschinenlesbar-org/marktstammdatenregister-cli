@@ -176,16 +176,22 @@ export function redactionFor(argv: readonly string[]): Redaction {
   const passwords = new Set<string>();
   // A base URL typed without its scheme is read as if it had one.
   const baseUrls = flagValues(argv, BASE_URL_FLAGS).map((value) => (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value) ? value : `http://${value}`));
-  for (const source of [...values, ...baseUrls]) {
+  for (const source of [...values.flatMap(urlsWithin), ...baseUrls]) {
     for (const secret of credentialsIn(source)) {
       secrets.add(secret);
       secrets.add(JSON.stringify(secret).slice(1, -1));
+      // A URL inside a --filter or --sort value goes out percent-encoded in the request URL,
+      // which an error record quotes (`…filter=Ort%7Eeq%7E%27https%3A%2F%2Fu%3Apw%40host…`).
+      echoed.add(encodeURIComponent(secret));
       // What a server echoes back: the Basic value and the decoded user:password on
       // stdout and stderr, the password alone (it may well occur in the data) on stderr.
       const [basic, pair, password] = echoedCredentialForms(secret);
       if (basic !== undefined) echoed.add(basic);
       if (pair !== undefined) echoed.add(pair);
-      if (password !== undefined) passwords.add(password);
+      if (password !== undefined) {
+        passwords.add(password);
+        passwords.add(encodeURIComponent(password));
+      }
     }
   }
   if (secrets.size === 0) return { out: (text) => text, err: (text) => text };
@@ -195,6 +201,21 @@ export function redactionFor(argv: readonly string[]): Redaction {
   const passwordList = [...passwords].sort((a, b) => b.length - a.length);
   const out = (text: string): string => redactSecrets(redactCredentials(text, list), echoedList);
   return { out, err: (text) => redactSecrets(out(text), passwordList) };
+}
+
+/** Where a scheme (`https://`) starts inside a value: anywhere, not only at its start. */
+const SCHEME_START = /[A-Za-z][A-Za-z0-9+.-]*:\/\//g;
+
+/**
+ * `value` and the rest of it from each place a URL starts inside it, for `credentialsIn`
+ * (which reads a URL at the start of its input only). A URL inside a `--filter` value
+ * (`Ort~eq~'https://user:pw@host'`), a padded or mid-phrase one, or one in a `--sort` spec
+ * reaches the request URL and the messages that quote the value.
+ */
+function urlsWithin(value: string): string[] {
+  const found = [value];
+  for (const match of value.matchAll(SCHEME_START)) if (match.index > 0) found.push(value.slice(match.index));
+  return found;
 }
 
 /**
