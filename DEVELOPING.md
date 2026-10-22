@@ -152,7 +152,9 @@ bidi characters is matched in its raw form. `redactionFor(argv)` collects the ex
 the value part of every `--opt=value` token, and of every URL that starts inside an argument
 (`urlsWithin`: a `--filter` value `Ort~eq~'https://u:pw@host'`, a padded or mid-phrase one, a
 `--sort` spec) (`credentialsIn`, which also handles values that don't parse as a URL), plus its
-percent-encoded form, which an error record's request URL carries. Only a value that starts with a scheme counts (a bare `a:b@c` is a
+percent-encoded form, which an error record's request URL carries. Each `://` is found with
+`indexOf` and its scheme by walking back, so the search stays linear in a long argument, and at
+most 64 URLs are read from one argument. Only a value that starts with a scheme counts (a bare `a:b@c` is a
 search text, a sort key or a User-Agent as often as a credential), except as the
 `--base-url` value, where a scheme-less `user:pw@host` is still read as one. It redacts those strings, raw and
 JSON-quoted, from every line the CLI prints — commander's usage errors echo rejected values,
