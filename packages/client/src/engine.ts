@@ -248,22 +248,34 @@ function cutDetail(text: string): string {
 /**
  * Describe a Kendo `Errors` value for an error message: a string as is; otherwise
  * (a ModelState object such as `{"": {"errors": ["Invalid filter"]}}`, or an array)
- * every string found in it, sanitised, blanks and repeats dropped, joined "; ".
- * Returns `undefined` when nothing readable is left. `clean` runs on each raw string
+ * every string found in it, sanitised, blanks and repeats dropped, joined "; " and cut at
+ * MAX_DETAIL_LENGTH characters (the walk stops once that much is found, so a huge `Errors`
+ * value costs no more than a short one). Returns `undefined` when nothing readable is left. `clean` runs on each raw string
  * first (the engine passes its credential scrubber).
  */
 export function describeMastrErrors(errors: unknown, clean: (text: string) => string = (text) => text): string | undefined {
-  const found: string[] = [];
+  // Repeats are found in a Set, and the walk stops once the joined text is longer than the
+  // message keeps: later strings can't change what the cut leaves. An Array.includes over
+  // every string so far, on to the end, made 80 000 distinct strings (709 KB) take 8 s.
+  const found = new Set<string>();
+  let joined = -"; ".length;
+  const full = (): boolean => joined > MAX_DETAIL_LENGTH;
   const walk = (value: unknown, depth: number): void => {
     if (typeof value === "string") {
       const text = sanitizeServerText(clean(value));
-      if (text !== "" && !found.includes(text)) found.push(text);
+      if (text !== "" && !found.has(text)) {
+        found.add(text);
+        joined += "; ".length + text.length;
+      }
     } else if (value !== null && typeof value === "object" && depth < 5) {
-      for (const v of Object.values(value)) walk(v, depth + 1);
+      for (const v of Object.values(value)) {
+        if (full()) return;
+        walk(v, depth + 1);
+      }
     }
   };
   walk(errors, 0);
-  return found.length > 0 ? cutDetail(found.join("; ")) : undefined;
+  return found.size > 0 ? cutDetail([...found].join("; ")) : undefined;
 }
 
 /**

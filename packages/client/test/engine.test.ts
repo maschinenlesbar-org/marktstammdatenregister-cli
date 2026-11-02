@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import { TextDecoder } from "node:util";
 import assert from "node:assert/strict";
-import { RequestEngine, bigIntegerKeysOption, cleartextProblem, firstInexactNumber, parseRetryAfter, sanitizeServerText, scanNumbers } from "../src/engine.js";
+import { MAX_DETAIL_LENGTH, RequestEngine, bigIntegerKeysOption, cleartextProblem, describeMastrErrors, firstInexactNumber, parseRetryAfter, sanitizeServerText, scanNumbers } from "../src/engine.js";
 import { MastrApiError, MastrParseError, MastrValidationError, cutText, redactUrl, toWellFormed } from "../src/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -540,4 +540,51 @@ test("a number literal with a long inner run of zeros is checked in linear time,
   assert.equal(firstInexactNumber('{"a":12345678901234567890}'), "12345678901234567890");
   assert.equal(firstInexactNumber('{"a":4e-324}'), "4e-324");
   assert.equal(firstInexactNumber('{"a":0.0001e-400}'), "0.0001e-400");
+});
+
+test("describeMastrErrors describes many distinct strings in linear time, with the same message near the cut", () => {
+  // The repeats were found with Array.includes over every string so far, and the walk went on
+  // past the 500 characters the message keeps: 40 000 distinct strings took about 1.7 s.
+  const many = Array.from({ length: 200_000 }, (_, i) => `error ${i}`);
+  const started = performance.now();
+  const message = describeMastrErrors(many);
+  const ms = performance.now() - started;
+  assert.ok(ms < 1000, `${Math.round(ms)} ms`);
+  assert.equal(message, `${many.join("; ").slice(0, MAX_DETAIL_LENGTH)}…`);
+  const nested = describeMastrErrors({ "": { errors: many }, other: { errors: many } });
+  assert.equal(nested, message);
+  // The old description, as the reference: every string found, repeats and blanks dropped,
+  // joined and then cut.
+  const reference = (errors: unknown): string | undefined => {
+    const found: string[] = [];
+    const walk = (value: unknown, depth: number): void => {
+      if (typeof value === "string") {
+        const text = sanitizeServerText(value);
+        if (text !== "" && !found.includes(text)) found.push(text);
+      } else if (value !== null && typeof value === "object" && depth < 5) {
+        for (const v of Object.values(value)) walk(v, depth + 1);
+      }
+    };
+    walk(errors, 0);
+    if (found.length === 0) return undefined;
+    const joined = found.join("; ");
+    return joined.length > MAX_DETAIL_LENGTH ? `${joined.slice(0, MAX_DETAIL_LENGTH)}…` : joined;
+  };
+  // Pieces whose joined length lands just under, at and just over the cut, with repeats, blanks
+  // and nesting, and a piece that crosses the cut.
+  for (const size of [1, 7, 48, 99, 166, 249, 250, 251, 498, 499, 500, 501, 502]) {
+    for (let extra = 0; extra < 4; extra++) {
+      const pieces = Array.from({ length: Math.ceil(1000 / size) + extra }, (_, i) => `${String(i).padStart(size, "x")}`);
+      const cases: unknown[] = [
+        pieces,
+        [...pieces.slice(0, 3), pieces[0], "", " ", ...pieces.slice(3)],
+        { "": { errors: pieces.slice(0, 2) }, b: [pieces.slice(2, 5), { c: pieces.slice(5) }] },
+        pieces.slice(0, extra + 1),
+        pieces.map((p) => p.slice(0, MAX_DETAIL_LENGTH - 2 - extra)).slice(0, 2),
+      ];
+      for (const errors of cases) assert.equal(describeMastrErrors(errors), reference(errors), `size ${size}, extra ${extra}`);
+    }
+  }
+  assert.equal(describeMastrErrors(["", " "]), reference(["", " "]));
+  assert.equal(describeMastrErrors("one"), "one");
 });
