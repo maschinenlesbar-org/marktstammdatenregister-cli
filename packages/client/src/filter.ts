@@ -358,21 +358,20 @@ function unquote(value: string): string {
  */
 export function resolveFilter(spec: string, columns: readonly FilterColumn[], category: string): string {
   const byName = new Map<string, FilterColumn>();
-  const byLowerName = new Map<string, FilterColumn[]>();
+  // One entry per lower-cased name: its column, or null when two or more columns have it (the
+  // same name twice included). Copying a list per column made N columns that share a name cost
+  // N² (80 000 of them, 2.6 MB, held the CLI for 8 s past --timeout).
+  const byLowerName = new Map<string, FilterColumn | null>();
   for (const column of columns) {
     if (typeof column.FilterName !== "string") continue;
     byName.set(column.FilterName, column);
     const lower = column.FilterName.toLowerCase();
-    byLowerName.set(lower, [...(byLowerName.get(lower) ?? []), column]);
+    byLowerName.set(lower, byLowerName.has(lower) ? null : column);
   }
   const parts = spec.split("~");
   for (let i = 0, n = 1; i < parts.length; i += 4, n++) {
     const name = parts[i]!;
-    let column = byName.get(name);
-    if (column === undefined) {
-      const sameCase = byLowerName.get(name.toLowerCase()) ?? [];
-      if (sameCase.length === 1) column = sameCase[0]!;
-    }
+    const column = byName.get(name) ?? byLowerName.get(name.toLowerCase()) ?? undefined;
     if (column === undefined) {
       const near = closeNames(name, [...byName.keys()]);
       throw new MastrValidationError(

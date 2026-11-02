@@ -206,3 +206,29 @@ test("buildFilter writes a number exactly as JavaScript prints it, without expon
     assert.equal(Number(sent(n)!.slice(1, -1)), n, String(n));
   }
 });
+
+test("resolveFilter indexes many columns that share a lower-cased name in linear time, by the same rule", () => {
+  // The index copied the list of a lower-cased name on every column it added: 40 000 repeats
+  // of one name took about 1.6 s, and the same for 40 000 case spellings of one name.
+  const text = (FilterName: string) => ({ FilterName, Type: "text" });
+  const repeated = Array.from({ length: 100_000 }, () => text("a"));
+  const spellings = Array.from({ length: 100_000 }, (_, i) =>
+    text([...i.toString(2).padStart(17, "0")].map((bit) => (bit === "1" ? "A" : "a")).join("")),
+  );
+  for (const [label, columns, spec, expected] of [
+    ["repeated", repeated, "a~eq~'x'", "a~eq~'x'"],
+    ["spellings", spellings, `${"a".repeat(17)}~eq~'x'`, `${"a".repeat(17)}~eq~'x'`],
+  ] as const) {
+    const started = performance.now();
+    assert.equal(resolveFilter(spec, columns, "strom"), expected, label);
+    const ms = performance.now() - started;
+    assert.ok(ms < 1000, `${label}: ${Math.round(ms)} ms`);
+  }
+  // A name that differs only in case is written the register's way when exactly one column has
+  // that lower-cased name; two or more (the same name twice included) make it unknown.
+  assert.equal(resolveFilter("ORT~eq~'x'", [text("Ort"), text("Plz")], "strom"), "Ort~eq~'x'");
+  assert.throws(() => resolveFilter("ORT~eq~'x'", [text("Ort"), text("ort")], "strom"), /unknown FilterName "ORT"/);
+  assert.throws(() => resolveFilter("ORT~eq~'x'", [text("Ort"), text("Ort")], "strom"), /unknown FilterName "ORT"/);
+  assert.throws(() => resolveFilter("A~eq~'x'", repeated, "strom"), /unknown FilterName "A"/);
+  assert.equal(resolveFilter("Ort~eq~'x'", [text("Ort"), text("ort")], "strom"), "Ort~eq~'x'");
+});
