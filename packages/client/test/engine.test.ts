@@ -521,3 +521,23 @@ test("an answer longer than V8's longest string is a MastrParseError naming the 
   const failing = new RequestEngine({ maxResponseBytes: 0, transport: makeMockTransport(() => rawResponse(huge, "text/plain", 500)).transport });
   await assert.rejects(failing.getJson("/x"), (err: unknown) => err instanceof MastrApiError && err.status === 500 && err.body === "");
 });
+
+test("a number literal with a long inner run of zeros is checked in linear time, with the same verdict", () => {
+  // decimalOf stripped the zeros with /0+$/, which tries a match at every zero of a run that
+  // doesn't end the text: 40 000 zeros took about 2.3 s, 100 000 well over 10 s.
+  const zeros = "0".repeat(100_000);
+  for (const literal of [`1${"0".repeat(20)}.${zeros}1`, `0.${"0".repeat(400)}1${zeros}3`, `1.${zeros}1e300`]) {
+    const started = performance.now();
+    const scan = scanNumbers(`{"Total":1,"Data":[{"x":${literal}}]}`);
+    const ms = performance.now() - started;
+    assert.ok(ms < 1000, `${literal.length} digits: ${Math.round(ms)} ms`);
+    assert.equal(scan.inexact, literal);
+  }
+  // The verdicts at the edges are unchanged: zeros only at the end, a value printed in its
+  // shortest form, an exact zero, and the leading zeros of an underflow.
+  assert.equal(firstInexactNumber(`{"a":1${"0".repeat(30)}}`), undefined);
+  assert.equal(firstInexactNumber('{"a":1E23,"b":1.7976931348623157E308,"c":5e-324,"d":0.000,"e":-0e5}'), undefined);
+  assert.equal(firstInexactNumber('{"a":12345678901234567890}'), "12345678901234567890");
+  assert.equal(firstInexactNumber('{"a":4e-324}'), "4e-324");
+  assert.equal(firstInexactNumber('{"a":0.0001e-400}'), "0.0001e-400");
+});
