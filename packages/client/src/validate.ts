@@ -204,10 +204,14 @@ export const baseUrlWhitespaceProblem: Problem<string> = (value) => {
  * characters ({@link baseUrlWhitespaceProblem}), an absolute URL, the `http:` or
  * `https:` scheme, and no query or fragment — request paths are appended to the
  * base URL as a string, so a `?` or `#` would swallow every path (`http://h/?x=1`
- * requests `/?x=1/Einheit/...`, `http://h/#f` requests `/`), and a `%` in the user name or
- * password that doesn't start a valid escape (Node fails to decode it for the Authorization
- * header at request time; a literal one is `%25`). Userinfo is allowed (error messages
- * redact it). The reasons never echo the URL.
+ * requests `/?x=1/Einheit/...`, `http://h/#f` requests `/`), no backslash (WHATWG reads it as
+ * `/` in an http(s) URL, so it ends the host: in `https://u:pw@a.example\@b.example` every
+ * reader of the base URL has to agree where), a `%` in the user name or password that doesn't
+ * start a valid escape (Node fails to decode it for the Authorization header at request time; a
+ * literal one is `%25`), and `http(s)://` followed by the host: WHATWG skips any slashes after
+ * `http:` and repairs `http:host`, `http:/host` and `http:///host` into `http://host` silently,
+ * so the host requested would not be the one typed. Userinfo is allowed (error messages redact
+ * it). The reasons never echo the URL.
  */
 export const baseUrlProblem: Problem<string> = (value) => {
   const blank = nonBlankProblem(value);
@@ -222,6 +226,7 @@ export const baseUrlProblem: Problem<string> = (value) => {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return "Only http and https URLs are supported.";
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
+  if (value.includes("\\")) return 'A base URL cannot contain a backslash (\\); write "/" instead.';
   // Node decodes the userinfo into the Authorization header and throws "URI malformed" for a
   // "%" that isn't an escape — at request time, as a network error. Reject it here.
   for (const part of [url.username, url.password]) {
@@ -231,6 +236,7 @@ export const baseUrlProblem: Problem<string> = (value) => {
       return 'The user name or password has a "%" that is not followed by two hex digits; write a literal "%" as %25.';
     }
   }
+  if (!/^https?:\/\/[^/]/i.test(value)) return 'Expected an absolute http(s) URL ("https://" and the host).';
   return undefined;
 };
 

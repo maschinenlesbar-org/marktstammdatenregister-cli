@@ -179,4 +179,13 @@ test("baseUrlProblem checks blank, whitespace, parse, scheme, query and fragment
   assert.equal(baseUrlProblem("data:text/plain,x"), "Only http and https URLs are supported.");
   assert.equal(baseUrlProblem("https://h/?x"), "A base URL cannot have a query (?) or fragment (#).");
   assert.equal(baseUrlProblem(5 as unknown as string), "Expected a string, got 5.");
+  // A backslash ends an http(s) host for WHATWG: refused, never echoing the value.
+  for (const value of ["https://alice:pw@api.example\\@evil.example", "https://api.example\\evil", "https:\\\\h.example"]) {
+    assert.equal(baseUrlProblem(value), 'A base URL cannot contain a backslash (\\); write "/" instead.', value);
+  }
+  // A scheme not followed by exactly "//" and the host: WHATWG repairs it silently (F4).
+  for (const value of ["http:h.example", "https:/h.example", "http:///h.example", "HTTPS:h.example/v1", "http:alice:pw@h.example"]) {
+    assert.equal(baseUrlProblem(value), 'Expected an absolute http(s) URL ("https://" and the host).', value);
+  }
+  assert.equal(baseUrlProblem("HTTPS://H.example/v1"), undefined);
 });

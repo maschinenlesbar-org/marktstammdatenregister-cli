@@ -209,12 +209,20 @@ reaches a custom transport; `--user-agent` uses the same rule. The default trans
 turns a header Node still refuses into a `MastrNetworkError`, never a raw `TypeError`.
 The constructor checks `baseUrl` with the exported `validateBaseUrl` (`baseUrlProblem`:
 blank, surrounding or inner whitespace or control characters, not an absolute
-http(s) URL, a query or fragment, a `%` in the userinfo that isn't an escape — Node would
-fail to decode it for the Authorization header at request time) and throws `MastrValidationError` — a configuration
+http(s) URL, a query or fragment, a backslash — WHATWG reads it as `/` in an http(s) URL, so
+it ends the host, and `https://u:pw@a.example\@b.example` sent the credentials to one host
+while a text-based reading named another —, a `%` in the userinfo that isn't an escape — Node
+would fail to decode it for the Authorization header at request time —, and a scheme not
+followed by exactly `//` and the host: WHATWG repairs `http:host`, `http:/host` and
+`http:///host` into `http://host` silently) and throws `MastrValidationError` — a configuration
 error, not a `MastrNetworkError`, which stays for transport failures (the default
-transport still gates the scheme per request). It runs on the raw value, before the
-trailing-slash strip: `new URL()` would trim whitespace silently while the engine joins
-the raw string to each path (`/MaStR%20/...`). `--base-url` uses the same rule. Wrong types are `MastrValidationError` too, never a raw `TypeError`: options that
+transport still gates the scheme per request). No reason echoes the value. It runs on the raw
+value: `new URL()` would trim whitespace and repair slashes silently. The engine then requests
+the base URL as WHATWG parses it (`new URL(baseUrl).href`, trailing slashes stripped: the host
+lower-cased, a default port dropped), the reading every check makes, so a custom transport that
+reads the URL as text reaches the same host. `credentialsIn` reads a userinfo the same way:
+after the slashes and backslashes a special scheme (`http(s)`, `ws(s)`, `ftp`, `file`) skips,
+up to a backslash too. `--base-url` uses the same rule. Wrong types are `MastrValidationError` too, never a raw `TypeError`: options that
 aren't an object, an unknown option key (`timeout` for `timeoutMs`, with a "did you mean"),
 a `transport` or `sleep` that isn't a function, `defaultHeaders` that isn't an object, a
 query that isn't an object, a filter that isn't a string (`null` counts as "none" for

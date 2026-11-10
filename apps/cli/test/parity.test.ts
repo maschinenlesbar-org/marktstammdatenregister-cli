@@ -256,3 +256,25 @@ test("validateBaseUrl returns the value without trailing slashes, or throws Mast
   assert.equal(validateBaseUrl("https://h.example/MaStR//"), "https://h.example/MaStR");
   assert.throws(() => validateBaseUrl("ftp://h.example"), MastrValidationError);
 });
+
+test("parity: a backslash or a scheme not followed by exactly // and the host in --base-url is refused on both sides, never echoing the password", async () => {
+  const pw = "s3cret-Pw";
+  for (const base of [
+    `https://alice:${pw}@api.example\\@evil.example`,
+    `http:alice:${pw}@127.0.0.1:9`,
+    `http:/alice:${pw}@127.0.0.1:9`,
+    `http:///alice:${pw}@127.0.0.1:9`,
+    `HTTPS:alice:${pw}@mirror.example`,
+    `https:\\\\alice:${pw}@mirror.example`,
+    `http:///user:${pw}@h.example/?q=1`,
+  ]) {
+    const o = await parity(["--base-url", base, "stromerzeugung"], (t) => new MastrClient({ baseUrl: base, transport: t }).stromerzeugung(), () =>
+      jsonResponse({ Data: [], Total: 0, Errors: null }),
+    );
+    assert.equal(o.cli.code, 2, `${base}: ${o.cli.err}`);
+    assert.equal(o.cli.requests.length, 0, base);
+    assert.equal(o.lib.requests.length, 0, base);
+    assert.ok(!o.cli.err.includes(pw) && !o.cli.out.includes(pw), o.cli.err);
+    assert.ok(o.lib.ok === false && !String((o.lib.error as Error).message).includes(pw), String(o.lib.ok));
+  }
+});

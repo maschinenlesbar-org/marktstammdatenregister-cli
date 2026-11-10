@@ -51,8 +51,9 @@ export interface EngineOptions {
   /**
    * Base URL of the API. Defaults to the canonical marktstammdatenregister.de base.
    * A value that breaks a rule of {@link validateBaseUrl} (blank, whitespace or
-   * control characters, not an absolute http(s) URL, a query or fragment) throws a
-   * MastrValidationError.
+   * control characters, not an absolute http(s) URL, a query or fragment, a backslash, a
+   * scheme not followed by `//` and the host) throws a MastrValidationError. Requests go to
+   * the URL as WHATWG parses it (host lower-cased, a default port dropped).
    */
   baseUrl?: string | undefined;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
@@ -596,7 +597,10 @@ export class RequestEngine {
     // The raw value is checked before the trailing-slash strip, so "https://h/ "
     // cannot slip past it; only an omitted baseUrl selects the default.
     const baseUrl = options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl;
-    this.#baseUrl = validateBaseUrl(baseUrl);
+    // Requests go to the base URL as WHATWG parses it, the reading every check of it makes (the
+    // host, the cleartext warning, the Authorization header Node derives), not to a text-based
+    // reading of the string: a transport that reads the URL as text reaches the same host.
+    this.#baseUrl = new URL(validateBaseUrl(baseUrl)).href.replace(/\/+$/, "");
     // The userinfo as typed and as sent (WHATWG percent-encodes some of its characters).
     const userinfos = [...new Set([...credentialsIn(baseUrl), ...credentialsIn(new URL(baseUrl).href)])];
     this.#credentials = userinfos.flatMap((raw) => {

@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { TextDecoder } from "node:util";
 import assert from "node:assert/strict";
 import { MAX_DETAIL_LENGTH, RequestEngine, bigIntegerKeysOption, cleartextProblem, describeMastrErrors, firstInexactNumber, parseRetryAfter, sanitizeServerText, scanNumbers } from "../src/engine.js";
-import { MastrApiError, MastrParseError, MastrValidationError, TextBuilder, cutText, echoedCredentialForms, redactUrl, toWellFormed } from "../src/errors.js";
+import { MastrApiError, MastrParseError, MastrValidationError, TextBuilder, credentialsIn, cutText, echoedCredentialForms, redactUrl, toWellFormed } from "../src/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -786,4 +786,68 @@ test("a token userinfo (no password) is scrubbed from library errors in every ec
       }
     }
   }
+});
+
+test("a backslash or a scheme not followed by // and the host is refused at construction, never echoing the password (F, F4)", () => {
+  for (const [baseUrl, reason] of [
+    ["https://alice:s3cret@api.example\\@evil.example", 'A base URL cannot contain a backslash (\\); write "/" instead.'],
+    ["https:\\\\alice:s3cret@h.example", 'A base URL cannot contain a backslash (\\); write "/" instead.'],
+    ["http:alice:s3cret@h.example", 'Expected an absolute http(s) URL ("https://" and the host).'],
+    ["https:/alice:s3cret@h.example", 'Expected an absolute http(s) URL ("https://" and the host).'],
+    ["http:///alice:s3cret@h.example", 'Expected an absolute http(s) URL ("https://" and the host).'],
+    ["HTTPS:h.example/v1", 'Expected an absolute http(s) URL ("https://" and the host).'],
+  ] as const) {
+    const mt = makeMockTransport(() => jsonResponse({}));
+    assert.throws(
+      () => new RequestEngine({ transport: mt.transport, baseUrl }),
+      (err: unknown) => err instanceof MastrValidationError && err.message === `Invalid baseUrl: ${reason}` && !err.message.includes("s3cret"),
+      baseUrl,
+    );
+    assert.equal(mt.calls.length, 0, baseUrl);
+  }
+  for (const baseUrl of ["HTTPS://h.example/v1", "http://alice:pw@h.example:8080"]) {
+    assert.doesNotThrow(() => new RequestEngine({ transport: makeMockTransport(() => jsonResponse({})).transport, baseUrl }), baseUrl);
+  }
+});
+
+test("requests go to the base URL as WHATWG parses it, an @ in its path included", async () => {
+  for (const [baseUrl, sent] of [
+    ["https://API.Example:443/v1/", "https://api.example/v1/x"],
+    ["https://alice:pw@api.example/v1/@evil.example", "https://alice:pw@api.example/v1/@evil.example/x"],
+  ] as const) {
+    const mt = makeMockTransport(() => jsonResponse({}));
+    await new RequestEngine({ transport: mt.transport, baseUrl }).getJson("/x");
+    assert.equal(mt.last().url, sent, baseUrl);
+  }
+});
+
+test("credentialsIn ends the authority of a special scheme at a backslash, as WHATWG does", () => {
+  for (const scheme of ["http", "https", "HTTPS", "ws", "wss", "ftp"]) {
+    assert.deepEqual(credentialsIn(`${scheme}://u:p@a.example\\@b.example/x`), ["u:p"], scheme);
+    assert.equal(new URL(`${scheme}://u:p@a.example\\@b.example/x`).password, "p", scheme);
+  }
+  // Another scheme's authority runs on to "/", "?" or "#".
+  assert.deepEqual(credentialsIn("foo://u:p@a.example\\@b.example/x"), ["u:p@a.example\\"]);
+  assert.deepEqual(credentialsIn("https://u:p@a.example/x\\@y"), ["u:p"]);
+});
+
+test("credentialsIn skips the slashes and backslashes WHATWG skips after a special scheme (F3)", () => {
+  // `http:///u:pw@h`, `https:\\u:pw@h` and `http:u:pw@h` all carry `u:pw` for WHATWG; read
+  // after "://", the userinfo was missed, so a refused --base-url echoed the password in clear.
+  for (const value of [
+    "http:alice:pw@h.example",
+    "http:/alice:pw@h.example",
+    "http:///alice:pw@h.example/x",
+    "https:////alice:pw@h.example",
+    "HTTPS:\\\\alice:pw@h.example",
+    "wss:\\/alice:pw@h.example",
+    "ftp:alice:pw@h.example",
+  ]) {
+    assert.deepEqual(credentialsIn(value), ["alice:pw"], value);
+    assert.equal(new URL(value).password, "pw", value);
+  }
+  // Another scheme needs "//" before an authority: `foo:u:p@h` and `foo:///u:p@h` carry none.
+  assert.deepEqual(credentialsIn("foo:u:p@h.example"), []);
+  assert.deepEqual(credentialsIn("foo:///u:p@h.example"), []);
+  assert.equal(new URL("foo:///u:p@h.example").password, "");
 });
