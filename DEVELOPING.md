@@ -195,6 +195,11 @@ and then is the decoded JSON written again with it replaced by `***` (`""` for a
 deeply nested to write again); the body of an HTTP 200 error envelope is the decoded answer
 written again, scrubbed in that spelling.
 
+A base URL (`--base-url`, and the environment variable where the CLI reads one) is read as
+a URL however its scheme is typed (`typedUrlCredentials`): missing (`alice:pw@host`) or
+mistyped (`http//alice:pw@host`, the colon left out, whose userinfo is everything between the
+first slashes and the last `@`), so commander's echo of a refused one shows no password.
+
 The client validates its own inputs before any request, for library callers the CLI's
 parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),
 `pageSize` outside 1..`MAX_PAGE_SIZE` (5000), a `sort` that is not `FieldKey-asc|desc`
