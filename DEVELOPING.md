@@ -36,8 +36,9 @@ never `npx`), two SBOMs scoped to the `apps/cli` workspace. **release** (the onl
 the GitHub Release with `gh` (tarball, SBOMs, notes). So no third-party code runs where the
 tarball is built or where the write token is. Update the tool by changing its version in
 `tools/sbom/package.json` and running `npm install --package-lock-only --ignore-scripts` there;
-don't chain its install into an npm script. `apps/cli/test/release-workflow.test.ts` reads the
-workflow and the lockfile and checks it. `publish.yml` runs `npm publish --workspace apps/cli`.
+don't chain its install into an npm script. The conformance test P31
+(`apps/cli/test/conformance-p31-release-pipeline.test.ts`) reads the workflow and the lockfile
+and checks it. `publish.yml` runs `npm publish --workspace apps/cli`.
 
 ## Layout
 
@@ -325,6 +326,18 @@ CLI's own. Notable coverage:
   `--compact`, 20 MB of DEL prints escaped, 90 MB of DEL is "too large to print", an answer in
   two million one-byte chunks is read under a 256 MB heap, and a lone surrogate or invalid
   bytes become U+FFFD with a WARN of `mastr.api`.
+  **P28–P31** (security audit 2026-10-27, reference `create-cli-template`). **P28** hostile
+  error answers: a number with a long run of zeros is refused in linear time, an error answer of
+  unterminated control-string introducers is cleaned in linear time, a 16 MB error message ends
+  in one ERROR record and six million lone surrogate escapes are repaired under a 128 MB heap
+  (the bin, 30 s), and the base URL's credentials are scrubbed from decoded server text (JSON
+  escapes), from the `Errors` envelope of an HTTP 200 answer (`quotedBody`) and from a 302
+  (mastr follows no redirect and names no Location: `REDIRECT_ERROR` is `HTTP 302`). **P29**
+  base-URL credentials: a token userinfo scrubbed in every echoed form, a backslash and a scheme
+  not followed by `//` and the host refused without echoing the password, requests to the
+  parsed host, linear stdout redaction; its glued-URL case is skipped (mastr's stdout redaction
+  is by exact match of argv's userinfo, no pattern pass over the answer). **P30** output links:
+  skipped (no `-o`). **P31** the release pipeline (no adapter).
 
 Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
 `{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
