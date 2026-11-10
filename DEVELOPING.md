@@ -216,7 +216,14 @@ FilterName, a dropdown code, a filter part, a query or option key, a charset) is
 for a library caller. The filter check (`resolveFilter`) quotes the register's own
 filter-columns reply — FilterNames in a "did you mean", dropdown codes and labels — through
 `serverTextForMessage` (exported from `engine.ts`): `sanitizeServerText`, then cut at 200,
-and the list of codes at 500. A hostile reply's line break used to forge log records, its
+and the list of codes at 500. `sanitizeServerText` reads at most the first 16 384 characters of
+its input and cleans them with linear regex replaces: whole escape sequences (CSI, a terminated
+OSC/DCS control string, a short `ESC` sequence) go first, then C0 but TAB–CR, DEL, C1 and every
+format character (Cf: bidi controls, zero-width characters, a soft hyphen), then whitespace
+folds to one space; a control string ends at another introducer. One `+=` per character over a
+16 MB error detail exhausted a small heap. Text an answer is rebuilt from — the repair of lone
+surrogate escapes, the quoting of `bigIntegerKeys` members — is collected in a `TextBuilder`
+(`errors.ts`), joined in batches, never one string node per piece. A hostile reply's line break used to forge log records, its
 ESC/OSC sequences reached the terminal, and a 200 000-character label made a 300 KB record.
 `filterColumns()` and the `filters` command keep the values as the register sent them. `count(category, { filter, sort })` refuses `page` and
 `pageSize` (`countQueryProblem`): the count is the same on every page.

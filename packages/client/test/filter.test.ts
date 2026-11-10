@@ -161,11 +161,11 @@ test("resolveFilter quotes the register's names and codes clean, on one line and
     assert.doesNotMatch(message, /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202e]/, JSON.stringify(message.slice(0, 300)));
     assert.ok(message.length < 2000, `${message.length} characters`);
   }
-  assert.match(messages[0]!, /Codes: 2495 \(Solar 2026-10-09T00:00:00\.000Z ERROR \[mastr\.api\] HTTP 500 forged record\), 2497 \(Wind \]0;pwned\[31mRED/);
+  assert.match(messages[0]!, /Codes: 2495 \(Solar 2026-10-09T00:00:00\.000Z ERROR \[mastr\.api\] HTTP 500 forged record\), 2497 \(Wind RED/);
   assert.match(messages[0]!, /Z{10}…/, "a long name is cut");
-  assert.match(messages[1]!, /It is the label of code 2498 Solar 2026-10-09T00:00:00\.000Z ERROR .* forged record\[31m: a dropdown takes its code/);
-  assert.match(messages[2]!, /Did you mean "Ortsteil 2026 forged", "Ortschaft2J"/);
-  assert.match(messages[3]!, /doesn't work on the number column "Leistung\[31m forged"/);
+  assert.match(messages[1]!, /It is the label of code 2498 Solar 2026-10-09T00:00:00\.000Z ERROR .* forged record: a dropdown takes its code/);
+  assert.match(messages[2]!, /Did you mean "Ortsteil 2026 forged", "Ortschaft"/);
+  assert.match(messages[3]!, /doesn't work on the number column "Leistung forged"/);
 });
 
 test("buildFilter sends a text value trimmed and in NFC (normalizeText); a blank one is refused (K6)", () => {

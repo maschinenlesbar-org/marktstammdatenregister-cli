@@ -458,7 +458,7 @@ test("the filter check's quote of the register's dropdown names and codes is one
     const msg = format === "jsonl" ? ((JSON.parse(cli.err[0]!) as { msg: string }).msg) : cli.err[0]!.slice(cli.err[0]!.indexOf("] ") + 2);
     // Cleaned by the library at its source: nothing for the record to escape.
     assert.doesNotMatch(msg, /[\u0000-\u001f\u007f-\u009f]|\\[nru]/, msg.slice(0, 300));
-    assert.match(msg, /Codes: 2495 \(Solar 2026-10-09T00:00:00\.000Z ERROR \[mastr\.api\] HTTP 500 forged record\), 2497 \(Wind \]0;pwned\[31mRED\[0m\)/);
+    assert.match(msg, /Codes: 2495 \(Solar 2026-10-09T00:00:00\.000Z ERROR \[mastr\.api\] HTTP 500 forged record\), 2497 \(Wind RED\)/);
     assert.ok(msg.length < 1500, `${msg.length} characters`);
   }
 });
