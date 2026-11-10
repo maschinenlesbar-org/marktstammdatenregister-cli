@@ -678,3 +678,86 @@ test("lone surrogate escapes are repaired within a small heap, millions of them"
   const out = execFileSync(process.execPath, ["--max-old-space-size=128", "--input-type=module", "-e", script], { encoding: "utf8" });
   assert.equal(out, String(n));
 });
+
+test("an error body keeps its spelling unless a credential hides behind an escape", async () => {
+  const base = "https://alice:s3cret-pw@mirror.example";
+  const bodyOf = async (body: string): Promise<string> => {
+    const e = new RequestEngine({ baseUrl: base, transport: async () => rawResponse(body, "application/json", 500) });
+    const err = await e.getJson("/x").catch((caught: unknown) => caught);
+    assert.ok(err instanceof MastrApiError, String(err));
+    return err.body;
+  };
+  // No credential, or one spelled as sent: the body as sent (scrubbed), escapes kept.
+  assert.equal(await bodyOf('{"m":"caf\\u00e9 \\"x\\""}'), '{"m":"caf\\u00e9 \\"x\\""}');
+  assert.equal(await bodyOf('{"m":"pw s3cret-pw \\u00e9"}'), '{"m":"pw *** \\u00e9"}');
+  // Escaped: written again decoded, scrubbed in that spelling.
+  assert.equal(await bodyOf('{"m":"pw s3cret\\u002dpw \\u00e9"}'), '{"m":"pw *** é"}');
+  // Not JSON: nobody decodes it, it stays as sent.
+  assert.equal(await bodyOf("pw s3cret\\u002dpw"), "pw s3cret\\u002dpw");
+  // Deeply nested: written again where this runtime can, else left out (probed, not assumed:
+  // whether JSON.stringify recurses depends on the Node version).
+  const deep = `${"[".repeat(200_000)}"s3cret\\u002dpw"${"]".repeat(200_000)}`;
+  let parses = true;
+  let writes = true;
+  try {
+    const value: unknown = JSON.parse(deep);
+    try {
+      JSON.stringify(value);
+    } catch {
+      writes = false;
+    }
+  } catch {
+    parses = false;
+  }
+  if (parses) {
+    const body = await bodyOf(deep);
+    assert.ok(!body.includes("s3cret"), body.slice(199_990, 200_030));
+    assert.equal(body === "", !writes);
+  }
+});
+
+test("a credential echoed behind JSON escapes is scrubbed from the detail of every error envelope, an inner space too", async () => {
+  // A password with a space (typed %20 in the base URL), a quote and an umlaut: a JSON writer
+  // spells it with \" and may write ä; the scrub of the body as sent missed it, and the
+  // decoded detail (`Errors`, `message`) carried it whole or from its second word on.
+  const pw = 'pa ss-"ä';
+  const base = `https://alice:${encodeURIComponent(pw)}@mirror.example`;
+  const basic = Buffer.from(`alice:${pw}`, "utf8").toString("base64");
+  const ascii = (text: string): string => JSON.stringify(text).replace(/[\u0080-￿]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
+  const every = (text: string): string => `"${[...text].map((ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`).join("")}"`;
+  for (const [status, member] of [[500, "Errors"], [401, "message"], [400, "detail"], [500, "Errors-object"]] as const) {
+    for (const json of [ascii(`wrong ${pw}`), every(`alice:${pw}`), JSON.stringify(`Basic ${basic}`)]) {
+      const body = member === "Errors-object" ? `{"Errors":{"":{"errors":[${json}]}}}` : `{"${member}":${json}}`;
+      const e = new RequestEngine({ baseUrl: base, transport: async () => rawResponse(body, "application/json", status) });
+      const err = await e.getJson("/x").catch((caught: unknown) => caught);
+      assert.ok(err instanceof MastrApiError, String(err));
+      const decoded = JSON.stringify(JSON.parse(err.body));
+      for (const text of [err.message, err.detail ?? "", err.body, decoded]) {
+        for (const secret of [pw, "ss-", basic, JSON.stringify(pw).slice(1, -1)]) assert.ok(!text.includes(secret), `${member} ${json}: ${text}`);
+      }
+    }
+  }
+});
+
+test("an echo of the request URL as sent is scrubbed, a short password too", async () => {
+  // Typed raw; WHATWG sends `p%22%C3%A4` in the URL, which a server echoes.
+  const e = new RequestEngine({
+    baseUrl: 'https://alice:p"ä@mirror.example',
+    transport: async (req) => rawResponse(JSON.stringify({ message: `no access: ${new URL(req.url).href}` }), "application/json", 403),
+  });
+  const err = await e.getJson("/x").catch((caught: unknown) => caught);
+  assert.ok(err instanceof MastrApiError, String(err));
+  for (const text of [err.message, err.detail ?? "", err.body]) {
+    assert.ok(!text.includes("p%22%C3%A4@") && !text.includes('p"ä@'), text);
+  }
+});
+
+test("a credential in an answer's Content-Type or charset is scrubbed from the parse error", async () => {
+  const base = "https://alice:s3cret-pw@mirror.example";
+  for (const contentType of ["text/s3cret-pw", "application/json; charset=s3cret-pw"]) {
+    const e = new RequestEngine({ baseUrl: base, transport: async () => rawResponse("<x>", contentType) });
+    const err = await e.getJson("/x").catch((caught: unknown) => caught);
+    assert.ok(err instanceof MastrParseError, String(err));
+    assert.ok(!err.message.includes("s3cret"), err.message);
+  }
+});

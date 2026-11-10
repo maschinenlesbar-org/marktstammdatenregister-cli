@@ -175,10 +175,18 @@ only, since it may well occur in the data.
 `redactUrl` falls back to the same exact-string redaction for a value that doesn't parse.
 In the library the engine keeps the base URL and the default headers in real `#private`
 fields, so `console.log(client)`, `util.inspect` and `JSON.stringify` never show them, and
-it scrubs the base URL's userinfo (raw and percent-decoded) and the forms a server echoes
-it back in (the `Basic` value, the decoded `user:password`, the password alone from 4
-characters: `echoedCredentialForms`) from error bodies and details,
-`Errors` envelopes, transport error text and the `cause` chain it attaches.
+it scrubs the base URL's userinfo (raw and percent-decoded, as typed and as WHATWG sends it)
+and the forms a server echoes it back in (the `Basic` value, the decoded `user:password`, the
+password alone from 4 characters: `echoedCredentialForms`; each also percent-encoded and as a
+JSON string spells it) from error bodies and details, `Errors` envelopes, the filter check's
+quotes of the filter-columns reply, an answer's Content-Type and charset, transport error text
+and the `cause` chain it attaches. A detail is scrubbed again once decoded (each `Errors`
+string before it is cleaned and cut), since a JSON escape (`\u00e4`, `\"`) hides an echo from
+the scrub of the body as sent; a secret is replaced whole, a password with an inner space too.
+`MastrApiError.body` stays as sent unless its decoded text still holds an echo behind an escape,
+and then is the decoded JSON written again with it replaced by `***` (`""` for a body too
+deeply nested to write again); the body of an HTTP 200 error envelope is the decoded answer
+written again, scrubbed in that spelling.
 
 The client validates its own inputs before any request, for library callers the CLI's
 parsers don't cover: an unknown category, `page` outside 1..`MAX_PAGE` (1 000 000),

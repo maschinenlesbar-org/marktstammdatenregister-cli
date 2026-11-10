@@ -221,6 +221,13 @@ export class MastrApiError extends MastrError {
   readonly detail: string | undefined;
   readonly url: string;
   readonly method: string;
+  /**
+   * The answer's body as text, the base URL's credentials scrubbed. As sent, unless it is JSON
+   * whose decoded text still holds an echoed credential behind an escape (`\"`, `\u00e4`): then
+   * the decoded JSON written again (other escapes, no insignificant whitespace) with it replaced
+   * by `***`, and `""` for such a body nested too deeply to write again. For an error envelope of
+   * an HTTP 200 answer, the decoded answer written again.
+   */
   readonly body: string;
 
   constructor(args: {

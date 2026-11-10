@@ -432,3 +432,32 @@ test('{"Error":true} to a request with a sort key names the sort key first, not 
     return true;
   });
 });
+
+test("a credential the register echoes in a 2xx error envelope or its filter columns is scrubbed, behind a JSON escape too", async () => {
+  const pw = 'pa ss-"ä';
+  const base = `https://alice:${encodeURIComponent(pw)}@mirror.example`;
+  const every = (text: string): string => `"${[...text].map((ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`).join("")}"`;
+  const secrets = [pw, "ss-", JSON.stringify(pw).slice(1, -1)];
+  const seen = (err: unknown): string => {
+    const e = err as { message: string; detail?: string; body?: string };
+    return [e.message, e.detail ?? "", e.body ?? "", e.body === undefined ? "" : JSON.stringify(JSON.parse(e.body))].join("\n");
+  };
+  // The two envelopes of an HTTP 200 answer: `Errors` and `{"Error":true,"Message":…}`.
+  for (const body of [`{"Data":[],"Total":0,"Errors":${every(`wrong ${pw}`)}}`, `{"Error":true,"Message":${every(`alice:${pw}`)},"Type":"danger"}`]) {
+    const client = new MastrClient({ baseUrl: base, transport: async () => ({ status: 200, headers: { "content-type": "application/json" }, body: Buffer.from(body) }) });
+    const err = await client.stromerzeugung().catch((caught: unknown) => caught);
+    assert.ok(err instanceof MastrApiError, String(err));
+    for (const secret of secrets) assert.ok(!seen(err).includes(secret), seen(err));
+  }
+  // A FilterName or a dropdown code the filter check quotes from the columns.
+  const columns = [
+    { FilterName: `Ort ${pw}`, Type: "text", ListObject: [] },
+    { FilterName: "Energieträger", Type: "multidropdown", ListObject: [{ Name: `Solar ${pw}`, Value: `2495 ${pw}` }, { Name: "Wind", Value: `2497 ${pw}` }] },
+  ];
+  const client = new MastrClient({ baseUrl: base, transport: async () => jsonResponse(columns) });
+  for (const filter of ["Ort~eq~'a'", "Energieträger~eq~'9999'", "Energieträger~eq~'wind'"]) {
+    const err = await client.stromerzeugung({ filter }).catch((caught: unknown) => caught);
+    assert.ok(err instanceof MastrValidationError, String(err));
+    for (const secret of [pw, JSON.stringify(pw).slice(1, -1)]) assert.ok(!err.message.includes(secret), err.message);
+  }
+});

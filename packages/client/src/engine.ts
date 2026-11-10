@@ -253,6 +253,27 @@ export function sanitizeServerText(text: string): string {
 }
 
 /**
+ * `form` and its spelling in a URL (`encodeURIComponent`): a server that puts a credential into
+ * a URL percent-encodes it. A form that has no such spelling (a lone surrogate) is kept as it is.
+ */
+function urlSpellings(form: string): string[] {
+  try {
+    return [form, encodeURIComponent(form)];
+  } catch {
+    return [form];
+  }
+}
+
+/**
+ * `form` and its spelling inside a JSON string (`\"`, `\\`): the client writes a decoded error
+ * envelope again with JSON.stringify (`MastrApiError.body` of an `Errors` or `{"Error":true}`
+ * answer), and a credential with a quote in it is spelled with a backslash there.
+ */
+function jsonSpellings(form: string): string[] {
+  return [form, JSON.stringify(form).slice(1, -1)];
+}
+
+/**
  * A short server string — a FilterName, a dropdown code or label from the filter-columns
  * reply — as an own message quotes it: `sanitizeServerText` (control and bidi characters
  * dropped, whitespace folded to one space, so it stays on one line) and cut at `max`
@@ -548,8 +569,10 @@ export class RequestEngine {
   readonly #credentials: string[];
   /**
    * The forms a server echoes that userinfo back in (the Basic value, the decoded
-   * `user:password`, the password alone), longest first, so a password never leaves half
-   * of the `user:password` around it.
+   * `user:password`, the password alone; `echoedCredentialForms`), each also percent-encoded as
+   * in a URL and escaped as in a JSON string (the client writes a decoded error envelope again
+   * with JSON.stringify), longest first, so a password never leaves half of the `user:password`
+   * around it.
    */
   readonly #echoed: string[];
   private readonly transport: Transport;
@@ -574,16 +597,18 @@ export class RequestEngine {
     // cannot slip past it; only an omitted baseUrl selects the default.
     const baseUrl = options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl;
     this.#baseUrl = validateBaseUrl(baseUrl);
-    this.#credentials = credentialsIn(baseUrl).flatMap((raw) => {
+    // The userinfo as typed and as sent (WHATWG percent-encodes some of its characters).
+    const userinfos = [...new Set([...credentialsIn(baseUrl), ...credentialsIn(new URL(baseUrl).href)])];
+    this.#credentials = userinfos.flatMap((raw) => {
       try {
         return [raw, decodeURIComponent(raw)];
       } catch {
         return [raw];
       }
     });
-    this.#echoed = credentialsIn(baseUrl)
-      .flatMap(echoedCredentialForms)
-      .sort((a, b) => b.length - a.length);
+    this.#echoed = [...new Set(userinfos.flatMap(echoedCredentialForms).flatMap(urlSpellings).flatMap(jsonSpellings))].sort(
+      (a, b) => b.length - a.length,
+    );
     this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Header values are checked up front: a blank one would be sent as is, and a
     // CR/LF or a character above U+00FF would reach a custom transport raw or make
@@ -646,6 +671,32 @@ export class RequestEngine {
    */
   scrub(text: string): string {
     return this.#credentials.length === 0 ? text : redactSecrets(redactCredentials(text, this.#credentials), this.#echoed);
+  }
+
+  /**
+   * An error body, already scrubbed as sent, as `MastrApiError.body` keeps it: when it is JSON
+   * with an escape in it, checked decoded too. An escape (`\"`, `\u00e4`) hides an echoed
+   * credential from the scrub of the text as sent, while a caller who parses the body sees it. Such
+   * a body is kept as the decoded JSON written again (`JSON.stringify`, one spelling per character)
+   * with the credential scrubbed in that spelling. A body that doesn't parse is text nobody
+   * decodes, and stays as sent; one too deeply nested to write again is left out.
+   */
+  private scrubBody(scrubbed: string): string {
+    if (this.#echoed.length === 0 || !scrubbed.includes("\\")) return scrubbed;
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(scrubbed);
+    } catch {
+      return scrubbed;
+    }
+    let rewritten: string;
+    try {
+      rewritten = JSON.stringify(decoded);
+    } catch {
+      return "";
+    }
+    const spelled = this.#echoed.map((form) => JSON.stringify(form).slice(1, -1));
+    return spelled.some((form) => rewritten.includes(form)) ? redactSecrets(rewritten, spelled) : scrubbed;
   }
 
   /**
@@ -830,7 +881,7 @@ export class RequestEngine {
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
     const res = await this.request(path, query);
     const request = `GET ${this.describeUrl(path, query)}`;
-    const decoded = decodeBody(res.data, res.contentType, request);
+    const decoded = decodeBody(res.data, res.contentType, request, (text) => this.scrub(text));
     if (res.status === 204 || decoded.text.trim().length === 0) {
       throw new MastrParseError(`${request}: empty response body.`);
     }
@@ -844,7 +895,7 @@ export class RequestEngine {
       // An HTML maintenance or proxy page is the usual non-JSON answer: name its type, so it
       // reads as an upstream problem rather than a client bug.
       const type = res.contentType.split(";")[0]?.trim() ?? "";
-      const hint = type !== "" && !/json/i.test(type) ? ` (expected JSON, got Content-Type "${cutDetail(sanitizeServerText(type))}")` : "";
+      const hint = type !== "" && !/json/i.test(type) ? ` (expected JSON, got Content-Type "${cutDetail(sanitizeServerText(this.scrub(type)))}")` : "";
       throw new MastrParseError(`${request}: the answer is not valid JSON${hint}.`, { cause });
     }
     // JSON.parse rounds and overflows numbers silently: refuse the answer rather than print
@@ -876,7 +927,9 @@ export class RequestEngine {
     let detail: string | undefined;
     try {
       const parsed = JSON.parse(text) as { Errors?: unknown; message?: unknown; detail?: unknown };
-      if (parsed?.Errors !== undefined && parsed.Errors !== null) detail = describeMastrErrors(parsed.Errors);
+      // Decoded text: scrubbed again (a JSON escape hid the credential from the scrub above),
+      // each `Errors` string before it is cleaned and cut.
+      if (parsed?.Errors !== undefined && parsed.Errors !== null) detail = describeMastrErrors(parsed.Errors, (t) => this.scrub(t));
       else if (typeof parsed?.message === "string") detail = parsed.message;
       else if (typeof parsed?.detail === "string") detail = parsed.detail;
     } catch {
@@ -890,9 +943,9 @@ export class RequestEngine {
     // `detail` came from the response body (JSON field or text snippet); the `\s+`
     // collapse above does not remove ESC, so strip control characters before it can
     // reach stderr and inject terminal escape sequences.
-    if (detail !== undefined) detail = cutDetail(sanitizeServerText(detail));
+    if (detail !== undefined) detail = cutDetail(sanitizeServerText(this.scrub(detail)));
     if (note !== undefined) detail = detail === undefined || detail === "" ? note : `${detail}; ${note}`;
-    return new MastrApiError({ status, url, method: "GET", body: text, detail });
+    return new MastrApiError({ status, url, method: "GET", body: this.scrubBody(text), detail });
   }
 }
 
@@ -902,15 +955,16 @@ export class RequestEngine {
  * TextDecoder also drops a leading byte order mark, which JSON.parse would reject. An
  * unknown charset label is a MastrParseError naming `request`. Bytes that are not valid in the
  * charset become U+FFFD, and `replaced` counts them: exactly for UTF-8 and the single-byte
- * charsets; for UTF-16 a U+FFFD the server sent counts too.
+ * charsets; for UTF-16 a U+FFFD the server sent counts too. The charset a message quotes is
+ * `scrub`bed first.
  */
-function decodeBody(body: Buffer, contentType: string, request: string): { text: string; replaced: number } {
+function decodeBody(body: Buffer, contentType: string, request: string, scrub: (text: string) => string): { text: string; replaced: number } {
   const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(charset, { fatal: true });
   } catch {
-    throw new MastrParseError(`${request}: unsupported response charset "${cutForMessage(sanitizeServerText(charset))}".`);
+    throw new MastrParseError(`${request}: unsupported response charset "${cutForMessage(sanitizeServerText(scrub(charset)))}".`);
   }
   try {
     return { text: decoder.decode(body), replaced: 0 };

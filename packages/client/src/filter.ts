@@ -355,8 +355,17 @@ function unquote(value: string): string {
  *   `{"Error":true}` (they work on text columns).
  *
  * `spec` must already pass {@link filterProblem} (the client normalises and checks it first).
+ * `scrub` runs on every name and code of the reply before a message quotes it (the client passes
+ * its credential scrubber: a mirror's reply may echo the base URL's credentials).
  */
-export function resolveFilter(spec: string, columns: readonly FilterColumn[], category: string): string {
+export function resolveFilter(
+  spec: string,
+  columns: readonly FilterColumn[],
+  category: string,
+  scrub: (text: string) => string = (text) => text,
+): string {
+  // The register's text as a message quotes it: scrubbed, then cleaned and cut.
+  const serverText = (text: string): string => serverTextForMessage(scrub(text));
   const byName = new Map<string, FilterColumn>();
   // One entry per lower-cased name: its column, or null when two or more columns have it (the
   // same name twice included). Copying a list per column made N columns that share a name cost
@@ -377,7 +386,7 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
       throw new MastrValidationError(
         `Invalid filter: unknown FilterName ${quoted(name)} in condition ${n}: ${category} has no such ` +
           "column, and the register would ignore it and return the unfiltered set." +
-          (near.length > 0 ? ` Did you mean ${near.map((x) => JSON.stringify(serverTextForMessage(x))).join(", ")}?` : "") +
+          (near.length > 0 ? ` Did you mean ${near.map((x) => JSON.stringify(serverText(x))).join(", ")}?` : "") +
           ` List the names with \`mastr filters ${category}\` (filterColumns() in the library).`,
       );
     }
@@ -386,7 +395,7 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
     if (UNARY_OPERATORS.has(op) && NO_NULL_TEST_TYPES.has(String(column.Type))) {
       throw new MastrValidationError(
         `Invalid filter: ${op} (condition ${n}) doesn't work on the ${String(column.Type)} column ` +
-          `${JSON.stringify(serverTextForMessage(column.FilterName!))}: the register answers null/nn on number, dropdown and ` +
+          `${JSON.stringify(serverText(column.FilterName!))}: the register answers null/nn on number, dropdown and ` +
           "boolean columns with an error (they work on text columns). There is no way to ask for " +
           "the units without a value in such a column.",
       );
@@ -404,12 +413,12 @@ export function resolveFilter(spec: string, columns: readonly FilterColumn[], ca
         const shown = cutForMessage(
           codes
             .slice(0, 8)
-            .map((o) => `${serverTextForMessage(o.Value)} (${typeof o.Name === "string" ? serverTextForMessage(o.Name) : ""})`)
+            .map((o) => `${serverText(o.Value)} (${typeof o.Name === "string" ? serverText(o.Name) : ""})`)
             .join(", "),
           MAX_DETAIL_LENGTH,
         );
-        const columnName = serverTextForMessage(column.FilterName!);
-        const code = label === undefined ? "" : serverTextForMessage(label.Value);
+        const columnName = serverText(column.FilterName!);
+        const code = label === undefined ? "" : serverText(label.Value);
         throw new MastrValidationError(
           `Invalid filter: ${quoted(item)} is not a code of the dropdown column ` +
             `${JSON.stringify(columnName)} (condition ${n}). ` +

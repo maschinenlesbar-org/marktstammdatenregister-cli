@@ -246,7 +246,7 @@ export class MastrClient {
     const filter = normalizeFilter(spec);
     validateFilter(filter);
     if (this.#allowUnknownFilters) return filter;
-    return resolveFilter(filter, await this.columnsOf(category), category);
+    return resolveFilter(filter, await this.columnsOf(category), category, (text) => this.engine.scrub(text));
   }
 
   /**
