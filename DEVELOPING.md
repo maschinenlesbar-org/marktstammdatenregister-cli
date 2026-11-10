@@ -144,7 +144,10 @@ documented limits hold for a `fetch` or `node:http` transport too. Every call ru
 the overall `timeoutMs` deadline: the request carries an `AbortSignal`
 (`HttpRequest.signal`, honoured by the default transport) that fires at the deadline, and
 the call rejects then whether the transport stops or not. `maxResponseBytes` is checked on
-the body any transport returns (the message names `--max-response-bytes` too). A body may be
+the body any transport returns (the message names `--max-response-bytes` too). The default
+transport joins small chunks as they arrive (at 1024 chunks or 64 KiB), so the memory an
+answer holds follows its bytes, not the number of chunks a server sends: a Buffer per one-byte
+chunk held about 210 bytes of heap each. A body may be
 a Buffer, any `ArrayBuffer` view (fetch's `Uint8Array`, from any realm) or an `ArrayBuffer`;
 headers a plain record in any case, a `Headers` object or a `Map`. Whatever a transport
 throws, and a response without a valid status, headers or body, becomes a
@@ -319,8 +322,9 @@ CLI's own. Notable coverage:
   no `-o` (`HAS_OUTPUT_OPTION = false`), so only its stdout case runs — stdout redirected to a
   file and cut short (`ulimit -f`) is exit 1 with an ERROR of `mastr.output`. **P27** big and
   odd answers (spawns the built bin under a small heap: 30 s): a large flat answer prints with
-  `--compact`, 20 MB of DEL prints escaped, 90 MB of DEL is "too large to print", and a lone
-  surrogate or invalid bytes become U+FFFD with a WARN of `mastr.api`.
+  `--compact`, 20 MB of DEL prints escaped, 90 MB of DEL is "too large to print", an answer in
+  two million one-byte chunks is read under a 256 MB heap, and a lone surrogate or invalid
+  bytes become U+FFFD with a WARN of `mastr.api`.
 
 Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
 `{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
