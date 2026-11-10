@@ -8,7 +8,7 @@
 
 import http from "node:http";
 import https from "node:https";
-import { MastrNetworkError, redactUrl } from "./errors.js";
+import { MastrNetworkError, credentialsIn, redactCredentials, redactUrl } from "./errors.js";
 
 export interface HttpRequest {
   method: string;
@@ -54,6 +54,14 @@ export function sizeLimitMessage(maxBytes: number): string {
 export const MAX_TIMEOUT_MS = 2_147_483_647;
 
 /**
+ * `url` for a message, its userinfo redacted; one typed without its scheme (`user:pw@host`,
+ * `TOKEN:@host`) is read as if it had one, since `redactUrl` finds a userinfo only after a scheme.
+ */
+function shownUrl(url: string): string {
+  return credentialsIn(url).length > 0 ? redactUrl(url) : redactCredentials(url, credentialsIn(`http://${url}`));
+}
+
+/**
  * Default transport. Resolves with the raw response (including non-2xx) — status
  * interpretation is the client's job. Rejects only on transport-level failures
  * (connection errors, timeouts, malformed URLs).
@@ -64,14 +72,17 @@ export const nodeHttpTransport: Transport = (request) =>
     try {
       url = new URL(request.url);
     } catch {
-      reject(new MastrNetworkError(`Invalid URL: ${request.url}`));
+      reject(new MastrNetworkError(`Invalid URL: ${shownUrl(request.url)}`));
       return;
     }
 
     // Only http/https are supported. Reject anything else up front with a clear,
     // typed error instead of letting Node throw an opaque ERR_INVALID_PROTOCOL.
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      reject(new MastrNetworkError(`Unsupported protocol "${url.protocol}" in URL: ${redactUrl(request.url)}`));
+      // `user:password@host` without a scheme parses with the user name as the scheme: name a
+      // scheme only when the value spells one (`<scheme>://`).
+      const named = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(request.url) ? ` "${url.protocol}"` : "";
+      reject(new MastrNetworkError(`Unsupported protocol${named} in URL: ${shownUrl(request.url)}`));
       return;
     }
 
