@@ -674,3 +674,16 @@ test("the URL search of the redaction is linear: a long argument, with or withou
     assert.ok(took < 1000, `${big.length} characters took ${Math.round(took)} ms`);
   }
 });
+
+test("a token in --base-url (a userinfo without a password) is redacted on stderr and stdout", async () => {
+  const token = "T0kenS3cret";
+  const basic = Buffer.from(`${token}:`, "utf8").toString("base64");
+  const base = `https://${token}@mirror.example`;
+  const failed = makeCli(() => jsonResponse({ Errors: `bad token ${token}` }, 401));
+  assert.notEqual(await run(["--base-url", base, "--max-retries", "0", "stromerzeugung"], failed.deps), 0);
+  assert.ok(!failed.err.join("\n").includes(token), failed.err.join("\n"));
+  const echoed = makeCli(registerResponder({ ...fx.unitPage, Data: [{ Id: 1, Ort: `Basic ${basic} for ${token}:x` }], Total: 1 }));
+  assert.equal(await run(["--base-url", base, "stromerzeugung"], echoed.deps), 0, echoed.err.join("\n"));
+  const out = echoed.out.join("\n");
+  assert.ok(!out.includes(basic) && !out.includes(`${token}:`), out);
+});

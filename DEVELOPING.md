@@ -171,13 +171,16 @@ JSON-quoted, from every line the CLI prints — commander's usage errors echo re
 and a pattern can't delimit a password holding a space, quote, `#`, `?` or `/`. The forms
 a server echoes a userinfo back in are replaced too: the `Basic` value and the decoded
 `user:password` on stdout and stderr, the password alone (4 characters or more) on stderr
-only, since it may well occur in the data.
+only, since it may well occur in the data. A userinfo without a password (`https://TOKEN@host`,
+`TOKEN:@host`) is a token: the user name takes the password's place (Node sends it as Basic
+`TOKEN:`).
 `redactUrl` falls back to the same exact-string redaction for a value that doesn't parse.
 In the library the engine keeps the base URL and the default headers in real `#private`
 fields, so `console.log(client)`, `util.inspect` and `JSON.stringify` never show them, and
 it scrubs the base URL's userinfo (raw and percent-decoded, as typed and as WHATWG sends it)
 and the forms a server echoes it back in (the `Basic` value, the decoded `user:password`, the
-password alone from 4 characters: `echoedCredentialForms`; each also percent-encoded and as a
+password alone from 4 characters, a token user name in its place when there is no password:
+`echoedCredentialForms`; each also percent-encoded and as a
 JSON string spells it) from error bodies and details, `Errors` envelopes, the filter check's
 quotes of the filter-columns reply, an answer's Content-Type and charset, transport error text
 and the `cause` chain it attaches. A detail is scrubbed again once decoded (each `Errors`

@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { TextDecoder } from "node:util";
 import assert from "node:assert/strict";
 import { MAX_DETAIL_LENGTH, RequestEngine, bigIntegerKeysOption, cleartextProblem, describeMastrErrors, firstInexactNumber, parseRetryAfter, sanitizeServerText, scanNumbers } from "../src/engine.js";
-import { MastrApiError, MastrParseError, MastrValidationError, TextBuilder, cutText, redactUrl, toWellFormed } from "../src/errors.js";
+import { MastrApiError, MastrParseError, MastrValidationError, TextBuilder, cutText, echoedCredentialForms, redactUrl, toWellFormed } from "../src/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse, queryOf } from "./helpers.js";
 import * as fx from "./fixtures.js";
 
@@ -759,5 +759,31 @@ test("a credential in an answer's Content-Type or charset is scrubbed from the p
     const err = await e.getJson("/x").catch((caught: unknown) => caught);
     assert.ok(err instanceof MastrParseError, String(err));
     assert.ok(!err.message.includes("s3cret"), err.message);
+  }
+});
+
+test("echoedCredentialForms treats a userinfo without a password as a token (Basic `TOKEN:`)", () => {
+  const basic = (pair: string): string => Buffer.from(pair, "utf8").toString("base64");
+  assert.deepEqual(echoedCredentialForms("alice:s3cret"), [basic("alice:s3cret"), "alice:s3cret", "s3cret"]);
+  assert.deepEqual(echoedCredentialForms("T0ken"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T0ken:"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T%C3%B6k"), [basic("Tök:"), "Tök:"]); // short: not alone
+  assert.deepEqual(echoedCredentialForms(":pw12"), [basic(":pw12"), ":pw12", "pw12"]);
+  assert.deepEqual(echoedCredentialForms(""), []);
+  assert.deepEqual(echoedCredentialForms(":"), []);
+});
+
+test("a token userinfo (no password) is scrubbed from library errors in every echoed form", async () => {
+  const token = "T0kenS3cret";
+  const basic = Buffer.from(`${token}:`, "utf8").toString("base64");
+  for (const baseUrl of [`https://${token}@mirror.example`, `https://${token}:@mirror.example`]) {
+    for (const echo of [`bad token ${token}`, `Authorization: Basic ${basic}`, `user ${token}: unknown`]) {
+      const e = new RequestEngine({ baseUrl, transport: async () => jsonResponse({ Errors: echo }, 401) });
+      const err = await e.getJson("/x").catch((caught: unknown) => caught);
+      assert.ok(err instanceof MastrApiError, String(err));
+      for (const text of [err.message, err.detail ?? "", err.body]) {
+        assert.ok(!text.includes(token) && !text.includes(basic), `${baseUrl} ${echo}: ${text}`);
+      }
+    }
   }
 });
