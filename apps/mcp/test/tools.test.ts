@@ -40,7 +40,7 @@ test("countUnits: a breakdown per Land, a capacity sum, and an ambiguous name wi
   assert.deepEqual((several["candidates"] as { label: string }[]).map((c) => c.label), ["Sachsen", "Sachsen-Anhalt"]);
   const none = (await connection.call("countUnits", { place: "Frankfurt" })).structuredContent ?? {};
   assert.equal(none["status"], "empty");
-  assert.match(String(none["reason"]), /whole spelling/);
+  assert.match(String(none["reason"]), /matched whole/);
   const wrong = await connection.call("countUnits", { category: "gasverbrauch", energySource: "Wind" });
   assert.equal(wrong.isError, true);
   assert.match(wrong.content[0]?.text ?? "", /only stromerzeugung/);

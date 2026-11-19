@@ -241,13 +241,13 @@ export interface UnitFilterInput {
   state?: string | undefined;
   /** The operating status (default `inOperation`); `any` counts every unit ever registered. */
   status?: UnitStatus | undefined;
-  /** The town (`Ort`), the whole name as the register spells it. */
+  /** The town (`Ort`), the whole name as the register spells it: the postal town ("Frankfurt", not "Frankfurt am Main"). */
   place?: string | undefined;
   /** A postcode, or its first digits (1–5). */
   postcode?: string | undefined;
   /** The district (`Landkreis`), the whole name. */
   district?: string | undefined;
-  /** The municipality (`Gemeinde`), the whole name. */
+  /** The municipality (`Gemeinde`), the whole official name ("Frankfurt am Main"). */
   municipality?: string | undefined;
   /** Part of the operator's name (organisations only; natural persons are anonymised). */
   operator?: string | undefined;
@@ -573,7 +573,7 @@ function statusNotes(searched: UnitSearched): string[] {
 /** Why a count found nothing, in words that say what to change. */
 function emptyReason(searched: UnitSearched): string {
   const hints = [
-    "Names of places, municipalities and districts must match the register's whole spelling ('Frankfurt am Main'); a raw filter with sw or ct matches a part (\"Ort~sw~'Frankfurt'\").",
+    "Places, municipalities and districts are matched whole, in the register's spelling: the place (Ort) is the postal town ('Frankfurt', not 'Frankfurt am Main'), the municipality (Gemeinde) the official name ('Frankfurt am Main'); a raw filter with sw or ct matches a part (\"Ort~sw~'Frankfurt'\").",
     searched.status.startsWith("any") ? undefined : `Only status ${searched.status} was counted; status 'any' counts planned and shut-down units too.`,
   ].filter((h): h is string => h !== undefined);
   return `No ${searched.category} unit matches ${searched.conditions.length === 0 ? "the status" : searched.conditions.join("; ")}. ${hints.join(" ")}`;

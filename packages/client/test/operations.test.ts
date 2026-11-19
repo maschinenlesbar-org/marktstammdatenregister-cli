@@ -118,7 +118,7 @@ test("an empty count says what was searched and what to change", async () => {
   const { client } = clientOn();
   const none = await countUnits(client, { place: "Frankfurt" });
   assert.equal(none.status, "empty");
-  assert.match(none.status === "empty" ? none.reason! : "", /No stromerzeugung unit matches Ort is "Frankfurt"\. .*whole spelling.*Only status In Betrieb \(35\) was counted/);
+  assert.match(none.status === "empty" ? none.reason! : "", /No stromerzeugung unit matches Ort is "Frankfurt"\. .*matched whole.*the postal town \('Frankfurt', not 'Frankfurt am Main'\).*Only status In Betrieb \(35\) was counted/);
 });
 
 test("searchUnits: sorted by the category's capacity key, read rows, ISO days, '&' for the full-width ampersand", async () => {
