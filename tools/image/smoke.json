@@ -1,0 +1,313 @@
+{
+  "comment": "What tools/image/smoke.mjs needs that is particular to this repo: the bin (its log topic), a command that makes one request, the exit code of a network error, the mock answer to that request (by path, under --base-url http://mock:8080; the client adds /Einheit/EinheitJson/…), and a string the printed answer contains. The answer is the live filter columns of the gas consumption units, recorded on 2026-11-19.",
+  "bin": "mastr",
+  "command": [
+    "filters",
+    "gasverbrauch"
+  ],
+  "networkErrorExit": 6,
+  "answers": {
+    "/Einheit/EinheitJson/GetFilterColumnsErweiterteOeffentlicheEinheitGasverbrauch": [
+      {
+        "FilterName": "Anzeige-Name der Einheit",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Betriebs-Status",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Endgültig stillgelegt",
+            "Value": "38"
+          },
+          {
+            "Name": "In Betrieb",
+            "Value": "35"
+          },
+          {
+            "Name": "In Planung",
+            "Value": "31"
+          },
+          {
+            "Name": "Vorübergehend stillgelegt",
+            "Value": "37"
+          }
+        ]
+      },
+      {
+        "FilterName": "Bundesland",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Ausschließliche Wirtschaftszone",
+            "Value": "1416"
+          },
+          {
+            "Name": "Baden-Württemberg",
+            "Value": "1402"
+          },
+          {
+            "Name": "Bayern",
+            "Value": "1403"
+          },
+          {
+            "Name": "Berlin",
+            "Value": "1401"
+          },
+          {
+            "Name": "Brandenburg",
+            "Value": "1400"
+          },
+          {
+            "Name": "Bremen",
+            "Value": "1404"
+          },
+          {
+            "Name": "Hamburg",
+            "Value": "1406"
+          },
+          {
+            "Name": "Hessen",
+            "Value": "1405"
+          },
+          {
+            "Name": "Mecklenburg-Vorpommern",
+            "Value": "1407"
+          },
+          {
+            "Name": "Niedersachsen",
+            "Value": "1408"
+          },
+          {
+            "Name": "Nordrhein-Westfalen",
+            "Value": "1409"
+          },
+          {
+            "Name": "Rheinland-Pfalz",
+            "Value": "1410"
+          },
+          {
+            "Name": "Saarland",
+            "Value": "1412"
+          },
+          {
+            "Name": "Sachsen",
+            "Value": "1413"
+          },
+          {
+            "Name": "Sachsen-Anhalt",
+            "Value": "1414"
+          },
+          {
+            "Name": "Schleswig-Holstein",
+            "Value": "1411"
+          },
+          {
+            "Name": "Thüringen",
+            "Value": "1415"
+          }
+        ]
+      },
+      {
+        "FilterName": "Datum der endgültigen Stilllegung",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Datum der geplanten Inbetriebnahme",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Flurstück",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Gasqualität des Netzes",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "H-Gas",
+            "Value": "767"
+          },
+          {
+            "Name": "L-Gas",
+            "Value": "766"
+          }
+        ]
+      },
+      {
+        "FilterName": "Gasverbrauch dient der Stromerzeugung",
+        "Type": "boolean",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Gemarkung",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Gemeinde",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Gemeindeschlüssel",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Inbetriebnahmedatum der Einheit",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Inbetriebnahmedatum der Einheit am aktuellen Standort",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Koordinate: Breitengrad (WGS84)",
+        "Type": "number",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Koordinate: Längengrad (WGS84)",
+        "Type": "number",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Land",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Belgien",
+            "Value": "66"
+          },
+          {
+            "Name": "Dänemark",
+            "Value": "90"
+          },
+          {
+            "Name": "Deutschland",
+            "Value": "84"
+          },
+          {
+            "Name": "Frankreich",
+            "Value": "106"
+          },
+          {
+            "Name": "Luxemburg",
+            "Value": "169"
+          },
+          {
+            "Name": "Niederlande",
+            "Value": "198"
+          },
+          {
+            "Name": "Österreich",
+            "Value": "206"
+          },
+          {
+            "Name": "Polen",
+            "Value": "215"
+          },
+          {
+            "Name": "Schweiz",
+            "Value": "231"
+          },
+          {
+            "Name": "Tschechische Republik",
+            "Value": "269"
+          }
+        ]
+      },
+      {
+        "FilterName": "Landkreis",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Letzte Aktualisierung",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. der Einheit",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. der Lokation",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. des Anlagenbetreibers",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. des Anschluss-Netzbetreibers",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Maximale Gasbezugsleistung",
+        "Type": "number",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Name des Anlagenbetreibers (nur Org.)",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Name des Anschluss-Netzbetreibers",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Netzbetreiberprüfung",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Geprüft",
+            "Value": "2954"
+          },
+          {
+            "Name": "In Prüfung",
+            "Value": "2955"
+          },
+          {
+            "Name": "Nicht vorgesehen",
+            "Value": "3075"
+          }
+        ]
+      },
+      {
+        "FilterName": "Ort",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Postleitzahl",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Registrierungsdatum der Einheit",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Straße",
+        "Type": "text",
+        "ListObject": []
+      }
+    ]
+  },
+  "expectStdout": "Maximale Gasbezugsleistung"
+}
