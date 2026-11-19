@@ -29,6 +29,53 @@ npm install @maschinenlesbar.org/marktstammdatenregister-cli
 
 Requires **Node.js 22.12+**.
 
+### Docker
+
+From 0.9.0 every release is also a container image for linux/amd64 and linux/arm64 on the
+GitHub Container Registry, made from the same tarball as the npm package. It needs no Node.js and no
+install:
+
+```bash
+docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+  ghcr.io/maschinenlesbar-org/marktstammdatenregister-cli:latest stromerzeugung --total
+```
+
+The image's entrypoint is the program, so the command follows the image name directly;
+`… marktstammdatenregister-cli:latest mastr stromerzeugung --total` works too.
+
+In a container with a memory limit (`--memory`) the default `--max-response-bytes` is an eighth
+of that limit (at most the usual 100 MiB), so an oversized answer is refused with a clear
+error instead of the container being killed for memory. A unit row is about 4 KB, so a page of
+`--page-size 5000` is about 20 MB: give such pulls `--memory 256m` or more, or page smaller.
+The CLI needs at least 12 processes and threads (`--pids-limit 12`): below that it refuses with
+an error, and with 4 or fewer Node.js itself hangs before the CLI can check.
+
+`latest` is the newest release. For scripts, name a release and pin its digest, which the
+[release notes](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/releases) give:
+`…/marktstammdatenregister-cli:0.9.0@sha256:<digest>`. Each image carries signed build provenance;
+check it with
+
+```bash
+gh attestation verify oci://ghcr.io/maschinenlesbar-org/marktstammdatenregister-cli:latest \
+  --repo maschinenlesbar-org/marktstammdatenregister-cli
+```
+
+### MCP server
+
+From 0.9.0 the register is also an [MCP](https://modelcontextprotocol.io/) server for AI agents,
+`@maschinenlesbar.org/marktstammdatenregister-mcp` (command `mastr-mcp`, image
+`ghcr.io/maschinenlesbar-org/marktstammdatenregister-mcp`): four read-only tools, counting units
+(with a breakdown per Land or energy source and a capacity sum), searching them, one unit by its
+MaStR number, and the column names and codes, with the register's traps handled (units in
+operation unless asked, names to codes, inclusive bounds, no server-side sum, the record read),
+on stdio or Streamable HTTP. Setup for Claude Code, Claude Desktop and VS Code:
+[MCP.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/MCP.md).
+
+```bash
+npm i -g @maschinenlesbar.org/marktstammdatenregister-mcp
+claude mcp add mastr -- mastr-mcp
+```
+
 ## CLI
 
 Four datasets, each paged and filterable. Prints `{ total, data }` (or just the
@@ -128,6 +175,17 @@ const filter = buildFilter([
 await mastr.stromerzeugung({ filter, pageSize: 1 });
 ```
 
+The skills' use cases are library functions too, with the register's traps built in (units in
+operation unless asked, names to codes, inclusive bounds, the record read):
+
+```ts
+import { countUnits, getUnit, searchUnits } from "@maschinenlesbar.org/marktstammdatenregister-cli";
+
+await countUnits(mastr, { energySource: "Wind", state: "Bayern", by: "Betriebs-Status" });
+await searchUnits(mastr, { energySource: "Solar", minCapacity: 10_000, sortBy: "commissioned", limit: 10 });
+await getUnit(mastr, { mastrNumber: "SEE984033548619" }); // ISO dates, the grid operator's number without HTML
+```
+
 ## Documentation
 
 - [Usage.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/Usage.md) — commands, filter syntax, exit codes
@@ -135,6 +193,7 @@ await mastr.stromerzeugung({ filter, pageSize: 1 });
 - [GLOSSARY.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/GLOSSARY.md) — MaStR domain terms
 - [DATA_LICENSE.md](DATA_LICENSE.md) — the DL-DE-BY-2.0 data terms
 - [SKILLS.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/SKILLS.md) — the Claude Code skills this repo ships
+- [MCP.md](https://github.com/maschinenlesbar-org/marktstammdatenregister-cli/blob/main/MCP.md) — the MCP server: tools, setup, options
 
 ## Licence
 
