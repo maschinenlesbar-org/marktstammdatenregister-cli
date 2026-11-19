@@ -225,8 +225,11 @@ export class MastrClient {
     this.#allowUnknownFilters = allowUnknownFilters === true;
   }
 
-  /** The category's filter columns, fetched on first use and kept; a failed fetch is not kept. */
-  private columnsOf(category: UnitCategory): Promise<FilterColumn[]> {
+  /**
+   * The category's filter columns as {@link filterColumns} gives them, fetched on first use and
+   * kept for the client's life (the filter check uses the same list); a failed fetch is not kept.
+   */
+  cachedFilterColumns(category: UnitCategory): Promise<FilterColumn[]> {
     let columns = this.#columns.get(category);
     if (columns === undefined) {
       columns = this.filterColumns(category);
@@ -246,7 +249,7 @@ export class MastrClient {
     const filter = normalizeFilter(spec);
     validateFilter(filter);
     if (this.#allowUnknownFilters) return filter;
-    return resolveFilter(filter, await this.columnsOf(category), category, (text) => this.engine.scrub(text));
+    return resolveFilter(filter, await this.cachedFilterColumns(category), category, (text) => this.engine.scrub(text));
   }
 
   /**

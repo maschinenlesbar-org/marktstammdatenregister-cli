@@ -64,4 +64,38 @@ export {
   redactCredentials,
 } from "./errors.js";
 
+export {
+  countUnits,
+  FILTER_GRAMMAR,
+  findFilterCodes,
+  getUnit,
+  MAX_GROUPS,
+  readRecord,
+  searchUnits,
+  SUM_PAGE_SIZE,
+  summarizeUnit,
+  UNIT_CATEGORIES,
+  UNIT_SORTS,
+  UNIT_STATUSES,
+} from "./operations.js";
+export type {
+  CapacitySum,
+  CountGroup,
+  CountUnitsInput,
+  FilterCodesAnswer,
+  FilterCode,
+  FilterColumnInfo,
+  FindFilterCodesInput,
+  GetUnitInput,
+  SearchUnitsInput,
+  UnitCount,
+  UnitFilterInput,
+  UnitRecord,
+  UnitSearch,
+  UnitSearched,
+  UnitSort,
+  UnitStatus,
+  UnitSummary,
+} from "./operations.js";
+
 export * from "./types.js";
