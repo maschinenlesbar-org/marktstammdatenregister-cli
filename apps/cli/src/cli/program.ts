@@ -12,6 +12,7 @@ import { MAX_TIMEOUT_MS } from "@maschinenlesbar.org/marktstammdatenregister-cli
 import { MAX_RETRIES } from "@maschinenlesbar.org/marktstammdatenregister-client/internal/engine";
 import { once, parseIntArg, parseBoundedInt, parseHeaderValue, parseBaseUrl } from "./shared.js";
 import { registerCommands } from "./commands/units.js";
+import { readContainerLimits } from "./limits.js";
 import { DEFAULT_LOG_FORMAT, logFormatProblem } from "./log.js";
 
 /**
@@ -36,6 +37,8 @@ export const VERSION = readVersion();
 export const defaultDeps: CliDeps = {
   io: defaultIO,
   createClient: (options) => new MastrClient(options),
+  // In a container: the memory and pids limits (cgroup), for action()'s checks.
+  limits: () => readContainerLimits(),
 };
 
 /** commander value-parser for `--log-format`. */

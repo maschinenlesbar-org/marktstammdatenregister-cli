@@ -2,7 +2,7 @@
 // Bin shim: parse argv, run the CLI, and set the process exit code. All real
 // logic lives in run.ts (testable without spawning a subprocess).
 
-import { handleOutputErrors } from "./io.js";
+import { exitOnSignalsAsPid1, handleOutputErrors } from "./io.js";
 import { installWarningLog } from "./log.js";
 import { processLogger, run } from "./run.js";
 
@@ -12,6 +12,8 @@ const log = processLogger(argv);
 installWarningLog(process, log);
 // Before run(): a reader that closes the pipe early (`| head`) must not end in a stack trace.
 handleOutputErrors(process, undefined, log);
+// In a container the CLI is PID 1, which ignores a signal nothing listens for.
+exitOnSignalsAsPid1();
 run(argv).then(
   (code) => {
     process.exitCode = code;
