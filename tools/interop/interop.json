@@ -1,0 +1,743 @@
+{
+  "comment": "What tools/interop/interop.mjs needs that is particular to this repo: the mock upstream answer per path (under --base-url http://127.0.0.1:<port>; the client adds /Einheit/EinheitJson/…), how many tools the server lists, and the calls to make with what each must answer. Live answers recorded on 2026-11-19: the filter columns (electricity generation trimmed to the columns the calls use; gas consumption whole) and one wind unit in the Saarland; the mock answers by path, so every unit search gets that one unit.",
+  "answers": {
+    "/Einheit/EinheitJson/GetFilterColumnsErweiterteOeffentlicheEinheitStromerzeugung": [
+      {
+        "FilterName": "Betriebs-Status",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Endgültig stillgelegt",
+            "Value": "38"
+          },
+          {
+            "Name": "In Betrieb",
+            "Value": "35"
+          },
+          {
+            "Name": "In Planung",
+            "Value": "31"
+          },
+          {
+            "Name": "Vorübergehend stillgelegt",
+            "Value": "37"
+          }
+        ]
+      },
+      {
+        "FilterName": "Bruttoleistung der Einheit",
+        "Type": "number",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Bundesland",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Ausschließliche Wirtschaftszone",
+            "Value": "1416"
+          },
+          {
+            "Name": "Baden-Württemberg",
+            "Value": "1402"
+          },
+          {
+            "Name": "Bayern",
+            "Value": "1403"
+          },
+          {
+            "Name": "Berlin",
+            "Value": "1401"
+          },
+          {
+            "Name": "Brandenburg",
+            "Value": "1400"
+          },
+          {
+            "Name": "Bremen",
+            "Value": "1404"
+          },
+          {
+            "Name": "Hamburg",
+            "Value": "1406"
+          },
+          {
+            "Name": "Hessen",
+            "Value": "1405"
+          },
+          {
+            "Name": "Mecklenburg-Vorpommern",
+            "Value": "1407"
+          },
+          {
+            "Name": "Niedersachsen",
+            "Value": "1408"
+          },
+          {
+            "Name": "Nordrhein-Westfalen",
+            "Value": "1409"
+          },
+          {
+            "Name": "Rheinland-Pfalz",
+            "Value": "1410"
+          },
+          {
+            "Name": "Saarland",
+            "Value": "1412"
+          },
+          {
+            "Name": "Sachsen",
+            "Value": "1413"
+          },
+          {
+            "Name": "Sachsen-Anhalt",
+            "Value": "1414"
+          },
+          {
+            "Name": "Schleswig-Holstein",
+            "Value": "1411"
+          },
+          {
+            "Name": "Thüringen",
+            "Value": "1415"
+          }
+        ]
+      },
+      {
+        "FilterName": "Energieträger",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "andere Gase",
+            "Value": "2411"
+          },
+          {
+            "Name": "Biomasse",
+            "Value": "2493"
+          },
+          {
+            "Name": "Braunkohle",
+            "Value": "2408"
+          },
+          {
+            "Name": "Druck aus Gasleitungen",
+            "Value": "2957"
+          },
+          {
+            "Name": "Druck aus Wasserleitungen",
+            "Value": "2958"
+          },
+          {
+            "Name": "Erdgas",
+            "Value": "2410"
+          },
+          {
+            "Name": "Geothermie",
+            "Value": "2403"
+          },
+          {
+            "Name": "Grubengas",
+            "Value": "2406"
+          },
+          {
+            "Name": "Kernenergie",
+            "Value": "2494"
+          },
+          {
+            "Name": "Klärschlamm",
+            "Value": "2405"
+          },
+          {
+            "Name": "Mineralölprodukte",
+            "Value": "2409"
+          },
+          {
+            "Name": "nicht biogener Abfall",
+            "Value": "2412"
+          },
+          {
+            "Name": "Solare Strahlungsenergie",
+            "Value": "2495"
+          },
+          {
+            "Name": "Solarthermie",
+            "Value": "2404"
+          },
+          {
+            "Name": "Speicher",
+            "Value": "2496"
+          },
+          {
+            "Name": "Steinkohle",
+            "Value": "2407"
+          },
+          {
+            "Name": "Wärme",
+            "Value": "2413"
+          },
+          {
+            "Name": "Wasser",
+            "Value": "2498"
+          },
+          {
+            "Name": "Wasserstoff",
+            "Value": "3030"
+          },
+          {
+            "Name": "Wind",
+            "Value": "2497"
+          }
+        ]
+      },
+      {
+        "FilterName": "Inbetriebnahmedatum der Einheit",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. der Einheit",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Name des Anlagenbetreibers (nur Org.)",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Ort",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Postleitzahl",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Wind an Land oder auf See",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Windenergie an Land",
+            "Value": "888"
+          },
+          {
+            "Name": "Windenergie auf See",
+            "Value": "889"
+          }
+        ]
+      }
+    ],
+    "/Einheit/EinheitJson/GetFilterColumnsErweiterteOeffentlicheEinheitGasverbrauch": [
+      {
+        "FilterName": "Anzeige-Name der Einheit",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Betriebs-Status",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Endgültig stillgelegt",
+            "Value": "38"
+          },
+          {
+            "Name": "In Betrieb",
+            "Value": "35"
+          },
+          {
+            "Name": "In Planung",
+            "Value": "31"
+          },
+          {
+            "Name": "Vorübergehend stillgelegt",
+            "Value": "37"
+          }
+        ]
+      },
+      {
+        "FilterName": "Bundesland",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Ausschließliche Wirtschaftszone",
+            "Value": "1416"
+          },
+          {
+            "Name": "Baden-Württemberg",
+            "Value": "1402"
+          },
+          {
+            "Name": "Bayern",
+            "Value": "1403"
+          },
+          {
+            "Name": "Berlin",
+            "Value": "1401"
+          },
+          {
+            "Name": "Brandenburg",
+            "Value": "1400"
+          },
+          {
+            "Name": "Bremen",
+            "Value": "1404"
+          },
+          {
+            "Name": "Hamburg",
+            "Value": "1406"
+          },
+          {
+            "Name": "Hessen",
+            "Value": "1405"
+          },
+          {
+            "Name": "Mecklenburg-Vorpommern",
+            "Value": "1407"
+          },
+          {
+            "Name": "Niedersachsen",
+            "Value": "1408"
+          },
+          {
+            "Name": "Nordrhein-Westfalen",
+            "Value": "1409"
+          },
+          {
+            "Name": "Rheinland-Pfalz",
+            "Value": "1410"
+          },
+          {
+            "Name": "Saarland",
+            "Value": "1412"
+          },
+          {
+            "Name": "Sachsen",
+            "Value": "1413"
+          },
+          {
+            "Name": "Sachsen-Anhalt",
+            "Value": "1414"
+          },
+          {
+            "Name": "Schleswig-Holstein",
+            "Value": "1411"
+          },
+          {
+            "Name": "Thüringen",
+            "Value": "1415"
+          }
+        ]
+      },
+      {
+        "FilterName": "Datum der endgültigen Stilllegung",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Datum der geplanten Inbetriebnahme",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Flurstück",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Gasqualität des Netzes",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "H-Gas",
+            "Value": "767"
+          },
+          {
+            "Name": "L-Gas",
+            "Value": "766"
+          }
+        ]
+      },
+      {
+        "FilterName": "Gasverbrauch dient der Stromerzeugung",
+        "Type": "boolean",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Gemarkung",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Gemeinde",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Gemeindeschlüssel",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Inbetriebnahmedatum der Einheit",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Inbetriebnahmedatum der Einheit am aktuellen Standort",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Koordinate: Breitengrad (WGS84)",
+        "Type": "number",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Koordinate: Längengrad (WGS84)",
+        "Type": "number",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Land",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Belgien",
+            "Value": "66"
+          },
+          {
+            "Name": "Dänemark",
+            "Value": "90"
+          },
+          {
+            "Name": "Deutschland",
+            "Value": "84"
+          },
+          {
+            "Name": "Frankreich",
+            "Value": "106"
+          },
+          {
+            "Name": "Luxemburg",
+            "Value": "169"
+          },
+          {
+            "Name": "Niederlande",
+            "Value": "198"
+          },
+          {
+            "Name": "Österreich",
+            "Value": "206"
+          },
+          {
+            "Name": "Polen",
+            "Value": "215"
+          },
+          {
+            "Name": "Schweiz",
+            "Value": "231"
+          },
+          {
+            "Name": "Tschechische Republik",
+            "Value": "269"
+          }
+        ]
+      },
+      {
+        "FilterName": "Landkreis",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Letzte Aktualisierung",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. der Einheit",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. der Lokation",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. des Anlagenbetreibers",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. des Anschluss-Netzbetreibers",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Maximale Gasbezugsleistung",
+        "Type": "number",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Name des Anlagenbetreibers (nur Org.)",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Name des Anschluss-Netzbetreibers",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Netzbetreiberprüfung",
+        "Type": "multidropdown",
+        "ListObject": [
+          {
+            "Name": "Geprüft",
+            "Value": "2954"
+          },
+          {
+            "Name": "In Prüfung",
+            "Value": "2955"
+          },
+          {
+            "Name": "Nicht vorgesehen",
+            "Value": "3075"
+          }
+        ]
+      },
+      {
+        "FilterName": "Ort",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Postleitzahl",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Registrierungsdatum der Einheit",
+        "Type": "date",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Straße",
+        "Type": "text",
+        "ListObject": []
+      }
+    ],
+    "/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung": {
+      "Data": [
+        {
+          "Id": 1818331,
+          "AnlagenbetreiberId": 2285816,
+          "AnlagenbetreiberPersonenArt": 517,
+          "AnlagenbetreiberMaskedName": "RAG Aktiengesellschaft",
+          "AnlagenbetreiberMaStRNummer": "ABR962113836948",
+          "AnlagenbetreiberName": "RAG Aktiengesellschaft",
+          "BetriebsStatusId": 35,
+          "BetriebsStatusName": "In Betrieb",
+          "Breitengrad": 49.347938,
+          "BundeslandId": 1412,
+          "Bundesland": "Saarland",
+          "DatumLetzteAktualisierung": "/Date(1772635866143)/",
+          "EinheitRegistrierungsdatum": "/Date(1554336000000)/",
+          "EinheitName": "EH-01",
+          "EndgueltigeStilllegungDatum": null,
+          "Flurstueck": "Flur 13, Flurstück 17/2",
+          "Gemarkung": "Wemmetsweiler",
+          "Gemeinde": "Merchweiler",
+          "Gemeindeschluessel": "10043113",
+          "GeplantesInbetriebsnahmeDatum": null,
+          "Hausnummer": null,
+          "InbetriebnahmeDatum": "/Date(1528934400000)/",
+          "InbetriebnahmeDatumAmAktuellenOrt": null,
+          "IsNBPruefungAbgeschlossen": 2954,
+          "Laengengrad": 7.08065,
+          "LandId": 84,
+          "Landkreis": "Neunkirchen",
+          "LokationId": 1957190,
+          "LokationMastrNr": "SEL982926726205",
+          "MaStRNummer": "SEE930070129359",
+          "NetzbetreiberId": "1077778",
+          "NetzbetreiberMaskedNamen": "Creos Deutschland GmbH (SNB940133714842)",
+          "NetzbetreiberMaStRNummer": "<a href=\"/MaStR/Akteur/Marktakteur/Detail/1077778\">SNB940133714842</a>",
+          "NetzbetreiberNamen": "Creos Deutschland GmbH (SNB940133714842)",
+          "NetzbetreiberPersonenArt": "517",
+          "Ort": "Merchweiler",
+          "Plz": "66589",
+          "Strasse": null,
+          "SystemStatusId": 472,
+          "SystemStatusName": "Aktiviert",
+          "Typ": 2,
+          "AktenzeichenGenehmigung": "3.5/bona/I-114261",
+          "AnzahlSolarModule": null,
+          "Batterietechnologie": null,
+          "BiomasseArt": null,
+          "BiomasseArtBezeichnung": null,
+          "Bruttoleistung": 3000,
+          "EegInbetriebnahmeDatum": "/Date(1528934400000)/",
+          "EegInstallierteLeistung": 3000,
+          "EegAnlageMastrNummer": "EEG983935731426",
+          "EegAnlageRegistrierungsdatum": "/Date(1554336000000)/",
+          "EegAnlagenschluessel": "E3391301665890000000000000L11S000",
+          "EegZuschlag": null,
+          "Zuschlagsnummern": "",
+          "EnergietraegerId": 2497,
+          "EnergietraegerName": "Wind",
+          "Genehmigungbehoerde": "Landesamt für Umwelt- und Arbeitsschutz, Saarbrücken",
+          "GenehmigungRegistrierungsdatum": "/Date(1554336000000)/",
+          "GenehmigungsMastrNummer": "SGE916341150000",
+          "Gruppierungsobjekte": "EEG983935731426; SGE916341150000",
+          "GruppierungsobjekteIds": "1812678; 16486",
+          "HatFlexibilitaetspraemie": null,
+          "HauptausrichtungSolarModule": null,
+          "HauptausrichtungSolarModuleBezeichnung": null,
+          "HauptbrennstoffId": null,
+          "HauptbrennstoffNamen": null,
+          "HauptneigungswinkelSolarmodule": null,
+          "HerstellerWindenergieanlage": 1627,
+          "HerstellerWindenergieanlageBezeichnung": "Nordex Energy GmbH",
+          "IsAnonymisiert": false,
+          "IsAnonymisiertNettoleistungZuHoch": false,
+          "IsBuergerenergie": null,
+          "IsEinheitNotstromaggregat": null,
+          "KraftwerkName": null,
+          "KraftwerkBlockName": null,
+          "KwkAnlageElektrischeLeistung": null,
+          "KwkAnlageInbetriebnahmedatum": null,
+          "KwkAnlageMastrNummer": null,
+          "KwkAnlageRegistrierungsdatum": null,
+          "KwkZuschlag": null,
+          "ArtDerSolaranlageId": null,
+          "ArtDerSolaranlageBezeichnung": null,
+          "WindAnLandOderSeeId": 888,
+          "WindAnLandOderSeeBezeichnung": "Windenergie an Land",
+          "Leistungsbegrenzung": null,
+          "MieterstromAngemeldet": null,
+          "MigrationseinheitMastrNummer": null,
+          "NabenhoeheWindenergieanlage": 134,
+          "Nettonennleistung": 3000,
+          "NutzbareSpeicherkapazitaet": null,
+          "NutzungsbereichGebSA": null,
+          "Pilotwindanlage": false,
+          "Prototypanlage": null,
+          "Regelzone": null,
+          "RotordurchmesserWindenergieanlage": 131,
+          "StandortAnonymisiert": "66589 Merchweiler",
+          "Stromspeichertechnologie": null,
+          "StromspeichertechnologieBezeichnung": null,
+          "SpannungsebenenId": null,
+          "SpannungsebenenNamen": "Mittelspannung",
+          "SpeicherEinheitMastrNummer": null,
+          "TechnologieStromerzeugungId": 691,
+          "TechnologieStromerzeugung": "Horizontalläufer",
+          "ThermischeNutzleistung": null,
+          "Typenbezeichnung": "N131/3000",
+          "VollTeilEinspeisung": 688,
+          "VollTeilEinspeisungBezeichnung": "Volleinspeisung",
+          "WasserkraftErtuechtigung": false,
+          "WindClusterOstseeId": null,
+          "WindClusterNordseeId": null,
+          "WindparkName": "Windpark Erkershöhe",
+          "SolarparkName": null,
+          "HauptneigungswinkelSolarmoduleBezeichnung": null,
+          "NutzungsbereichGebSABezeichnung": null,
+          "VorherigeNutzungsartDerFlaecheBezeichnung": null,
+          "VorherigerNutzungsartenBereichDerFlaecheBezeichnung": null,
+          "ZusaetzlicheFlaechenMerkmaleBezeichnung": null,
+          "InAnspruchgenommeneFlaeche": null,
+          "LichteHoehe": null
+        }
+      ],
+      "Total": 1,
+      "AggregateResults": null,
+      "Errors": null
+    },
+    "/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitGasverbrauch": {
+      "Data": [],
+      "Total": 0,
+      "AggregateResults": null,
+      "Errors": null
+    }
+  },
+  "tools": 4,
+  "calls": [
+    {
+      "name": "countUnits",
+      "arguments": {
+        "energySource": "Wind",
+        "state": "Saarland"
+      },
+      "expect": {
+        "status": "ok",
+        "total": 1,
+        "searched.filter": "Energieträger~eq~'2497'~and~Bundesland~eq~'1412'~and~Betriebs-Status~eq~'35'"
+      }
+    },
+    {
+      "name": "searchUnits",
+      "arguments": {
+        "energySource": "Wind",
+        "sortBy": "capacity"
+      },
+      "expect": {
+        "status": "ok",
+        "units.0.mastrNumber": "SEE930070129359",
+        "units.0.grossKw": 3000,
+        "units.0.commissioned": "2018-06-14"
+      }
+    },
+    {
+      "name": "getUnit",
+      "arguments": {
+        "mastrNumber": "SEE930070129359"
+      },
+      "expect": {
+        "status": "ok",
+        "record.NetzbetreiberMaStRNummer": "SNB940133714842",
+        "unit.place": "Merchweiler"
+      }
+    },
+    {
+      "name": "getUnit",
+      "arguments": {
+        "mastrNumber": "GVE111111111111"
+      },
+      "expect": {
+        "status": "empty"
+      }
+    },
+    {
+      "name": "findFilterCodes",
+      "arguments": {
+        "column": "Bundesland",
+        "value": "Saar"
+      },
+      "expect": {
+        "status": "ok",
+        "columns.0.codes.0.code": "1412"
+      }
+    },
+    {
+      "name": "countUnits",
+      "arguments": {
+        "state": "Sachs"
+      },
+      "expect": {
+        "status": "ambiguous"
+      }
+    },
+    {
+      "name": "searchUnits",
+      "arguments": {
+        "limit": 500
+      },
+      "error": true
+    }
+  ]
+}
