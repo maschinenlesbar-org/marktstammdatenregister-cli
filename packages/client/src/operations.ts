@@ -732,10 +732,22 @@ function shown(value: unknown): string | undefined {
   return typeof value === "string" && value !== "" ? value.replace(/＆/g, "&") : undefined;
 }
 
-/** The text of a lone HTML link (the grid operator's number comes as `<a href=…>SNB…</a>`), else the text. */
+/**
+ * The texts of a value that is nothing but HTML links, joined with ", " (the grid operator's
+ * number comes as `<a href=…>SNB…</a>`, one link per grid operator: a large plant has several),
+ * else the value as it is. One pass with a sticky pattern, so text that opens links and never
+ * closes them costs a scan, not one per character.
+ */
 function withoutHtml(value: string): string {
-  const link = /^\s*<a\b[^>]*>([^<]*)<\/a>\s*$/i.exec(value);
-  return link === null ? value : link[1]!.trim();
+  if (!/^\s*<a\b/i.test(value)) return value;
+  const link = /\s*(?:,\s*)?<a\b[^>]*>([^<]*)<\/a>/iy;
+  const texts: string[] = [];
+  let end = 0;
+  for (let match = link.exec(value); match !== null; match = link.exec(value)) {
+    texts.push(match[1]!.trim());
+    end = link.lastIndex;
+  }
+  return texts.length > 0 && /^\s*$/.test(value.slice(end)) ? texts.join(", ") : value;
 }
 
 /** The fields a list shows, read from a row of `category`. */

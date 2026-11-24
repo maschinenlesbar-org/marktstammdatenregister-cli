@@ -73,8 +73,10 @@ mastr stromerzeugung --filter "MaStR-Nr. der Einheit~eq~'SEE984033548619'" --iso
   confidential data are not published), not a bug. Don't try to de-anonymise.
 - **Coordinates may be null** — handle before mapping.
 - **`NetzbetreiberMaStRNummer` is an HTML link**, not a bare number, on the rows seen
-  (solar, onshore and offshore wind alike). Strip the tags (`gsub("<[^>]*>"; "")`) or take
-  the number from the parentheses in `NetzbetreiberNamen`; never paste the raw HTML.
+  (solar, onshore and offshore wind alike), one link per grid operator: a large plant
+  connected to several has several links (Datteln 4: two SNB numbers). Strip the tags
+  (`gsub("<[^>]*>"; "")`) and give each number, or take the numbers from the parentheses in
+  `NetzbetreiberNamen`; never paste the raw HTML.
 - **Company names use a full-width ampersand `＆`** (U+FF06), e.g.
   `EnBW He Dreiht GmbH ＆ Co. KG` in `AnlagenbetreiberName`. A `--filter` with a plain `&`
   still matches these names (both gave 51 rows for that operator on 2026-09-15), but

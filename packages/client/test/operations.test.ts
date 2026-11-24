@@ -8,7 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient } from "../src/client.js";
 import { MastrValidationError } from "../src/errors.js";
-import { countUnits, findFilterCodes, getUnit, searchUnits } from "../src/operations.js";
+import { countUnits, findFilterCodes, getUnit, readRecord, searchUnits } from "../src/operations.js";
 import { makeMockTransport } from "./helpers.js";
 import { ENERGY, msDate, registerLog, registerOf, sampleRegister, STATE, STATUS, unit } from "./register.js";
 import type { MastrUnit } from "../src/types.js";
@@ -168,6 +168,21 @@ test("getUnit reads a unit by its number: the category from the prefix, ISO date
   assert.equal(answer.record["EndgueltigeStilllegungDatum"], undefined, "empty fields are left out");
   assert.equal(answer.unit.grossKw, 3000);
   assert.match(answer.notes.join(" "), /gross and net capacity in kW/);
+});
+
+test("a unit with several grid operators gets each number without the HTML; other markup passes as text; linear on hostile text", () => {
+  const two = '<a href="/MaStR/Akteur/Marktakteur/Detail/1000010">SNB976890256486</a><a href="/MaStR/Akteur/Marktakteur/Detail/1001715"> SNB942182027607</a>';
+  assert.equal(readRecord({ NetzbetreiberMaStRNummer: two })["NetzbetreiberMaStRNummer"], "SNB976890256486, SNB942182027607");
+  assert.equal(readRecord({ N: ' <a href="/x">SNB1</a>, <A HREF="/y">SNB2</A> ' })["N"], "SNB1, SNB2");
+  assert.equal(readRecord({ N: '<a href="/x">SNB940133714842</a>' })["N"], "SNB940133714842");
+  assert.equal(readRecord({ N: "<b>fett</b>" })["N"], "<b>fett</b>", "only links are taken apart");
+  assert.equal(readRecord({ N: '<a href="/x">SNB1</a> und mehr' })["N"], '<a href="/x">SNB1</a> und mehr', "text besides the links: left as it is");
+  // Text that opens links but never closes them: one pass, not one scan per character.
+  for (const hostile of ["<a ".repeat(100_000), `${'<a href="/x">S</a>'.repeat(20_000)}<a ${" ".repeat(100_000)}`, `<a href="/x">S</a>${" ".repeat(200_000)}x`]) {
+    const started = performance.now();
+    assert.equal(readRecord({ N: hostile })["N"], hostile);
+    assert.ok(performance.now() - started < 500, `took ${performance.now() - started} ms for ${hostile.length} characters`);
+  }
 });
 
 test("getUnit: a home battery by its SSE number, an anonymised PV unit, gas units by GEE/GVE", async () => {
