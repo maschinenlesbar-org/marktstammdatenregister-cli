@@ -749,6 +749,9 @@ async function sumCapacity(client: MastrClient, category: UnitCategory, spec: st
 // ---------------------------------------------------------------------------------------------
 // searchUnits (mastr-search)
 
+/** The last offset a search takes. */
+export const MAX_OFFSET = 1_000_000;
+
 /** The input of {@link searchUnits}. */
 export interface SearchUnitsInput extends UnitFilterInput {
   /** What to sort by (default: the register's order). */
@@ -862,7 +865,7 @@ export async function searchUnits(client: MastrClient, input: SearchUnitsInput =
   const limit = input.limit ?? 20;
   const offset = input.offset ?? 0;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new MastrValidationError(`Invalid limit: expected a whole number from 1 to 100, got ${String(limit)}.`);
-  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1_000_000) throw new MastrValidationError(`Invalid offset: expected a whole number from 0 to 1000000, got ${String(offset)}.`);
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_OFFSET) throw new MastrValidationError(`Invalid offset: expected a whole number from 0 to ${MAX_OFFSET}, got ${String(offset)}.`);
   let sort: string | undefined;
   // order alone gave the register's order without a word: "the smallest units" were any units.
   if (input.sortBy === undefined && input.order !== undefined) {
@@ -899,7 +902,11 @@ export async function searchUnits(client: MastrClient, input: SearchUnitsInput =
     units,
     notes,
   };
-  if (next < first.total) answer.nextOffset = next;
+  if (next < first.total && next <= MAX_OFFSET) answer.nextOffset = next;
+  else if (next < first.total) {
+    // A nextOffset past the last offset a search takes would be refused when followed.
+    notes.push(`${first.total} units match; a search reaches the first ${MAX_OFFSET} of them. For the rest, narrow the filter (a Land, a year, a capacity range) or sort the other way.`);
+  }
   if (first.total === 0) answer.reason = emptyReason(searched);
   else if (units.length === 0) answer.reason = `${first.total} units match; offset ${offset} is past the last of them.`;
   return answer;

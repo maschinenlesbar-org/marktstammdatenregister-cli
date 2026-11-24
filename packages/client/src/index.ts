@@ -70,6 +70,7 @@ export {
   findFilterCodes,
   getUnit,
   MAX_GROUPS,
+  MAX_OFFSET,
   readRecord,
   searchUnits,
   SUM_PAGE_SIZE,

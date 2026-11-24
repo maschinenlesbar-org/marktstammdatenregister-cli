@@ -218,6 +218,30 @@ test("searchUnits: order without sortBy is refused, not the register's order wit
   assert.equal(smallest.status === "ok" && smallest.searched.sort, "Bruttoleistung-asc");
 });
 
+test("searchUnits: no nextOffset past the last offset a search takes (1000000), and a note how to reach the rest", async () => {
+  const live = registerOf(sampleRegister());
+  const client = new MastrClient({
+    transport: makeMockTransport((req) => {
+      const url = new URL(req.url);
+      if (url.pathname.includes("/GetFilterColumns")) return live(req);
+      const size = Number(url.searchParams.get("pageSize"));
+      const page = Number(url.searchParams.get("page"));
+      return jsonResponse({ Data: Array.from({ length: size }, (_, i) => ({ MaStRNummer: `SEE${String((page - 1) * size + i).padStart(12, "0")}` })), Total: 6_500_000, Errors: null });
+    }).transport,
+  });
+  const near = await searchUnits(client, { offset: 999_960, limit: 20 });
+  assert.equal(near.status === "ok" && near.nextOffset, 999_980);
+  const edge = await searchUnits(client, { offset: 999_980, limit: 20 });
+  assert.equal(edge.status === "ok" && edge.nextOffset, 1_000_000, "1000000 itself can still be asked for");
+  const last = await searchUnits(client, { offset: 999_990, limit: 20 });
+  assert.equal(last.status, "ok");
+  if (last.status !== "ok") return;
+  assert.equal(last.units.length, 20);
+  assert.equal(last.units[0]?.mastrNumber, "SEE000000999990");
+  assert.equal(last.nextOffset, undefined);
+  assert.match(last.notes.join(" "), /6500000 units match; a search reaches the first 1000000 of them.*narrow the filter.*sort the other way/);
+});
+
 test("searchUnits: an offset off the page grid reads two pages and gives exactly the slice", async () => {
   const rows = Array.from({ length: 30 }, (_, i) => unit("stromerzeugung", { EinheitName: `PV ${String(i).padStart(2, "0")}`, Bruttoleistung: 100 - i }, "pv"));
   const { client, log } = clientOn(rows);
