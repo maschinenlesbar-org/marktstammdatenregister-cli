@@ -962,7 +962,15 @@ export function readRecord(row: MastrUnit): Record<string, unknown> {
 function recordNotes(row: MastrUnit, category: UnitCategory): string[] {
   const notes: string[] = [];
   if (category === "stromerzeugung") notes.push("Bruttoleistung and Nettonennleistung are gross and net capacity in kW (divide by 1000 for MW); say which one you give.");
-  if (category === "gaserzeugung") notes.push("Gas storage: MaxEinspeicherleistung/MaxAusspeicherleistung in kWh/h, MaxArbeitsvolumen in kWh; Erzeugungsleistung has no unit stated in the register.");
+  if (category === "gaserzeugung") {
+    // Gas generation is biogas plants and storage alike: the storage figures only where a unit has them.
+    const storage = ["MaxEinspeicherleistung", "MaxAusspeicherleistung", "MaxArbeitsvolumen"].some((key) => typeof row[key] === "number");
+    notes.push(
+      storage
+        ? "Gas storage: MaxEinspeicherleistung/MaxAusspeicherleistung in kWh/h, MaxArbeitsvolumen in kWh; Erzeugungsleistung has no unit stated in the register."
+        : "Erzeugungsleistung has no unit stated in the register.",
+    );
+  }
   if (category === "gasverbrauch") notes.push("MaximaleGasbezugsLeistung has no unit stated in the register; don't call it kW.");
   if (category === "stromverbrauch") notes.push("Electricity consumption units carry no capacity in the register.");
   const operator = typeof row.AnlagenbetreiberName === "string" ? row.AnlagenbetreiberName : "";

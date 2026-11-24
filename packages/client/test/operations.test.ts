@@ -283,6 +283,15 @@ test("getUnit: a missing location is said withheld by law only for a natural per
   assert.doesNotMatch(notes, /by law|only for larger units/);
 });
 
+test("getUnit: the gas storage note only for a unit with storage figures", async () => {
+  const { client } = clientOn([unit("gaserzeugung", { MaStRNummer: "GEE900000000001" }), unit("gaserzeugung", { MaStRNummer: "GEE900000000002", ArtDesGasspeichers: "Kavernenspeicher", MaxArbeitsvolumen: 1_000_000, MaxEinspeicherleistung: 50_000 })]);
+  const biogas = await getUnit(client, { mastrNumber: "GEE900000000001" });
+  assert.doesNotMatch(biogas.status === "ok" ? biogas.notes.join(" ") : "", /storage|MaxEinspeicherleistung/i);
+  assert.match(biogas.status === "ok" ? biogas.notes.join(" ") : "", /Erzeugungsleistung has no unit stated/);
+  const storage = await getUnit(client, { mastrNumber: "GEE900000000002" });
+  assert.match(storage.status === "ok" ? storage.notes.join(" ") : "", /Gas storage: MaxEinspeicherleistung\/MaxAusspeicherleistung in kWh\/h, MaxArbeitsvolumen in kWh/);
+});
+
 test("getUnit: no match is empty naming the number; an installation of several units is ambiguous; other numbers say how to search", async () => {
   const { client, log } = clientOn([unit("stromerzeugung", { EegAnlageMastrNummer: "EEG900000000001" }), unit("stromerzeugung", { EegAnlageMastrNummer: "EEG900000000001" })]);
   const none = await getUnit(client, { mastrNumber: "SEE111111111111" });
