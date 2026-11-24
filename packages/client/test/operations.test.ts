@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { MastrClient } from "../src/client.js";
 import { MastrValidationError } from "../src/errors.js";
 import { countUnits, findFilterCodes, getUnit, readRecord, searchUnits } from "../src/operations.js";
-import { makeMockTransport } from "./helpers.js";
+import { jsonResponse, makeMockTransport } from "./helpers.js";
 import { ENERGY, msDate, registerLog, registerOf, sampleRegister, STATE, STATUS, unit } from "./register.js";
 import type { MastrUnit } from "../src/types.js";
 
@@ -139,6 +139,26 @@ test("sumCapacity sums gross and net kW here, and only for a set small enough to
   assert.equal(log.unitRequests().length - before, 1, "only the count, no page read");
   const consumption = await countUnits(client, { category: "stromverbrauch", status: "any", sumCapacity: true });
   assert.match(consumption.status === "ok" && !consumption.capacity!.summed ? consumption.capacity!.reason : "", /no capacity/);
+});
+
+test("sumCapacity gives no sum when the pages hold other units than the count: fewer, or one twice", async () => {
+  const register = registerOf(sampleRegister());
+  /** The register, with the rows of each sum page changed by `edit`. */
+  const editing = (edit: (rows: unknown[]) => unknown[]) =>
+    new MastrClient({
+      transport: makeMockTransport((req) => {
+        const res = register(req);
+        if (new URL(req.url).searchParams.get("pageSize") !== "2000") return res;
+        const body = JSON.parse(res.body.toString()) as { Data: unknown[]; Total: number };
+        return jsonResponse({ ...body, Data: edit(body.Data) });
+      }).transport,
+    });
+  const short = await countUnits(editing((rows) => rows.slice(0, 2)), { energySource: "Wind", status: "any", sumCapacity: true });
+  assert.equal(short.status === "ok" && short.total, 6);
+  assert.deepEqual(short.status === "ok" && short.capacity?.summed, false);
+  assert.match(short.status === "ok" && short.capacity?.summed === false ? short.capacity.reason : "", /6 units match, but the register's pages held 2 of them/);
+  const twice = await countUnits(editing((rows) => [rows[0], ...rows.slice(0, -1)]), { energySource: "Wind", status: "any", sumCapacity: true });
+  assert.match(twice.status === "ok" && twice.capacity?.summed === false ? twice.capacity.reason : "", /6 units match, but the register's pages held 5 of them.*Ask again/);
 });
 
 test("an empty count says what was searched and what to change", async () => {

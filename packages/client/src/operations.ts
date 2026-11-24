@@ -667,16 +667,28 @@ async function sumCapacity(client: MastrClient, category: UnitCategory, spec: st
   let net = 0;
   let units = 0;
   let withoutFigure = 0;
+  // Each unit once, by its number: a page that comes back short, or a set that changes while the
+  // pages are read (a unit commissioned or shut down shifts the rest), would sum other units.
+  const seen = new Set<string>();
   const pages = Math.ceil(total / SUM_PAGE_SIZE);
   for (let page = 1; page <= pages && page <= MAX_PAGE; page++) {
     const { data } = await client.units(category, { page, pageSize: SUM_PAGE_SIZE, ...(spec === undefined ? {} : { filter: spec }) });
     for (const row of data) {
+      const number = typeof row.MaStRNummer === "string" ? row.MaStRNummer : `row ${seen.size}`;
+      if (seen.has(number)) continue;
+      seen.add(number);
       units++;
       const value = row[capacity.field];
       if (typeof value === "number" && Number.isFinite(value)) gross += value;
       else withoutFigure++;
       if (typeof row.Nettonennleistung === "number" && Number.isFinite(row.Nettonennleistung)) net += row.Nettonennleistung;
     }
+  }
+  if (units !== total) {
+    return {
+      summed: false,
+      reason: `${total} units match, but the register's pages held ${units} of them (a page came back short, or the set changed while it was read): no sum, never a part of one. Ask again, or narrow the filter.`,
+    };
   }
   const round = (n: number): number => Math.round(n * 1000) / 1000;
   return category === "stromerzeugung"
