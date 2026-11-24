@@ -753,7 +753,7 @@ async function sumCapacity(client: MastrClient, category: UnitCategory, spec: st
 export interface SearchUnitsInput extends UnitFilterInput {
   /** What to sort by (default: the register's order). */
   sortBy?: UnitSort | undefined;
-  /** `desc` (default: largest, newest first) or `asc`. */
+  /** `desc` (default: largest, newest first) or `asc`; only with `sortBy`. */
   order?: "asc" | "desc" | undefined;
   /** Where the page starts (default 0). */
   offset?: number | undefined;
@@ -864,6 +864,10 @@ export async function searchUnits(client: MastrClient, input: SearchUnitsInput =
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new MastrValidationError(`Invalid limit: expected a whole number from 1 to 100, got ${String(limit)}.`);
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1_000_000) throw new MastrValidationError(`Invalid offset: expected a whole number from 0 to 1000000, got ${String(offset)}.`);
   let sort: string | undefined;
+  // order alone gave the register's order without a word: "the smallest units" were any units.
+  if (input.sortBy === undefined && input.order !== undefined) {
+    throw new MastrValidationError(`Invalid order: order needs sortBy, which it orders (the ${category} units sort by ${Object.keys(SORT_KEYS[category]).join(", ")}); without sortBy the units come in the register's order.`);
+  }
   if (input.sortBy !== undefined) {
     const key = SORT_KEYS[category][input.sortBy];
     if (key === undefined) {

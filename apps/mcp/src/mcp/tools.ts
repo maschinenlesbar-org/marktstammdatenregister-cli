@@ -185,7 +185,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     inputSchema: input({
       ...FILTERS,
       sortBy: { type: "string", enum: [...UNIT_SORTS], description: "capacity (gross), netCapacity, commissioned, registered or updated (default: the register's order)." },
-      order: { type: "string", enum: ["desc", "asc"], description: "desc (default: largest, newest first) or asc." },
+      order: { type: "string", enum: ["desc", "asc"], description: "desc (default: largest, newest first) or asc; only with sortBy." },
       offset: { type: "integer", minimum: 0, maximum: 1_000_000, description: "Where the page starts (default 0); nextOffset says where the next one does." },
       limit: { type: "integer", minimum: 1, maximum: 100, description: "How many units (1-100, default 20)." },
     }),

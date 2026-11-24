@@ -210,6 +210,14 @@ test("searchUnits: sorted by the category's capacity key, read rows, ISO days, '
   await assert.rejects(searchUnits(client, { category: "stromverbrauch", sortBy: "capacity" }), /can't be sorted by capacity/);
 });
 
+test("searchUnits: order without sortBy is refused, not the register's order without a word", async () => {
+  const { client, log } = clientOn();
+  await assert.rejects(searchUnits(client, { order: "asc" }), (err: unknown) => err instanceof MastrValidationError && /order needs sortBy.*capacity, netCapacity, commissioned, registered, updated/.test(err.message));
+  assert.equal(log.unitRequests().length, 0);
+  const smallest = await searchUnits(client, { sortBy: "capacity", order: "asc", limit: 1 });
+  assert.equal(smallest.status === "ok" && smallest.searched.sort, "Bruttoleistung-asc");
+});
+
 test("searchUnits: an offset off the page grid reads two pages and gives exactly the slice", async () => {
   const rows = Array.from({ length: 30 }, (_, i) => unit("stromerzeugung", { EinheitName: `PV ${String(i).padStart(2, "0")}`, Bruttoleistung: 100 - i }, "pv"));
   const { client, log } = clientOn(rows);
