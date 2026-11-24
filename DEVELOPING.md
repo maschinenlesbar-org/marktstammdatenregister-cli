@@ -412,6 +412,7 @@ seconds, ms under 1 s). Tests: `apps/cli/test/retry-log.test.ts`.
 | `src/mcp/limiter.ts` | One per process around the upstream transport: 2 in flight, 120 a minute, pause on 429, a bounded queue. |
 | `src/mcp/http.ts` | node:http adapter for the SDK's `createMcpHandler`: POST /mcp, /healthz, Host and Origin checks (the SDK does neither), 1 MiB body, 8 requests at once, timeouts. |
 | `src/mcp/config.ts`, `run.ts`, `index.ts` | Options (`node:util` parseArgs), argv -> exit code, the bin (console into log records, SIGINT/SIGTERM, stdin's end). |
+| `src/mcp/credentials.ts`, `auth.ts` | The credentials hook (api.ts's `findCredentials`; this API needs none) and the secrets redacted from results and records; the HTTP bearer token of `--auth-token-file`. |
 
 The protocol is the SDK's: `@modelcontextprotocol/server` 2.4.0, bundled with its core and zod
 (prepack). It serves the 2026-07-28 revision and the 2025 handshake (2025-11-25, 2025-06-18)
@@ -437,22 +438,24 @@ the same in every repository with an MCP server: a fix lands there first and com
 `npm run sync-kit -- ../marktstammdatenregister-cli` (run in create-cli-template; `--check` lists
 the drift).
 
-Tests (`apps/mcp/test`) run in-process over the SDK's InMemoryTransport with raw JSON-RPC (the
-kit's `harness.ts`). The rules every server follows are the shared conformance tests
-`conformance-m1-…` to `conformance-m10-…` (protocol and tool rules, HTTP, Host and Origin,
-stdio with the built bin, config, limiter, result shaping, drain, call errors, MCP.md), each with
-an adapter block naming this repo's calls and mock answers; `tools.test.ts` holds this server's
-own (the four tools, the traps). The mock register is the client's `test/register.ts`
+Tests (`apps/mcp/test`) run in-process over the SDK's InMemoryTransport with raw JSON-RPC (the kit's
+`harness.ts`). The rules every server follows are the shared conformance tests `conformance-m1-…` to
+`conformance-m12-…` (protocol and tool rules, HTTP, Host and Origin, stdio with the built bin,
+config, limiter, result shaping, drain, call errors, MCP.md, credentials, the HTTP bearer token of
+`--auth-token-file`: `auth.ts`, required where `api.ts` exports `HTTP_NEEDS_AUTH_TOKEN = true`, for
+an API called with a personal account), each with an adapter block naming this repo's calls and mock
+answers (this API needs no credentials, so the credentials tests are skipped); `tools.test.ts` holds
+this server's own (the four tools, the traps). The mock register is the client's `test/register.ts`
 (`registerOf`, `sampleRegister`, `unit`): the live filter columns of the four categories
-(`test/live-register.ts`, recorded 2026-11-19, the two longest dropdowns cut to 25 codes) and
-rows built from one live row per kind (a wind unit in the Saarland, a natural person's PV unit, a
-home battery, a consumer, a biogas plant, a CHP plant), filtered the way the register filters
-(split on `~`, dropdowns by code, `gt`/`lt` strict, dates by day, `eq` on text the whole text),
-sorted and paged, so a use case that sends the wrong condition gets the wrong rows. The stdio
-tests start the built bin (30 s each). `tools/interop/` checks the built server against the
-official client 2.4.0 (stdio and HTTP; legacy, auto and pinned 2026-07-28) in ci.yml's `interop`
-job; it has its own lockfile and is never installed by the workspace, release or publish runs;
-the calls it makes and the mock's answers (recorded live) are in `tools/interop/interop.json`.
+(`test/live-register.ts`, recorded 2026-11-19, the two longest dropdowns cut to 25 codes) and rows
+built from one live row per kind (a wind unit in the Saarland, a natural person's PV unit, a home
+battery, a consumer, a biogas plant, a CHP plant), filtered the way the register filters (split on
+`~`, dropdowns by code, `gt`/`lt` strict, dates by day, `eq` on text the whole text), sorted and
+paged, so a use case that sends the wrong condition gets the wrong rows. The stdio tests start the
+built bin (30 s each). `tools/interop/` checks the built server against the official client 2.4.0
+(stdio and HTTP; legacy, auto and pinned 2026-07-28) in ci.yml's `interop` job; it has its own
+lockfile and is never installed by the workspace, release or publish runs; the calls it makes and
+the mock's answers (recorded live) are in `tools/interop/interop.json`.
 
 ## Container image
 
