@@ -155,7 +155,7 @@ parseMsDate(String(solar.data[0]?.EinheitRegistrierungsdatum)); // Date | null
 ```
 
 The client checks a filter's FilterNames and dropdown codes against the category's columns
-(`filterColumns()`, fetched once per client and category) and throws `MastrValidationError`
+(`filterColumns()`, fetched once per client and category and kept for an hour, `FILTER_COLUMNS_MAX_AGE_MS`) and throws `MastrValidationError`
 for one the register would ignore; `new MastrClient({ allowUnknownFilters: true })` skips that
 check and its request. A query key it doesn't know (`filtr`) is refused the same way.
 

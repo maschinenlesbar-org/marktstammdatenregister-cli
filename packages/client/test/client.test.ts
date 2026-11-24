@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MastrClient, formatMastrDate, parseMsDate, isoifyDates } from "../src/client.js";
+import { FILTER_COLUMNS_MAX_AGE_MS, MastrClient, formatMastrDate, parseMsDate, isoifyDates } from "../src/client.js";
 import { MastrApiError, MastrParseError, MastrValidationError } from "../src/errors.js";
 import { makeMockTransport, jsonResponse, queryOf, registerResponder } from "./helpers.js";
 import * as fx from "./fixtures.js";
@@ -246,6 +246,24 @@ test("filterColumns() throws on an Errors envelope or a non-array reply instead 
     () => empty.filterColumns("stromerzeugung"),
     (err) => err instanceof MastrParseError && /expected a JSON array of filter columns, got an empty one\.$/.test(err.message),
   );
+});
+
+test("the filter columns are kept for an hour: a code the register adds later is known after that, a clock set back keeps nothing", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+  const mt = makeMockTransport(registerResponder(fx.unitPage));
+  const client = new MastrClient({ transport: mt.transport });
+  const columns = () => mt.calls.filter((r) => new URL(r.url).pathname.includes("/GetFilterColumns")).length;
+  await client.cachedFilterColumns("stromerzeugung");
+  t.mock.timers.setTime(1_000_000 + FILTER_COLUMNS_MAX_AGE_MS);
+  await client.cachedFilterColumns("stromerzeugung");
+  assert.equal(columns(), 1, "kept for the hour");
+  t.mock.timers.setTime(1_000_000 + FILTER_COLUMNS_MAX_AGE_MS + 1);
+  await client.cachedFilterColumns("stromerzeugung");
+  assert.equal(columns(), 2, "asked again after it");
+  t.mock.timers.setTime(500_000);
+  await client.cachedFilterColumns("stromerzeugung");
+  assert.equal(columns(), 3, "a clock set back doesn't stretch the hour");
+  assert.equal(FILTER_COLUMNS_MAX_AGE_MS, 3_600_000);
 });
 
 test("forgetFilterColumns drops the kept columns, so the next use fetches them again", async () => {

@@ -33,6 +33,8 @@ const DEFAULT_PAGE_SIZE = 25;
 export const MAX_PAGE = 1_000_000;
 /** Largest `pageSize` the client (and the CLI's `--page-size`) accepts. */
 export const MAX_PAGE_SIZE = 5000;
+/** How long a client keeps a category's filter columns (`cachedFilterColumns`): an hour. */
+export const FILTER_COLUMNS_MAX_AGE_MS = 3_600_000;
 
 /** The category's endpoint suffix; an unknown category (from plain JS) throws. */
 function categorySuffix(category: UnitCategory): string {
@@ -213,8 +215,8 @@ function shapeError(request: string, expected: string): MastrParseError {
 export class MastrClient {
   private readonly engine: RequestEngine;
   readonly #allowUnknownFilters: boolean;
-  /** Each category's filter columns, fetched once per client for the filter check. */
-  readonly #columns = new Map<UnitCategory, Promise<FilterColumn[]>>();
+  /** Each category's filter columns for the filter check, with when they were asked for. */
+  readonly #columns = new Map<UnitCategory, { at: number; columns: Promise<FilterColumn[]> }>();
 
   constructor(options: MastrClientOptions = {}) {
     const { allowUnknownFilters, ...engineOptions } = optionsObject(options);
@@ -227,19 +229,20 @@ export class MastrClient {
 
   /**
    * The category's filter columns as {@link filterColumns} gives them, fetched on first use and
-   * kept for the client's life (the filter check uses the same list); a failed fetch is not kept.
+   * kept for {@link FILTER_COLUMNS_MAX_AGE_MS} (the filter check uses the same list): a long-running
+   * caller (the MCP server) learns a code the register adds. A failed fetch is not kept, and a clock
+   * set back doesn't stretch the hour.
    */
   cachedFilterColumns(category: UnitCategory): Promise<FilterColumn[]> {
-    let columns = this.#columns.get(category);
-    if (columns === undefined) {
-      const fetched = this.filterColumns(category);
-      columns = fetched;
-      this.#columns.set(category, fetched);
-      fetched.catch(() => {
-        if (this.#columns.get(category) === fetched) this.#columns.delete(category);
-      });
-    }
-    return columns;
+    const kept = this.#columns.get(category);
+    const now = Date.now();
+    if (kept !== undefined && now - kept.at >= 0 && now - kept.at <= FILTER_COLUMNS_MAX_AGE_MS) return kept.columns;
+    const entry = { at: now, columns: this.filterColumns(category) };
+    this.#columns.set(category, entry);
+    entry.columns.catch(() => {
+      if (this.#columns.get(category) === entry) this.#columns.delete(category);
+    });
+    return entry.columns;
   }
 
   /**
