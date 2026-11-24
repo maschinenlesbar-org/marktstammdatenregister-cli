@@ -930,6 +930,8 @@ const NUMBER_KINDS: Record<string, { category: UnitCategory; column: string; fie
 const OTHER_NUMBERS: Record<string, string> = {
   ABR: "an operator (Anlagenbetreiber): search its units with operatorNumber",
   SNB: "a grid operator (Netzbetreiber): search with the raw filter \"MaStR-Nr. des Anschluss-Netzbetreibers~eq~'SNB…'\"",
+  GNB: "a gas grid operator (Netzbetreiber): search category gaserzeugung or gasverbrauch with the raw filter \"MaStR-Nr. des Anschluss-Netzbetreibers~eq~'GNB…'\"",
+  SGE: "a permit (Genehmigung) of electricity generation units: search with the raw filter \"MaStR-Nr. der Genehmigung~eq~'SGE…'\"",
   SEL: "an electricity generation location: search with the raw filter \"MaStR-Nr. der Lokation~eq~'SEL…'\"",
   SVL: "an electricity consumption location: search category stromverbrauch with the raw filter \"MaStR-Nr. der Lokation~eq~'SVL…'\"",
   GEL: "a gas generation location: search category gaserzeugung with the raw filter \"MaStR-Nr. der Lokation~eq~'GEL…'\"",

@@ -346,6 +346,8 @@ test("getUnit: no match is empty naming the number; an installation of several u
   assert.equal(two.status === "ambiguous" && two.candidates.length, 2);
   const requests = log.unitRequests().length;
   await assert.rejects(getUnit(client, { mastrNumber: "ABR949444220202" }), /an operator \(Anlagenbetreiber\): search its units with operatorNumber/);
+  await assert.rejects(getUnit(client, { mastrNumber: "GNB912345678901" }), /a gas grid operator .*category gaserzeugung or gasverbrauch .*MaStR-Nr\. des Anschluss-Netzbetreibers~eq~'GNB…'/);
+  await assert.rejects(getUnit(client, { mastrNumber: "SGE916341150000" }), /a permit \(Genehmigung\).*MaStR-Nr\. der Genehmigung~eq~'SGE…'/);
   await assert.rejects(getUnit(client, { mastrNumber: "SEE123" }), /three letters .* and 12 digits/);
   await assert.rejects(getUnit(client, { mastrNumber: "" }), MastrValidationError);
   assert.equal(log.unitRequests().length, requests, "no request for a number that can't be a unit");
