@@ -76,7 +76,7 @@ export interface EngineOptions {
    * connections (`isTransientNetworkError`), an integer
    * 0..`MAX_RETRIES` (10); defaults to 2. Each waits `retryDelayMs * attempt`, or the
    * response's `Retry-After` when that is longer. A `Retry-After` above
-   * `MAX_RETRY_AFTER_MS` waits that cap (30 s) and then retries.
+   * `MAX_RETRY_AFTER_MS` (30 s) is not retried: the error comes at once and names the wait.
    */
   maxRetries?: number | undefined;
   /**
@@ -148,9 +148,11 @@ function intOption(name: string, value: number | undefined, max: number, fallbac
 }
 
 /**
- * Longest `Retry-After` the engine waits before retrying a 429/503. When the server asks
- * for longer, the engine waits this cap and retries (as most of the *-cli clients do): a
- * hostile or careless value must not stall the CLI, and `maxRetries` still bounds the run.
+ * Longest `Retry-After` the engine waits out before retrying a 429/503. When the server asks
+ * for longer, the engine does not retry and the error comes at once, naming the wait (as most
+ * of the *-cli clients do): retrying sooner would only land inside the window the server asked
+ * to keep free, and a hostile value must not park the client. The MCP server's limiter pauses a
+ * host for at most as long, and a tool call has 45 s by default.
  */
 export const MAX_RETRY_AFTER_MS = 30_000;
 
@@ -841,27 +843,31 @@ export class RequestEngine {
       }
 
       const retryable = status === 429 || status === 503;
-      if (retryable && attempt < this.maxRetries) {
-        // A Retry-After beyond MAX_RETRY_AFTER_MS waits the cap: a hostile value must not
-        // stall the CLI, and maxRetries still bounds the run.
-        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
+      // A Retry-After beyond MAX_RETRY_AFTER_MS is not retried: the error below comes at once and
+      // names the wait (retrying sooner only lands in the window the register asked to keep free).
+      const retryAfter = retryable ? parseRetryAfter(responseHeaders["retry-after"]) : undefined;
+      const tooLong = retryAfter !== undefined && retryAfter > MAX_RETRY_AFTER_MS;
+      if (retryable && attempt < this.maxRetries && !tooLong) {
         attempt += 1;
         // The linear backoff is the floor: a Retry-After can make a wait longer, never
         // shorter. `Retry-After: 0` or a date in the past turned the retries into a
         // zero-delay burst against a register that had just answered 429/503.
         const backoff = this.retryDelayMs * attempt;
-        await this.backOff(
-          attempt,
-          retryAfter === undefined ? backoff : Math.max(Math.min(retryAfter, MAX_RETRY_AFTER_MS), backoff),
-          url,
-          status,
-        );
+        await this.backOff(attempt, retryAfter === undefined ? backoff : Math.max(retryAfter, backoff), url, status);
         continue;
       }
 
       const contentType = String(responseHeaders["content-type"] ?? "");
       if (status < 200 || status >= 300) {
-        throw this.toApiError(url, status, body);
+        throw this.toApiError(
+          url,
+          status,
+          body,
+          tooLong
+            ? `the server asked to retry after ${Math.ceil(retryAfter / 1000)} s (Retry-After), longer than the ` +
+                `${MAX_RETRY_AFTER_MS / 1000} s this client waits, so it was not retried: retrying sooner won't help, try again later`
+            : undefined,
+        );
       }
 
       return { data: body, contentType, status };

@@ -185,13 +185,24 @@ test("a malformed Retry-After falls back to the linear backoff", async () => {
   }
 });
 
-test("a Retry-After above 30 s waits the 30 s cap, then retries", async () => {
-  for (const long of ["31", "99999999999", new Date(Date.now() + 3_600_000).toUTCString()]) {
+test("a Retry-After above 30 s is not retried: one request, no wait, and the error names the wait", async () => {
+  for (const [long, seconds] of [["31", 31], ["99999999999", 99999999999], [new Date(Date.now() + 3_600_000).toUTCString(), 3600]] as const) {
     const r = retryRun(long);
-    await assert.rejects(() => r.e.getJson("/x"), (err) => err instanceof MastrApiError && err.status === 429);
-    assert.deepEqual(r.delays, [30_000, 30_000], long);
-    assert.equal(r.calls(), 3, long);
+    await assert.rejects(
+      () => r.e.getJson("/x"),
+      (err) =>
+        err instanceof MastrApiError &&
+        err.status === 429 &&
+        new RegExp(`the server asked to retry after (${seconds}|${seconds - 1}) s \\(Retry-After\\), longer than the 30 s this client waits, so it was not retried: retrying sooner won't help, try again later`).test(err.message),
+      long,
+    );
+    assert.deepEqual(r.delays, [], long);
+    assert.equal(r.calls(), 1, long);
   }
+  // 30 s itself is still waited out.
+  const at = retryRun("30");
+  await assert.rejects(() => at.e.getJson("/x"), (err) => err instanceof MastrApiError && !/won't help/.test(err.message));
+  assert.deepEqual(at.delays, [30_000, 30_000]);
 });
 
 test("parseRetryAfter reads seconds and IMF-fixdates only", () => {

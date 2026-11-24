@@ -316,8 +316,8 @@ CLI's own. Notable coverage:
 - `conformance-p*.test.ts` — the checks shared across the `*-cli` repos (fix plan
   2026-10-06; only the adapter block at the top is repo-specific): P1/P2 credential
   redaction, P4 base-URL rules (the P19 env-var case is skipped: mastr reads no environment
-  variable), P5 the transport contract, P6 the retry floor (a `Retry-After` above 30 s waits
-  the 30 s cap, then retries), P7 pipes (spawns the built bin), P8/P9/P13
+  variable), P5 the transport contract, P6 the retry floor (a `Retry-After` above 30 s is
+  not retried, the error names the wait), P7 pipes (spawns the built bin), P8/P9/P13
   charset, envelopes and error classes, and **P10 strict filters**, written here first: an
   unknown, misspelled or `__proto__` key or FilterName, arrays and NaN, unnormalised names,
   a repeated `--filter` and a repeated single-value option. Test helpers answer the client's
@@ -388,8 +388,9 @@ seconds, ms under 1 s). Tests: `apps/cli/test/retry-log.test.ts`.
   `maxRetries`, waiting `retryDelayMs * attempt` (200 ms, 400 ms, …) or the `Retry-After`
   (seconds or an IMF-fixdate, `parseRetryAfter`) when that is longer — the backoff is the
   floor, so `Retry-After: 0` or a past date never makes a burst. A `Retry-After` above
-  `MAX_RETRY_AFTER_MS` = 30 s waits the 30 s cap and retries (the choice of most `*-cli`
-  repos; `maxRetries` still bounds the run). `retryDelayMs` is at most 30 000. Only
+  `MAX_RETRY_AFTER_MS` = 30 s is not retried: the `MastrApiError` comes at once and names the
+  wait the server asked for (retrying sooner won't help; the choice of most `*-cli` repos, and
+  the MCP server's limiter pauses a host for at most 30 s too). `retryDelayMs` is at most 30 000. Only
   `http:`/`https:` base URLs.
 - **Scaffold origin:** scaffolded from `entgeltatlas-cli` (GET + query transport); the
   X-API-Key auth machinery was stripped because MaStR's public search needs no auth.
