@@ -324,6 +324,12 @@ export class MastrClient {
     if (data.length > pageSize) {
       throw shapeError(request, `at most ${pageSize} rows (the pageSize), got ${data.length}`);
     }
+    // No rows on a page that Total says holds some: read as "past the end", a caller paging on
+    // would ask for the same page again.
+    const page = query.page ?? DEFAULT_PAGE;
+    if (data.length === 0 && total > (page - 1) * pageSize) {
+      throw shapeError(request, `the rows of page ${page} (Total ${total}, ${pageSize} a page), got none`);
+    }
     return { total, data: data as MastrUnit[] };
   }
 

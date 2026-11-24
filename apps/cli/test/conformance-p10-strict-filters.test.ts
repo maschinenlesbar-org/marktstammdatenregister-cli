@@ -76,7 +76,7 @@ const isDataRequest = (req: HttpRequest): boolean => !new URL(req.url).pathname.
 const respond = (req: HttpRequest): HttpResponse => ({
   status: 200,
   headers: { "content-type": "application/json; charset=utf-8" },
-  body: Buffer.from(JSON.stringify(isDataRequest(req) ? { Data: [], Total: 1456625, Errors: null } : COLUMNS)),
+  body: Buffer.from(JSON.stringify(isDataRequest(req) ? { Data: [{ MaStRNummer: "SEE984033548619" }], Total: 1456625, Errors: null } : COLUMNS)),
 });
 /** CliDeps for this repo. */
 const makeDeps = (io: CliDeps["io"], transport: (req: HttpRequest) => Promise<HttpResponse>): CliDeps => ({

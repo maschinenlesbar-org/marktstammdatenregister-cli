@@ -211,6 +211,17 @@ test("any non-null Errors in a 200 envelope throws MastrApiError with its messag
   );
 });
 
+test("a page with no rows where Total says there are some is a shape error; a page past the end is empty", async () => {
+  const { client } = clientFor({ Data: [], Total: 5, Errors: null });
+  await assert.rejects(
+    () => client.stromerzeugung({ pageSize: 3 }),
+    (err) => err instanceof MastrParseError && /expected the rows of page 1 \(Total 5, 3 a page\), got none\.$/.test(err.message),
+  );
+  await assert.rejects(() => client.stromerzeugung({ page: 2, pageSize: 3 }), MastrParseError, "page 2 holds units 4 and 5");
+  assert.deepEqual(await client.stromerzeugung({ page: 3, pageSize: 3 }), { total: 5, data: [] }, "page 3 is past the last unit");
+  assert.deepEqual(await client.stromerzeugung({ page: 2, pageSize: 5 }), { total: 5, data: [] });
+});
+
 test("Data null with Total 0 is an empty page", async () => {
   const { client } = clientFor({ Data: null, Total: 0, Errors: null });
   assert.deepEqual(await client.stromerzeugung(), { total: 0, data: [] });
