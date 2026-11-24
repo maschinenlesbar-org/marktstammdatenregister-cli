@@ -9,6 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { INSTRUCTIONS, listTools } from "../src/mcp/server.js";
+import { DEADLINE_HINT, SIZE_HINT, TOOLS } from "../src/mcp/tools.js";
 import { connect } from "./harness.js";
 import { mastr, sampleRegister, unit } from "./helpers.js";
 
@@ -21,6 +22,31 @@ test("four tools: counting, searching, one unit, and the columns with their code
 test("the instructions name the column of a breakdown per German Land: Bundesland, not Land (the country)", () => {
   assert.match(INSTRUCTIONS, /by for a breakdown per Bundesland or Energieträger/);
   assert.doesNotMatch(INSTRUCTIONS, /per Land\b/);
+});
+
+test("the deadline's and the size cap's advice fit every tool: each option they name comes with the tools that take it", async () => {
+  const schemas = new Map(TOOLS.map((tool) => [tool.name, Object.keys((tool.inputSchema as { properties: Record<string, unknown> }).properties)]));
+  const options = new Set([...schemas.values()].flat());
+  for (const hint of [DEADLINE_HINT, SIZE_HINT]) {
+    const pairs = [...hint.matchAll(/(\w+(?: or \w+)*) \((\w+(?:, \w+)*)\)/g)];
+    assert.ok(pairs.length >= 2, hint);
+    const named = new Set<string>();
+    for (const [, names, tools] of pairs) {
+      for (const tool of (tools as string).split(", ")) {
+        for (const option of (names as string).split(" or ")) {
+          assert.ok(schemas.get(tool)?.includes(option), `${tool} takes no ${option}: ${hint}`);
+          named.add(option);
+        }
+      }
+    }
+    for (const word of hint.match(/\w+/g) ?? []) assert.ok(!options.has(word) || named.has(word), `${word} named without its tools: ${hint}`);
+  }
+  // getUnit has neither a limit nor a filter: its deadline error says to try again, nothing it can't do.
+  const hanging = { transport: (request: { signal?: AbortSignal }): Promise<never> => new Promise<never>((_, reject) => request.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true })) };
+  const connection = await connect({ transport: hanging, config: { callTimeoutMs: 30 } });
+  const text = (await connection.call("getUnit", { mastrNumber: "SEE900000000001" })).content[0]?.text ?? "";
+  await connection.close();
+  assert.match(text, /took longer than .* and was stopped.*try again shortly/);
 });
 
 test("countUnits: units in operation by name, the status said, with the source and the attribution", async () => {
