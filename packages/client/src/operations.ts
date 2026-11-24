@@ -18,7 +18,7 @@
 // through the transport (the MCP server's limiter), so the functions take no options.
 
 import { formatMastrDate, MAX_PAGE, parseMsDate, type MastrClient } from "./client.js";
-import { cutForMessage, MastrValidationError } from "./errors.js";
+import { cutForMessage, MastrParseError, MastrValidationError } from "./errors.js";
 import { buildFilter, FILTER_OPERATORS, type FilterCondition, type FilterOperator } from "./filter.js";
 import type { FilterColumn, MastrUnit, UnitCategory } from "./types.js";
 import { assertValid, normalizeText, textProblem } from "./validate.js";
@@ -200,6 +200,44 @@ function columnNamed(columns: readonly FilterColumn[], name: string, category: U
 }
 
 /**
+ * The columns the structured filters and getUnit build on, in `category` (each checked live on
+ * 2026-11-19): a list without one of them is an odd answer of the register, not a caller's mistake.
+ */
+function knownColumns(category: UnitCategory): string[] {
+  const capacity = CAPACITY[category];
+  return [
+    COLUMN.status, COLUMN.state, COLUMN.commissioned, COLUMN.registered, COLUMN.place, COLUMN.postcode, COLUMN.district,
+    COLUMN.municipality, COLUMN.operator, COLUMN.operatorNumber, COLUMN.name, COLUMN.unitNumber,
+    ...(category === "stromerzeugung" ? [COLUMN.energySource] : []),
+    ...(capacity === undefined ? [] : [capacity.column]),
+    ...Object.values(NUMBER_KINDS).filter((k) => k.category === category).map((k) => k.column),
+  ].filter((name, i, all) => all.indexOf(name) === i);
+}
+
+/**
+ * The category's filter columns from the client's cache, checked: an empty list (the client
+ * refuses it), one without a column the category has (`knownColumns`), or a dropdown the tools
+ * resolve names against without its codes is the register's odd answer. Then the kept list is
+ * dropped, so the next call asks again, and the error says it is the register's answer: kept, it
+ * failed every later call of the process with errors that blamed the caller's input.
+ */
+async function columnsOf(client: MastrClient, category: UnitCategory): Promise<FilterColumn[]> {
+  const columns = await client.cachedFilterColumns(category);
+  const named = new Map(columns.map((c) => [c.FilterName, c]));
+  const missing = knownColumns(category).filter((name) => !named.has(name)).map((name) => JSON.stringify(name));
+  const dropdowns: string[] = [COLUMN.status, COLUMN.state, ...(category === "stromerzeugung" ? [COLUMN.energySource] : [])];
+  const noCodes = dropdowns.filter((name) => named.has(name) && codesOf(named.get(name)!).length === 0).map((name) => `the codes of ${JSON.stringify(name)}`);
+  if (missing.length > 0 || noCodes.length > 0) {
+    client.forgetFilterColumns(category);
+    throw new MastrParseError(
+      `Unexpected answer: the register's filter columns of ${category} came without ${[...missing, ...noCodes].join(", ")} (which the category has, checked live): ` +
+        "an odd answer, not the input; they are asked for again at the next call.",
+    );
+  }
+  return columns;
+}
+
+/**
  * The codes of a dropdown column for one value a caller wrote: a code, a label (case, umlauts and
  * punctuation aside), a known alias (`aliases`), else the labels that start with it, then those
  * that contain it. One fits: its code. Several: `AmbiguousValue`. None: a validation error listing
@@ -339,7 +377,7 @@ async function buildUnitFilter(client: MastrClient, input: UnitFilterInput, omit
   if (!UNIT_STATUSES.includes(status)) {
     throw new MastrValidationError(`Invalid status: expected one of ${UNIT_STATUSES.join(", ")}, got ${JSON.stringify(cutForMessage(String(status)))}.`);
   }
-  const columns = await client.cachedFilterColumns(category);
+  const columns = await columnsOf(client, category);
   const conditions: FilterCondition[] = [];
   const words: string[] = [];
   const dropdown = (field: string, value: string | undefined, columnName: string, aliases?: Record<string, string>): void => {
@@ -499,7 +537,7 @@ export async function findFilterCodes(client: MastrClient, input: FindFilterCode
   const columnText = input.column === undefined ? undefined : textInput("column", input.column);
   const value = input.value === undefined ? undefined : textInput("value", input.value);
   const searched: Record<string, string> = { category, ...(columnText === undefined ? {} : { column: columnText }), ...(value === undefined ? {} : { value }) };
-  const columns = (await client.cachedFilterColumns(category)).filter((c) => typeof c.FilterName === "string");
+  const columns = (await columnsOf(client, category)).filter((c) => typeof c.FilterName === "string");
   const sortKeys = SORT_KEYS[category] as Record<string, string>;
   const done = (rest: { columns?: FilterColumnInfo[]; codes?: FilterCode[] }): FilterCodesAnswer => ({ status: "ok", searched, ...rest, sortKeys, grammar: FILTER_GRAMMAR });
   if (columnText !== undefined) {
@@ -609,7 +647,7 @@ export async function countUnits(client: MastrClient, input: CountUnitsInput = {
     const category = input.category ?? "stromerzeugung";
     if (input.by !== undefined && UNIT_CATEGORIES.includes(category)) {
       const by = textInput("by", input.by);
-      const columns = await client.cachedFilterColumns(category);
+      const columns = await columnsOf(client, category);
       const wanted = fold(by);
       const dropdowns = columns.filter((c) => c.Type === "multidropdown" && typeof c.FilterName === "string");
       const alias = BY_ALIASES[wanted];
@@ -952,6 +990,8 @@ export async function getUnit(client: MastrClient, input: GetUnitInput): Promise
     );
   }
   const searched = { mastrNumber: number, category: kind.category, kind: kind.kind };
+  // The same columns the client checks the filter against (kept, no request of its own), checked.
+  await columnsOf(client, kind.category);
   const filter = buildFilter([{ name: kind.column, op: "eq", value: number }]);
   const { total, data } = await client.units(kind.category, { filter, pageSize: 10 });
   if (total === 0 || data.length === 0) {

@@ -240,7 +240,26 @@ test("filterColumns() throws on an Errors envelope or a non-array reply instead 
       (err) => err instanceof MastrParseError && /expected a JSON array of filter columns\.$/.test(err.message),
       JSON.stringify(body),
     );
-  }
+  }  // Every category has columns: an empty list is an odd answer, not "no filters".
+  const { client: empty } = clientFor([]);
+  await assert.rejects(
+    () => empty.filterColumns("stromerzeugung"),
+    (err) => err instanceof MastrParseError && /expected a JSON array of filter columns, got an empty one\.$/.test(err.message),
+  );
+});
+
+test("forgetFilterColumns drops the kept columns, so the next use fetches them again", async () => {
+  const mt = makeMockTransport(registerResponder(fx.unitPage));
+  const client = new MastrClient({ transport: mt.transport });
+  const columns = () => mt.calls.filter((r) => new URL(r.url).pathname.includes("/GetFilterColumns")).length;
+  await client.cachedFilterColumns("stromerzeugung");
+  await client.cachedFilterColumns("gasverbrauch");
+  await client.cachedFilterColumns("stromerzeugung");
+  assert.equal(columns(), 2);
+  client.forgetFilterColumns("stromerzeugung");
+  await client.cachedFilterColumns("stromerzeugung");
+  await client.cachedFilterColumns("gasverbrauch");
+  assert.equal(columns(), 3, "only the category forgotten is fetched again");
 });
 
 test("units() rejects a malformed filter before any request (MastrValidationError)", async () => {

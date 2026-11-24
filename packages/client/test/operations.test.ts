@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MastrClient } from "../src/client.js";
-import { MastrValidationError } from "../src/errors.js";
+import { MastrParseError, MastrValidationError } from "../src/errors.js";
 import { countUnits, findFilterCodes, getUnit, readRecord, searchUnits } from "../src/operations.js";
 import { jsonResponse, makeMockTransport } from "./helpers.js";
 import { ENERGY, msDate, registerLog, registerOf, sampleRegister, STATE, STATUS, unit } from "./register.js";
@@ -290,6 +290,51 @@ test("findFilterCodes: the columns with their operators and sort keys; one colum
   const gas = await findFilterCodes(client, { category: "gasverbrauch", value: "Wind" });
   assert.equal(gas.status, "empty");
   assert.equal(log.requests.filter((r) => r.url.includes("GetFilterColumns")).length, 2, "the columns are fetched once per category and client");
+});
+
+test("an empty or partial filter-columns answer is refused as the register's, not kept, and fetched again at the next call", async () => {
+  const live = registerOf(sampleRegister());
+  /** The register, whose first answer to a columns request is `odd(columns)`. */
+  const oddOnce = (odd: (columns: { FilterName: string }[]) => unknown) => {
+    let first = true;
+    let requests = 0;
+    const client = new MastrClient({
+      transport: makeMockTransport((req) => {
+        const res = live(req);
+        if (!new URL(req.url).pathname.includes("/GetFilterColumns")) return res;
+        requests += 1;
+        if (!first) return res;
+        first = false;
+        return jsonResponse(odd(JSON.parse(res.body.toString()) as { FilterName: string }[]));
+      }).transport,
+    });
+    return { client, requests: () => requests };
+  };
+  const empty = oddOnce(() => []);
+  await assert.rejects(countUnits(empty.client, { energySource: "Wind" }), (err: unknown) => err instanceof MastrParseError && /got an empty one/.test(err.message));
+  assert.equal((await countUnits(empty.client, { energySource: "Wind" })).status, "ok");
+  assert.equal(empty.requests(), 2);
+  // Without Bundesland: the register's answer is blamed, never the caller's state or raw filter.
+  const partial = oddOnce((columns) => columns.filter((c) => c.FilterName !== "Bundesland"));
+  await assert.rejects(
+    countUnits(partial.client, { state: "Bayern" }),
+    (err: unknown) => err instanceof MastrParseError && /the register's filter columns of stromerzeugung came without "Bundesland".*an odd answer, not the input.*asked for again at the next call/.test(err.message),
+  );
+  assert.equal((await countUnits(partial.client, { state: "Bayern" })).status, "ok");
+  const raw = oddOnce((columns) => columns.filter((c) => c.FilterName !== "Bundesland"));
+  await assert.rejects(searchUnits(raw.client, { filter: "Bundesland~eq~'1403'", limit: 1 }), MastrParseError);
+  assert.equal((await searchUnits(raw.client, { filter: "Bundesland~eq~'1403'", limit: 1 })).status, "ok");
+  for (const run of [(c: MastrClient) => findFilterCodes(c, {}), (c: MastrClient) => getUnit(c, { mastrNumber: "SEE900000000001" })]) {
+    const odd = oddOnce((columns) => columns.filter((c) => c.FilterName !== "MaStR-Nr. der Einheit"));
+    await assert.rejects(run(odd.client), MastrParseError);
+    await run(odd.client);
+  }
+  // A dropdown the tools resolve names against, without its codes.
+  const noCodes = oddOnce((columns) => columns.map((c) => (c.FilterName === "Betriebs-Status" ? { ...c, ListObject: [] } : c)));
+  await assert.rejects(countUnits(noCodes.client, {}), /came without the codes of "Betriebs-Status"/);
+  assert.equal((await countUnits(noCodes.client, {})).status, "ok");
+  // A column another category has is still the caller's mistake.
+  await assert.rejects(countUnits(partial.client, { category: "gasverbrauch", energySource: "Wind" }), (err: unknown) => err instanceof MastrValidationError);
 });
 
 test("the commissioning day of a unit is read as the day the register means (UTC midnight), not shifted by a time zone", async () => {

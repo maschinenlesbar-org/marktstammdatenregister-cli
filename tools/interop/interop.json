@@ -1,7 +1,12 @@
 {
-  "comment": "What tools/interop/interop.mjs needs that is particular to this repo: the mock upstream answer per path (under --base-url http://127.0.0.1:<port>; the client adds /Einheit/EinheitJson/…), how many tools the server lists, and the calls to make with what each must answer. Live answers recorded on 2026-11-19: the filter columns (electricity generation trimmed to the columns the calls use; gas consumption whole) and one wind unit in the Saarland; the mock answers by path, so every unit search gets that one unit.",
+  "comment": "What tools/interop/interop.mjs needs that is particular to this repo: the mock upstream answer per path (under --base-url http://127.0.0.1:<port>; the client adds /Einheit/EinheitJson/…), how many tools the server lists, and the calls to make with what each must answer. Live answers recorded on 2026-11-19: the filter columns (electricity generation trimmed to the columns the calls use and the ones the tools require of a category; gas consumption whole) and one wind unit in the Saarland; the mock answers by path, so every unit search gets that one unit.",
   "answers": {
     "/Einheit/EinheitJson/GetFilterColumnsErweiterteOeffentlicheEinheitStromerzeugung": [
+      {
+        "FilterName": "Anzeige-Name der Einheit",
+        "Type": "text",
+        "ListObject": []
+      },
       {
         "FilterName": "Betriebs-Status",
         "Type": "multidropdown",
@@ -190,12 +195,42 @@
         ]
       },
       {
+        "FilterName": "Gemeinde",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
         "FilterName": "Inbetriebnahmedatum der Einheit",
         "Type": "date",
         "ListObject": []
       },
       {
+        "FilterName": "Landkreis",
+        "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. der EEG-Anlage",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
         "FilterName": "MaStR-Nr. der Einheit",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. der KWK-Anlage",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. der Speichereinheit",
+        "Type": "mastrnummer",
+        "ListObject": []
+      },
+      {
+        "FilterName": "MaStR-Nr. des Anlagenbetreibers",
         "Type": "mastrnummer",
         "ListObject": []
       },
@@ -212,6 +247,11 @@
       {
         "FilterName": "Postleitzahl",
         "Type": "text",
+        "ListObject": []
+      },
+      {
+        "FilterName": "Registrierungsdatum der Einheit",
+        "Type": "date",
         "ListObject": []
       },
       {

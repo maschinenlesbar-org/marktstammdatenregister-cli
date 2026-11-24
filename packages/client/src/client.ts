@@ -232,11 +232,24 @@ export class MastrClient {
   cachedFilterColumns(category: UnitCategory): Promise<FilterColumn[]> {
     let columns = this.#columns.get(category);
     if (columns === undefined) {
-      columns = this.filterColumns(category);
-      this.#columns.set(category, columns);
-      columns.catch(() => this.#columns.delete(category));
+      const fetched = this.filterColumns(category);
+      columns = fetched;
+      this.#columns.set(category, fetched);
+      fetched.catch(() => {
+        if (this.#columns.get(category) === fetched) this.#columns.delete(category);
+      });
     }
     return columns;
+  }
+
+  /**
+   * Drop the filter columns kept for `category` (for every category without one): the next use
+   * fetches them again. For a caller that finds the kept list odd (the use cases, when it lacks a
+   * column the category has: see operations.ts).
+   */
+  forgetFilterColumns(category?: UnitCategory): void {
+    if (category === undefined) this.#columns.clear();
+    else this.#columns.delete(category);
   }
 
   /**
@@ -401,8 +414,8 @@ export class MastrClient {
 
   /**
    * The filterable columns (names, types, dropdown codes) for a category. An `Errors`
-   * envelope throws `MastrApiError`, any other non-array reply `MastrParseError` —
-   * never an empty list, which would read as "this category has no filters".
+   * envelope throws `MastrApiError`, any other non-array reply, or an empty one,
+   * `MastrParseError` — never an empty list, which would read as "this category has no filters".
    */
   async filterColumns(category: UnitCategory): Promise<FilterColumn[]> {
     const path = `${SERVICE}/GetFilterColumnsErweiterteOeffentlicheEinheit${categorySuffix(category)}`;
@@ -419,6 +432,9 @@ export class MastrClient {
     if (!Array.isArray(res) || !res.every(isObject)) {
       throw shapeError(`GET ${this.engine.describeUrl(path)}`, "a JSON array of filter columns");
     }
+    // Every category has columns: an empty list would read as "no filters", and the filter check
+    // would refuse every name for as long as it is kept.
+    if (res.length === 0) throw shapeError(`GET ${this.engine.describeUrl(path)}`, "a JSON array of filter columns, got an empty one");
     return res as FilterColumn[];
   }
 }
