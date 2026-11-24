@@ -966,11 +966,15 @@ function recordNotes(row: MastrUnit, category: UnitCategory): string[] {
   if (category === "gasverbrauch") notes.push("MaximaleGasbezugsLeistung has no unit stated in the register; don't call it kW.");
   if (category === "stromverbrauch") notes.push("Electricity consumption units carry no capacity in the register.");
   const operator = typeof row.AnlagenbetreiberName === "string" ? row.AnlagenbetreiberName : "";
-  if (operator.startsWith("natürliche Person") || row["IsAnonymisiert"] === true) {
-    notes.push("The operator is a natural person and anonymised by law; don't try to find out who it is.");
-  }
+  const person = operator.startsWith("natürliche Person") || row["IsAnonymisiert"] === true;
+  if (person) notes.push("The operator is a natural person and anonymised by law; don't try to find out who it is.");
   if (row.Breitengrad === null || row.Breitengrad === undefined) {
-    notes.push("The exact location (street, coordinates) is withheld or missing: the register publishes it only for larger units (by law, not a gap in the data).");
+    // A plant of 1.1 GW (Datteln 4) has no coordinates either: the law explains it only for a person's unit.
+    notes.push(
+      person
+        ? "The exact location (street, coordinates) is withheld: the register doesn't publish it for a natural person's small unit (by law, not a gap in the data)."
+        : "The exact location (street, coordinates) is not in the register's public record for this unit; give the place and postcode, don't guess more.",
+    );
   }
   return notes;
 }

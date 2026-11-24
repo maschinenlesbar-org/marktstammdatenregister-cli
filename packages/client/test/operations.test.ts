@@ -275,6 +275,14 @@ test("getUnit: a home battery by its SSE number, an anonymised PV unit, gas unit
   assert.equal(gas.status === "ok" && gas.record["AnlagenbetreiberName"], "Alterric Biogas GmbH & Co. KG");
 });
 
+test("getUnit: a missing location is said withheld by law only for a natural person's unit", async () => {
+  const { client } = clientOn([unit("stromerzeugung", { MaStRNummer: "SEE913516809497", Breitengrad: null, Laengengrad: null, AnlagenbetreiberName: "Uniper Kraftwerke GmbH", Bruttoleistung: 1_100_000 })]);
+  const large = await getUnit(client, { mastrNumber: "SEE913516809497" });
+  const notes = large.status === "ok" ? large.notes.join(" ") : "";
+  assert.match(notes, /The exact location \(street, coordinates\) is not in the register's public record for this unit/);
+  assert.doesNotMatch(notes, /by law|only for larger units/);
+});
+
 test("getUnit: no match is empty naming the number; an installation of several units is ambiguous; other numbers say how to search", async () => {
   const { client, log } = clientOn([unit("stromerzeugung", { EegAnlageMastrNummer: "EEG900000000001" }), unit("stromerzeugung", { EegAnlageMastrNummer: "EEG900000000001" })]);
   const none = await getUnit(client, { mastrNumber: "SEE111111111111" });
