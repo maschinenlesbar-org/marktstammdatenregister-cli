@@ -59,6 +59,18 @@ test("a label that fits several codes is ambiguous with the candidates, and noth
   assert.equal(log.unitRequests().length, 0);
 });
 
+test("gas and coal name several energy sources: ambiguous with them, never one picked", async () => {
+  const { client, log } = clientOn();
+  const gas = await countUnits(client, { energySource: "gas" });
+  assert.equal(gas.status, "ambiguous");
+  assert.deepEqual(gas.status === "ambiguous" ? (gas.candidates as { label: string }[]).map((c) => c.label) : [], ["andere Gase", "Erdgas", "Grubengas"]);
+  const coal = await countUnits(client, { energySource: "Coal" });
+  assert.deepEqual(coal.status === "ambiguous" ? (coal.candidates as { label: string }[]).map((c) => c.label) : [], ["Braunkohle", "Steinkohle"]);
+  assert.equal(log.unitRequests().length, 0);
+  const natural = await countUnits(client, { energySource: "natural gas, hard coal" });
+  assert.deepEqual(natural.status !== "ambiguous" ? natural.searched.conditions : [], ["Energieträger: Erdgas (2410) or Steinkohle (2407)"]);
+});
+
 test("an unknown label, or a column the category lacks, is a validation error naming what there is", async () => {
   const { client, log } = clientOn();
   await assert.rejects(countUnits(client, { energySource: "Kohlestrom" }), (err: unknown) => err instanceof MastrValidationError && /Solare Strahlungsenergie \(2495\)/.test(err.message));

@@ -122,17 +122,20 @@ const STATE_ALIASES: Record<string, string> = {
   awz: "Ausschließliche Wirtschaftszone", eez: "Ausschließliche Wirtschaftszone", offshore: "Ausschließliche Wirtschaftszone",
 };
 
-/** Energy sources as people write them, folded, to the register's label. */
-const ENERGY_ALIASES: Record<string, string> = {
+/**
+ * Energy sources as people write them, folded, to the register's label, or labels: a word that
+ * means several ("gas", "coal") is ambiguous with them, never one picked.
+ */
+const ENERGY_ALIASES: Record<string, string | string[]> = {
   solar: "Solare Strahlungsenergie", pv: "Solare Strahlungsenergie", photovoltaik: "Solare Strahlungsenergie", photovoltaic: "Solare Strahlungsenergie", photovoltaics: "Solare Strahlungsenergie", sonne: "Solare Strahlungsenergie", solarstrom: "Solare Strahlungsenergie",
   "solar thermal": "Solarthermie",
   windkraft: "Wind", windenergie: "Wind", "wind power": "Wind", "wind energy": "Wind",
   storage: "Speicher", battery: "Speicher", batterie: "Speicher", batteriespeicher: "Speicher", stromspeicher: "Speicher", "battery storage": "Speicher",
   hydro: "Wasser", hydropower: "Wasser", wasserkraft: "Wasser", water: "Wasser",
   biomass: "Biomasse", biogas: "Biomasse",
-  "natural gas": "Erdgas", gas: "Erdgas",
+  "natural gas": "Erdgas", gas: ["Erdgas", "andere Gase", "Grubengas"],
   lignite: "Braunkohle", "brown coal": "Braunkohle",
-  "hard coal": "Steinkohle", coal: "Steinkohle",
+  "hard coal": "Steinkohle", coal: ["Braunkohle", "Steinkohle"],
   nuclear: "Kernenergie", kernkraft: "Kernenergie", atomkraft: "Kernenergie",
   geothermal: "Geothermie",
   oil: "Mineralölprodukte", "mineral oil": "Mineralölprodukte", heizoel: "Mineralölprodukte",
@@ -243,7 +246,7 @@ async function columnsOf(client: MastrClient, category: UnitCategory): Promise<F
  * that contain it. One fits: its code. Several: `AmbiguousValue`. None: a validation error listing
  * the labels.
  */
-function resolveLabel(column: FilterColumn, value: string, field: string, aliases: Record<string, string> = {}): FilterCode {
+function resolveLabel(column: FilterColumn, value: string, field: string, aliases: Record<string, string | string[]> = {}): FilterCode {
   const name = column.FilterName ?? field;
   const codes = codesOf(column);
   const wanted = fold(value);
@@ -251,7 +254,7 @@ function resolveLabel(column: FilterColumn, value: string, field: string, aliase
   if (byCode !== undefined) return codeOf(name, byCode.label, byCode.code);
   const exact = codes.filter((c) => fold(c.label) === wanted);
   const alias = aliases[wanted];
-  const aliased = alias === undefined ? [] : codes.filter((c) => c.label === alias);
+  const aliased = alias === undefined ? [] : codes.filter((c) => (typeof alias === "string" ? c.label === alias : alias.includes(c.label)));
   const starts = codes.filter((c) => fold(c.label).startsWith(wanted));
   const contains = codes.filter((c) => fold(c.label).includes(wanted));
   const found = [exact, aliased, starts, contains].find((list) => list.length > 0) ?? [];
@@ -380,7 +383,7 @@ async function buildUnitFilter(client: MastrClient, input: UnitFilterInput, omit
   const columns = await columnsOf(client, category);
   const conditions: FilterCondition[] = [];
   const words: string[] = [];
-  const dropdown = (field: string, value: string | undefined, columnName: string, aliases?: Record<string, string>): void => {
+  const dropdown = (field: string, value: string | undefined, columnName: string, aliases?: Record<string, string | string[]>): void => {
     if (value === undefined) return;
     const items = listOf(textInput(field, value));
     if (items.length === 0) throw new MastrValidationError(`Invalid ${field}: expected a name or code.`);
