@@ -110,6 +110,18 @@ test("by counts per code of one dropdown, largest first; a filter on that column
   const perStatus = await countUnits(client, { energySource: "Wind", by: "Betriebs-Status" });
   assert.equal(perStatus.status === "ok" && perStatus.total, 6, "per status counts every status");
   assert.match(perStatus.status === "ok" ? perStatus.notes[0]! : "", /per operating status/);
+  // With a status asked, the total and the group count the same units: that status.
+  const planned = await countUnits(client, { energySource: "Wind", by: "Betriebs-Status", status: "planned" });
+  assert.equal(planned.status, "ok");
+  if (planned.status === "ok") {
+    assert.deepEqual(planned.groups, [{ label: "In Planung", code: "31", total: planned.total }]);
+    assert.equal(planned.searched.status, "In Planung (31)");
+    assert.ok(planned.total > 0 && planned.total < 6);
+    assert.doesNotMatch(planned.notes.join(" "), /add up to|every status/);
+    assert.match(planned.notes[0]!, /Only units with status In Planung \(31\)/);
+  }
+  const anyStatus = await countUnits(client, { energySource: "Wind", by: "Betriebs-Status", status: "any" });
+  assert.equal(anyStatus.status === "ok" && anyStatus.total, 6);
   await assert.rejects(countUnits(client, { by: "Hauptbrennstoff" }), /more than the 20 counts one call makes/);
   const fuzzy = await countUnits(client, { by: "Gebiet" });
   assert.equal(fuzzy.status, "ambiguous", "two dropdowns are named Gebiet nach dem Flächenentwicklungsplan");

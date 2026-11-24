@@ -615,7 +615,9 @@ export async function countUnits(client: MastrClient, input: CountUnitsInput = {
       }
       byColumn = found[0]!;
     }
-    built = await buildUnitFilter(client, input, byColumn?.FilterName === COLUMN.status);
+    // A count per status counts every status, unless a status is asked: then the total and the
+    // one group count the same units (the filter's own condition narrows the codes, below).
+    built = await buildUnitFilter(client, input, byColumn?.FilterName === COLUMN.status && input.status === undefined);
   } catch (err) {
     return ambiguousAnswer(err, input.category);
   }
@@ -629,10 +631,7 @@ export async function countUnits(client: MastrClient, input: CountUnitsInput = {
     // A filter on the same column (state "BY, BW" with by Bundesland) narrows the groups to its codes.
     const own = new RegExp(`(?:^|~and~)${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}~eq~'([^']*)'`).exec(spec ?? "");
     const allowed = own === null ? undefined : new Set(listOf(own[1]!));
-    let codes = codesOf(byColumn).filter((c) => allowed === undefined || allowed.has(c.code));
-    if (byColumn.FilterName === COLUMN.status && input.status !== undefined && input.status !== "any") {
-      codes = codes.filter((c) => c.code === STATUS_CODES[input.status as Exclude<UnitStatus, "any">].code);
-    }
+    const codes = codesOf(byColumn).filter((c) => allowed === undefined || allowed.has(c.code));
     if (codes.length > MAX_GROUPS) {
       throw new MastrValidationError(`Invalid by: ${name} has ${codes.length} codes, more than the ${MAX_GROUPS} counts one call makes. Narrow it with a filter on that column, or count single codes.`);
     }
@@ -648,7 +647,7 @@ export async function countUnits(client: MastrClient, input: CountUnitsInput = {
     answer.groups = groups;
     const sum = groups.reduce((n, g) => n + g.total, 0);
     if (sum !== total) notes.push(`The groups add up to ${sum}, the total is ${total}: ${sum < total ? "some units have no value in" : "a unit can have several values of"} ${name}.`);
-    if (byColumn.FilterName === COLUMN.status) notes.splice(0, 1, "Counted per operating status (every status).");
+    if (byColumn.FilterName === COLUMN.status && searched.status.startsWith("any")) notes.splice(0, 1, "Counted per operating status (every status).");
   }
   if (input.sumCapacity === true) answer.capacity = await sumCapacity(client, category, spec, total, input.maxSumUnits ?? 20_000);
   return answer;
