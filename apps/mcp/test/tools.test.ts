@@ -8,7 +8,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listTools } from "../src/mcp/server.js";
+import { INSTRUCTIONS, listTools } from "../src/mcp/server.js";
 import { connect } from "./harness.js";
 import { mastr, sampleRegister, unit } from "./helpers.js";
 
@@ -16,6 +16,11 @@ const BASE = "https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson";
 
 test("four tools: counting, searching, one unit, and the columns with their codes", () => {
   assert.deepEqual(listTools().map((t) => t.name), ["countUnits", "searchUnits", "getUnit", "findFilterCodes"]);
+});
+
+test("the instructions name the column of a breakdown per German Land: Bundesland, not Land (the country)", () => {
+  assert.match(INSTRUCTIONS, /by for a breakdown per Bundesland or Energieträger/);
+  assert.doesNotMatch(INSTRUCTIONS, /per Land\b/);
 });
 
 test("countUnits: units in operation by name, the status said, with the source and the attribution", async () => {

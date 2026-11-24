@@ -66,7 +66,7 @@ For scripts and shared configs, pin a release and its digest from the
 
 | Tool | What it answers |
 |---|---|
-| `countUnits` | How many units match: energy source and Land by name (Wind, Solar, Bayern, NRW), place, postcode, operator, capacity and commissioning bounds; a count per Land or energy source; the capacity summed for a set small enough to read. |
+| `countUnits` | How many units match: energy source and Land by name (Wind, Solar, Bayern, NRW), place, postcode, operator, capacity and commissioning bounds; a count per Bundesland or Energieträger (`by`; `Land` is the country); the capacity summed for a set small enough to read. |
 | `searchUnits` | The matching units a page at a time, sorted by capacity or date: MaStR number, name, status, energy source, gross and net kW, place, commissioning day, operator. |
 | `getUnit` | One unit by its MaStR number (SEE, SSE, SVE, GEE, GVE; EEG and KWK installations), every published field read: ISO dates, the grid operator's number without HTML. |
 | `findFilterCodes` | The register's German column names, their operators and the dropdown codes it needs instead of labels, with the category's sort keys. |

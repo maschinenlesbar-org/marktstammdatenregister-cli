@@ -23,6 +23,7 @@ const SUFFIX: Record<string, UnitCategory> = {
 const FIELD: Record<string, string> = {
   "Betriebs-Status": "BetriebsStatusId",
   Bundesland: "BundeslandId",
+  Land: "LandId",
   "Energieträger": "EnergietraegerId",
   "Inbetriebnahmedatum der Einheit": "InbetriebnahmeDatum",
   "Registrierungsdatum der Einheit": "EinheitRegistrierungsdatum",

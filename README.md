@@ -65,7 +65,7 @@ gh attestation verify oci://ghcr.io/maschinenlesbar-org/marktstammdatenregister-
 From 0.9.0 the register is also an [MCP](https://modelcontextprotocol.io/) server for AI agents,
 `@maschinenlesbar.org/marktstammdatenregister-mcp` (command `mastr-mcp`, image
 `ghcr.io/maschinenlesbar-org/marktstammdatenregister-mcp`): four read-only tools, counting units
-(with a breakdown per Land or energy source and a capacity sum), searching them, one unit by its
+(with a breakdown per Bundesland or energy source and a capacity sum), searching them, one unit by its
 MaStR number, and the column names and codes, with the register's traps handled (units in
 operation unless asked, names to codes, inclusive bounds, no server-side sum, the record read),
 on stdio or Streamable HTTP. Setup for Claude Code, Claude Desktop and VS Code:

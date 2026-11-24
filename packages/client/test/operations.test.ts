@@ -122,6 +122,16 @@ test("by counts per code of one dropdown, largest first; a filter on that column
   }
   const anyStatus = await countUnits(client, { energySource: "Wind", by: "Betriebs-Status", status: "any" });
   assert.equal(anyStatus.status === "ok" && anyStatus.total, 6);
+  // "Land" is the register's country column, not the German Land: counted, and said so.
+  const perCountry = await countUnits(client, { energySource: "Wind", by: "Land" });
+  assert.equal(perCountry.status === "ok" && perCountry.by, "Land");
+  assert.match(perCountry.status === "ok" ? perCountry.notes.join(" ") : "", /Land is the register's country column .*per German Land \(state\): by Bundesland/);
+  assert.doesNotMatch(byState.notes.join(" "), /country column/);
+  // English and plural names of the columns.
+  for (const [by, column] of [["state", "Bundesland"], ["Bundesländer", "Bundesland"], ["energy source", "Energieträger"]] as const) {
+    const answer = await countUnits(client, { energySource: "Wind", state: "BY", by });
+    assert.equal(answer.status === "ok" && answer.by, column, by);
+  }
   await assert.rejects(countUnits(client, { by: "Hauptbrennstoff" }), /more than the 20 counts one call makes/);
   const fuzzy = await countUnits(client, { by: "Gebiet" });
   assert.equal(fuzzy.status, "ambiguous", "two dropdowns are named Gebiet nach dem Flächenentwicklungsplan");

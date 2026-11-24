@@ -545,6 +545,13 @@ export const SUM_PAGE_SIZE = 2000;
 /** The most codes a count `by` a column makes (one request each). */
 export const MAX_GROUPS = 20;
 
+/** Names of the `by` columns as people write them, folded, to the register's FilterName. */
+const BY_ALIASES: Record<string, string> = {
+  state: "Bundesland", states: "Bundesland", "federal state": "Bundesland", "federal states": "Bundesland", laender: "Bundesland", bundeslaender: "Bundesland",
+  "energy source": "Energieträger", "energy sources": "Energieträger", energietraeger: "Energieträger",
+  status: "Betriebs-Status", "operating status": "Betriebs-Status",
+};
+
 /** The input of {@link countUnits}. */
 export interface CountUnitsInput extends UnitFilterInput {
   /** A dropdown column (name or part of it) to count per code: "Bundesland", "Energieträger". */
@@ -605,7 +612,8 @@ export async function countUnits(client: MastrClient, input: CountUnitsInput = {
       const columns = await client.cachedFilterColumns(category);
       const wanted = fold(by);
       const dropdowns = columns.filter((c) => c.Type === "multidropdown" && typeof c.FilterName === "string");
-      const exact = dropdowns.filter((c) => fold(c.FilterName!) === wanted);
+      const alias = BY_ALIASES[wanted];
+      const exact = dropdowns.filter((c) => fold(c.FilterName!) === wanted || c.FilterName === alias);
       const found = exact.length > 0 ? exact : dropdowns.filter((c) => fold(c.FilterName!).includes(wanted));
       if (found.length > 1) {
         return { status: "ambiguous", searched: { category, by }, candidates: found.map((c) => c.FilterName!), reason: `"${by}" is part of ${found.length} dropdown column names: pick one.` };
@@ -648,6 +656,7 @@ export async function countUnits(client: MastrClient, input: CountUnitsInput = {
     const sum = groups.reduce((n, g) => n + g.total, 0);
     if (sum !== total) notes.push(`The groups add up to ${sum}, the total is ${total}: ${sum < total ? "some units have no value in" : "a unit can have several values of"} ${name}.`);
     if (byColumn.FilterName === COLUMN.status && searched.status.startsWith("any")) notes.splice(0, 1, "Counted per operating status (every status).");
+    if (name === "Land") notes.push("Land is the register's country column (Deutschland, Belgien, …); a count per German Land (state): by Bundesland.");
   }
   if (input.sumCapacity === true) answer.capacity = await sumCapacity(client, category, spec, total, input.maxSumUnits ?? 20_000);
   return answer;
