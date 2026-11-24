@@ -1,9 +1,11 @@
 import { test } from "node:test";
+import { AsyncLocalStorage } from "node:async_hooks";
 import assert from "node:assert/strict";
 import { FILTER_COLUMNS_MAX_AGE_MS, MastrClient, formatMastrDate, parseMsDate, isoifyDates } from "../src/client.js";
 import { MastrApiError, MastrParseError, MastrValidationError } from "../src/errors.js";
 import { makeMockTransport, jsonResponse, queryOf, registerResponder } from "./helpers.js";
 import * as fx from "./fixtures.js";
+import type { HttpRequest, HttpResponse } from "../src/http.js";
 
 function clientFor(body: unknown) {
   const mt = makeMockTransport(() => jsonResponse(body));
@@ -400,6 +402,43 @@ test("the filter check suggests close names and writes a name in another case th
   );
   await client.stromerzeugung({ filter: "ORT~eq~'Münster'" });
   assert.equal(queryOf(mt.last()).get("filter"), "Ort~eq~'Münster'");
+});
+
+test("the shared columns lookup: the caller that started it cancelled fails no other waiting for it", async () => {
+  // A transport like the MCP server's limiter: each request carries the signal of the call it runs in.
+  const calls = new AsyncLocalStorage<{ signal: AbortSignal }>();
+  const respond = registerResponder(fx.unitPage);
+  let columnRequests = 0;
+  const transport = (req: HttpRequest): Promise<HttpResponse> => {
+    const signal = calls.getStore()?.signal;
+    if (signal?.aborted) return Promise.reject(new Error("aborted"));
+    if (!new URL(req.url).pathname.includes("/GetFilterColumns")) return Promise.resolve(respond(req));
+    columnRequests += 1;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve(respond(req)), 50);
+      signal?.addEventListener("abort", () => (clearTimeout(timer), reject(new Error("aborted"))), { once: true });
+    });
+  };
+  const client = new MastrClient({ transport, maxRetries: 0 });
+  const first = new AbortController();
+  const a = calls.run({ signal: first.signal }, () => client.count("stromerzeugung", { filter: "Ort~eq~'a'" }));
+  const b = calls.run({ signal: new AbortController().signal }, () => client.count("stromerzeugung", { filter: "Ort~eq~'b'" }));
+  setTimeout(() => first.abort(), 10);
+  const [ra, rb] = await Promise.allSettled([a, b]);
+  assert.equal(rb.status, "fulfilled", rb.status === "rejected" ? String(rb.reason) : "");
+  assert.equal(ra.status, "rejected", "the cancelled call's own lookup is aborted with it");
+  assert.equal(columnRequests, 2, "the waiting call asked once more, on its own");
+  // A lone caller's lookup carries its signal: cancelled, nothing is left running.
+  const alone = new AbortController();
+  const lone = new MastrClient({ transport, maxRetries: 0 });
+  const c = calls.run({ signal: alone.signal }, () => lone.count("gasverbrauch", { filter: "Ort~eq~'c'" }));
+  setTimeout(() => alone.abort(), 10);
+  await assert.rejects(c);
+  assert.equal(columnRequests, 3);
+  // Shared while it is fine: two callers, one request.
+  const both = new MastrClient({ transport, maxRetries: 0 });
+  await Promise.all([1, 2].map(() => calls.run({ signal: new AbortController().signal }, () => both.count("stromerzeugung", { filter: "Ort~eq~'d'" }))));
+  assert.equal(columnRequests, 4);
 });
 
 test("the filter columns are fetched once per client and category; a failed fetch is retried next time", async () => {

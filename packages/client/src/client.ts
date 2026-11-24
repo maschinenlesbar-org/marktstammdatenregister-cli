@@ -11,7 +11,7 @@
 //   page.total; // total solar units
 
 import { RequestEngine, describeMastrErrors, optionsObject, type EngineOptions } from "./engine.js";
-import { MastrApiError, MastrParseError, MastrValidationError, cutForMessage } from "./errors.js";
+import { MastrApiError, MastrNetworkError, MastrParseError, MastrValidationError, cutForMessage } from "./errors.js";
 import { normalizeFilter, resolveFilter, validateFilter } from "./filter.js";
 import { COUNT_IGNORED_KEYS, assertValid, countQueryProblem, normalizeToken, sortProblem } from "./validate.js";
 import type { QueryParams } from "./query.js";
@@ -232,11 +232,28 @@ export class MastrClient {
    * kept for {@link FILTER_COLUMNS_MAX_AGE_MS} (the filter check uses the same list): a long-running
    * caller (the MCP server) learns a code the register adds. A failed fetch is not kept, and a clock
    * set back doesn't stretch the hour.
+   *
+   * The fetch runs in the context of the caller that starts it: a transport that takes a per-call
+   * signal from the context (the MCP server's limiter) aborts it with that caller, so a lone
+   * caller's lookup never outlives it. Another caller waiting for that fetch, when it fails on the
+   * network (the starter cancelled or at its deadline), fetches once more on its own instead of
+   * failing with the starter's error.
    */
   cachedFilterColumns(category: UnitCategory): Promise<FilterColumn[]> {
+    return this.#sharedColumns(category, false);
+  }
+
+  #sharedColumns(category: UnitCategory, retried: boolean): Promise<FilterColumn[]> {
     const kept = this.#columns.get(category);
     const now = Date.now();
-    if (kept !== undefined && now - kept.at >= 0 && now - kept.at <= FILTER_COLUMNS_MAX_AGE_MS) return kept.columns;
+    if (kept !== undefined && now - kept.at >= 0 && now - kept.at <= FILTER_COLUMNS_MAX_AGE_MS) {
+      if (retried) return kept.columns;
+      // A waiter: the fetch carries the starter's signal; on a network failure it asks once itself.
+      return kept.columns.catch((err: unknown) => {
+        if (!(err instanceof MastrNetworkError)) throw err;
+        return this.#sharedColumns(category, true);
+      });
+    }
     const entry = { at: now, columns: this.filterColumns(category) };
     this.#columns.set(category, entry);
     entry.columns.catch(() => {
