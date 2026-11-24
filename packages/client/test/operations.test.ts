@@ -316,6 +316,27 @@ test("getUnit: the gas storage note only for a unit with storage figures", async
   assert.match(storage.status === "ok" ? storage.notes.join(" ") : "", /Gas storage: MaxEinspeicherleistung\/MaxAusspeicherleistung in kWh\/h, MaxArbeitsvolumen in kWh/);
 });
 
+test("getUnit: a row whose number isn't the one asked is the register's error, never another unit's record as the answer", async () => {
+  const live = registerOf(sampleRegister());
+  const answering = (row: Record<string, unknown>) =>
+    new MastrClient({
+      transport: makeMockTransport((req) => (new URL(req.url).pathname.includes("/GetFilterColumns") ? live(req) : jsonResponse({ Data: [row], Total: 1, Errors: null }))).transport,
+    });
+  for (const [asked, row] of [
+    ["SEE900000000001", { MaStRNummer: "SEE111111111111", EinheitName: "eine andere" }],
+    ["SEE900000000001", { EinheitName: "ohne Nummer" }],
+    ["EEG900000000001", { MaStRNummer: "SEE111111111111", EegAnlageMastrNummer: "EEG222222222222" }],
+  ] as const) {
+    await assert.rejects(
+      getUnit(answering(row), { mastrNumber: asked }),
+      (err: unknown) => err instanceof MastrParseError && new RegExp(`the register answered a row .* for ${asked}`).test(err.message),
+      `${asked} ${JSON.stringify(row)}`,
+    );
+  }
+  const right = await getUnit(answering({ MaStRNummer: "SEE111111111111", EegAnlageMastrNummer: "EEG222222222222" }), { mastrNumber: "EEG222222222222" });
+  assert.equal(right.status, "ok");
+});
+
 test("getUnit: no match is empty naming the number; an installation of several units is ambiguous; other numbers say how to search", async () => {
   const { client, log } = clientOn([unit("stromerzeugung", { EegAnlageMastrNummer: "EEG900000000001" }), unit("stromerzeugung", { EegAnlageMastrNummer: "EEG900000000001" })]);
   const none = await getUnit(client, { mastrNumber: "SEE111111111111" });

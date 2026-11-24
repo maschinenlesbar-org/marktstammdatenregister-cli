@@ -916,14 +916,14 @@ export async function searchUnits(client: MastrClient, input: SearchUnitsInput =
 // getUnit (mastr-unit)
 
 /** The MaStR numbers getUnit reads: the prefix, the category and the column it is filtered by. */
-const NUMBER_KINDS: Record<string, { category: UnitCategory; column: string; kind: string }> = {
-  SEE: { category: "stromerzeugung", column: COLUMN.unitNumber, kind: "electricity generation unit" },
-  SSE: { category: "stromerzeugung", column: "MaStR-Nr. der Speichereinheit", kind: "electricity storage unit" },
-  EEG: { category: "stromerzeugung", column: "MaStR-Nr. der EEG-Anlage", kind: "EEG installation" },
-  KWK: { category: "stromerzeugung", column: "MaStR-Nr. der KWK-Anlage", kind: "CHP (KWK) installation" },
-  SVE: { category: "stromverbrauch", column: COLUMN.unitNumber, kind: "electricity consumption unit" },
-  GEE: { category: "gaserzeugung", column: COLUMN.unitNumber, kind: "gas generation or storage unit" },
-  GVE: { category: "gasverbrauch", column: COLUMN.unitNumber, kind: "gas consumption unit" },
+const NUMBER_KINDS: Record<string, { category: UnitCategory; column: string; field: string; kind: string }> = {
+  SEE: { category: "stromerzeugung", column: COLUMN.unitNumber, field: "MaStRNummer", kind: "electricity generation unit" },
+  SSE: { category: "stromerzeugung", column: "MaStR-Nr. der Speichereinheit", field: "SpeicherEinheitMastrNummer", kind: "electricity storage unit" },
+  EEG: { category: "stromerzeugung", column: "MaStR-Nr. der EEG-Anlage", field: "EegAnlageMastrNummer", kind: "EEG installation" },
+  KWK: { category: "stromerzeugung", column: "MaStR-Nr. der KWK-Anlage", field: "KwkAnlageMastrNummer", kind: "CHP (KWK) installation" },
+  SVE: { category: "stromverbrauch", column: COLUMN.unitNumber, field: "MaStRNummer", kind: "electricity consumption unit" },
+  GEE: { category: "gaserzeugung", column: COLUMN.unitNumber, field: "MaStRNummer", kind: "gas generation or storage unit" },
+  GVE: { category: "gasverbrauch", column: COLUMN.unitNumber, field: "MaStRNummer", kind: "gas consumption unit" },
 };
 
 /** Prefixes of numbers that are no unit, and what to do instead. */
@@ -1020,6 +1020,13 @@ export async function getUnit(client: MastrClient, input: GetUnitInput): Promise
   await columnsOf(client, kind.category);
   const filter = buildFilter([{ name: kind.column, op: "eq", value: number }]);
   const { total, data } = await client.units(kind.category, { filter, pageSize: 10 });
+  // The register answers the unfiltered set when it ignores a filter: a row of another number is
+  // its error, never that unit's record given as the one asked for.
+  const stray = data.find((row) => row[kind.field] !== number);
+  if (stray !== undefined) {
+    const got = typeof stray[kind.field] === "string" ? cutForMessage(stray[kind.field] as string) : "no number";
+    throw new MastrParseError(`Unexpected answer: the register answered a row with ${kind.field} ${JSON.stringify(got)} for ${number}; it may have ignored the filter. Ask again.`);
+  }
   if (total === 0 || data.length === 0) {
     return {
       status: "empty",
