@@ -290,14 +290,21 @@ interface BuiltFilter {
 
 const DAY_MS = 86_400_000;
 
-/** `YYYY-MM-DD` moved by `days`, or a validation error for a day that isn't one. */
-function shiftDay(field: string, value: string, days: number): string {
+/**
+ * `YYYY-MM-DD` moved by `days`, or undefined when that leaves the years 1 to 9999 (a bound at the
+ * calendar's end, "on or before 9999-12-31", restricts nothing); a validation error for a day that
+ * isn't one. The year is set as written: `Date.UTC` reads 0–99 as 1900–1999.
+ */
+function shiftDay(field: string, value: string, days: number): string | undefined {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  const date = match === null ? NaN : Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  if (match === null || Number.isNaN(date) || new Date(date).toISOString().slice(0, 10) !== value.trim()) {
-    throw new MastrValidationError(`Invalid ${field}: expected a day as YYYY-MM-DD, got ${JSON.stringify(cutForMessage(value))}.`);
+  const day = new Date(0);
+  if (match !== null) day.setUTCFullYear(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (match === null || Number(match[1]) < 1 || day.toISOString().slice(0, 10) !== value.trim()) {
+    throw new MastrValidationError(`Invalid ${field}: expected a day from 0001-01-01 to 9999-12-31 as YYYY-MM-DD, got ${JSON.stringify(cutForMessage(value))}.`);
   }
-  return new Date(date + days * DAY_MS).toISOString().slice(0, 10);
+  const moved = new Date(day.getTime() + days * DAY_MS);
+  const year = moved.getUTCFullYear();
+  return year < 1 || year > 9999 ? undefined : moved.toISOString().slice(0, 10);
 }
 
 /** A capacity bound, checked: finite and not negative. */
@@ -392,11 +399,13 @@ async function buildUnitFilter(client: MastrClient, input: UnitFilterInput, omit
     if (from === undefined && to === undefined) return;
     columnNamed(columns, column, category, `${what}From`);
     if (from !== undefined) {
-      conditions.push({ name: column, op: "gt", value: shiftDay(`${what}From`, from, -1) });
+      const before = shiftDay(`${what}From`, from, -1);
+      if (before !== undefined) conditions.push({ name: column, op: "gt", value: before });
       words.push(`${column} on or after ${from.trim()}`);
     }
     if (to !== undefined) {
-      conditions.push({ name: column, op: "lt", value: shiftDay(`${what}To`, to, 1) });
+      const after = shiftDay(`${what}To`, to, 1);
+      if (after !== undefined) conditions.push({ name: column, op: "lt", value: after });
       words.push(`${column} on or before ${to.trim()}`);
     }
     if (from !== undefined && to !== undefined && from.trim() > to.trim()) {

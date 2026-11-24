@@ -76,8 +76,23 @@ test("capacity and date bounds are inclusive: the register's strict gt/lt are mo
   const newYear = await countUnits(client, { energySource: "Wind", commissionedFrom: "2025-01-01", commissionedTo: "2025-01-01" });
   assert.equal(newYear.status === "ok" && newYear.total, 1);
   assert.match(filters().at(-1)!, /Inbetriebnahmedatum der Einheit~gt~'2024-12-31'~and~Inbetriebnahmedatum der Einheit~lt~'2025-01-02'/);
-  await assert.rejects(countUnits(client, { commissionedFrom: "2025-02-30" }), /expected a day as YYYY-MM-DD/);
+  await assert.rejects(countUnits(client, { commissionedFrom: "2025-02-30" }), /expected a day from 0001-01-01 to 9999-12-31 as YYYY-MM-DD/);
   await assert.rejects(countUnits(client, { minCapacity: 10, maxCapacity: 5 }), /more than maxCapacity/);
+});
+
+test("a day bound at the calendar's ends is no restriction, years before 100 are read as written, year 0 is refused", async () => {
+  const { client, filters } = clientOn();
+  const all = await countUnits(client, { energySource: "Wind", status: "any" });
+  const toEnd = await countUnits(client, { energySource: "Wind", status: "any", commissionedTo: "9999-12-31", registeredTo: "9999-12-31" });
+  assert.equal(toEnd.status === "ok" && toEnd.total, all.status === "ok" && all.total);
+  assert.doesNotMatch(filters().at(-1)!, /~lt~|\+0100/, "no condition past the year 9999");
+  assert.deepEqual(toEnd.status === "ok" ? toEnd.searched.conditions.slice(1) : [], ["Inbetriebnahmedatum der Einheit on or before 9999-12-31", "Registrierungsdatum der Einheit on or before 9999-12-31"]);
+  const fromStart = await countUnits(client, { energySource: "Wind", status: "any", commissionedFrom: "0001-01-01" });
+  assert.equal(fromStart.status === "ok" && fromStart.total, all.status === "ok" && all.total);
+  assert.doesNotMatch(filters().at(-1)!, /~gt~/, "no condition before the year 1");
+  await countUnits(client, { energySource: "Wind", commissionedFrom: "0099-03-01", commissionedTo: "0099-12-31" });
+  assert.match(filters().at(-1)!, /Inbetriebnahmedatum der Einheit~gt~'0099-02-28'~and~Inbetriebnahmedatum der Einheit~lt~'0100-01-01'/, "the year 99, not 1999");
+  await assert.rejects(countUnits(client, { commissionedFrom: "0000-01-01" }), /expected a day from 0001-01-01 to 9999-12-31 as YYYY-MM-DD, got "0000-01-01"/);
 });
 
 test("by counts per code of one dropdown, largest first; a filter on that column narrows the codes", async () => {
