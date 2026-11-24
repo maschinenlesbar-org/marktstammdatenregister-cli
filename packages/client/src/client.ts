@@ -307,6 +307,13 @@ export class MastrClient {
     // A reply with no matches may carry `Data: null`; with a positive Total it must be an array.
     if (data === null && total === 0) return { total, data: [] };
     if (!Array.isArray(data)) throw shapeError(request, "a Data array");
+    // A row that isn't an object would fail whoever reads it (a TypeError, not an answer).
+    const odd = data.findIndex((row) => !isObject(row));
+    if (odd >= 0) {
+      const row: unknown = data[odd];
+      const kind = row === null ? "null" : Array.isArray(row) ? "an array" : `a ${typeof row}`;
+      throw shapeError(request, `a Data array of JSON objects (the unit rows), got ${kind} at index ${odd}`);
+    }
     // A page can't hold more rows than match, nor more than were asked for: such a reply
     // would print rows next to `"total": 0` (and the CLI's "0 results" note), or a page
     // larger than --page-size.

@@ -175,6 +175,9 @@ test("a malformed 200 envelope throws MastrParseError instead of reading as 0 ma
     [{ Data: [], Total: 1.5 }, "a numeric Total"],
     [{ Data: "not-an-array", Total: 3 }, "a Data array"],
     [{ Data: null, Total: 3 }, "a Data array"],
+    // Rows that aren't objects: a shape error, not a TypeError in whoever reads the rows.
+    [{ Data: [null, 42, "x", [1]], Total: 4 }, "a Data array of JSON objects (the unit rows), got null at index 0"],
+    [{ Data: [{ MaStRNummer: "SEE984033548619" }, [1]], Total: 2 }, "a Data array of JSON objects (the unit rows), got an array at index 1"],
   ];
   for (const [body, expected] of cases) {
     const { client } = clientFor(body);
