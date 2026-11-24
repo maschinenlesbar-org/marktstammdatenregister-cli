@@ -1,6 +1,6 @@
 {
   "name": "@maschinenlesbar.org/marktstammdatenregister-mcp",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "MCP server for the Marktstammdatenregister (MaStR), the Bundesnetzagentur's register of Germany's electricity and gas units: counts, searches and unit records by name, for AI agents (stdio and Streamable HTTP)",
   "type": "module",
   "bin": {
