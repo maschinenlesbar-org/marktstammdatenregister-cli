@@ -155,8 +155,11 @@ page) surfaces as an error and maps to the usage exit code.
 **Custom transports.** The engine enforces the transport contract itself, so the
 documented limits hold for a `fetch` or `node:http` transport too. Every call runs under
 the overall `timeoutMs` deadline: the request carries an `AbortSignal`
-(`HttpRequest.signal`, honoured by the default transport) that fires at the deadline, and
-the call rejects then whether the transport stops or not. `maxResponseBytes` is checked on
+(`HttpRequest.signal`, honoured by the default transport) that fires at the deadline, aborted
+with the timeout error as its reason, and the call rejects then whether the transport stops or
+not. The default transport stops with the signal's reason, and for a signal some other caller
+aborted (the MCP server's tool call: its deadline, a cancellation) it says "Request aborted by
+its caller before it finished", never a timeout it didn't have. `maxResponseBytes` is checked on
 the body any transport returns (the message names `--max-response-bytes` too). The default
 transport joins small chunks as they arrive (at 1024 chunks or 64 KiB), so the memory an
 answer holds follows its bytes, not the number of chunks a server sends: a Buffer per one-byte
